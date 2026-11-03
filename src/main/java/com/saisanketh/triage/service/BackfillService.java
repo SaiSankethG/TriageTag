@@ -1,0 +1,58 @@
+package com.saisanketh.triage.service;
+
+import com.saisanketh.triage.domain.Issue;
+import com.saisanketh.triage.source.IssuePage;
+import com.saisanketh.triage.source.IssueSource;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+/**
+ * Loads all of a repo's issues: fetches every page from the {@link IssueSource} and upserts each issue.
+ *
+ * <p>Why a separate class from {@link IssueService}: {@code @Transactional} on {@code upsert} only works
+ * when the call comes from <em>another</em> bean (it goes through Spring's proxy). If this loop lived
+ * in IssueService and called {@code this.upsert(...)}, the transaction would silently not start.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class BackfillService {
+
+    private static final int LOG_EVERY_PAGES = 10;
+
+    private final IssueSource issueSource;   // only an interface: this class knows nothing about GitHub
+    private final IssueService issueService;
+
+    public BackfillSummary backfill(String repo) {
+        long start = System.nanoTime();   // nanoTime is for measuring durations; it never jumps like wall-clock time
+        int pages = 0;
+        int inserted = 0;
+        int updated = 0;
+        int skipped = 0;
+
+        String cursor = null;                 // null = first page
+        do {
+            IssuePage page = issueSource.fetchPage(repo, cursor);
+            pages++;
+            skipped += page.skipped();
+            for (Issue issue : page.issues()) {
+                if (issueService.upsert(issue) == UpsertResult.INSERTED) {
+                    inserted++;
+                } else {
+                    updated++;
+                }
+            }
+            if (pages % LOG_EVERY_PAGES == 0) {
+                log.info("Backfill {}: {} pages, {} inserted, {} updated, {} skipped so far",
+                        repo, pages, inserted, updated, skipped);
+            }
+            cursor = page.nextCursor();
+        } while (cursor != null);            // only a null cursor means "no more pages"
+
+        long durationMs = (System.nanoTime() - start) / 1_000_000;
+        BackfillSummary summary = new BackfillSummary(repo, pages, inserted, updated, skipped, durationMs);
+        log.info("Backfill finished: {}", summary);
+        return summary;
+    }
+}

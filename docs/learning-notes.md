@@ -434,3 +434,68 @@ the same code without personal data.
 3. **Name a surprising value in GitHub's issue data.**
    `state_reason: "reopened"` on an *open* issue; `body` is sometimes `""` and sometimes `null`;
    ids are already bigger than a Java `int`.
+
+## M1 finish, step D: upsert and backfill loop (piece 5) (4 Nov 2026)
+
+Files: `service/IssueService.java`, `service/BackfillService.java`, `service/BackfillSummary.java`,
+`service/UpsertResult.java`, `Issue.updateFrom(...)`; tests `IssueServiceTest` (2), `BackfillServiceTest` (2).
+
+### What it does
+- `IssueService.upsert(issue)`: looks the issue up by `(source, externalId)`. Found -> copy the new data
+  onto our existing row (`updateFrom`) and save -> `UPDATED`. Not found -> save it -> `INSERTED`.
+- `BackfillService.backfill("owner/name")`: starts with cursor `null`, fetches a page, upserts each issue,
+  adds up the counts, follows `nextCursor` until it is `null`. Returns
+  `BackfillSummary(repo, pages, inserted, updated, skipped, durationMs)`, and logs progress every 10 pages.
+
+### Two deliberate differences from the step D prompt
+1. **`backfill` is in `BackfillService`, not `IssueService`.** See "self-invocation" below: inside one class,
+   `this.upsert()` would skip the transaction without any error.
+2. **`upsert` does not overwrite `duplicate_of` with null.** The prompt says "copy all fields", but GitHub's
+   JSON never contains `duplicate_of` (step F fills it). Copying null would erase the answer key every
+   time the backfill is re-run. So it's copied only when the incoming value is not null.
+
+### Basics used here
+- **`@Service`** (Spring): the same as `@Component` (Spring creates one instance and injects it),
+  but the name says "this holds business logic". Purely a label for readers.
+- **`@RequiredArgsConstructor`** (Lombok): writes a constructor for every `final` field.
+  *Before:* `public IssueService(IssueRepository issueRepository) { this.issueRepository = issueRepository; }`
+  *After:* `@RequiredArgsConstructor` on the class; Spring uses that constructor to inject the repository.
+- **`@Transactional`** (Spring): "run this method in one database transaction". Spring starts a transaction
+  before the method and commits after it (or rolls back if it throws a RuntimeException). It works by
+  wrapping the bean in a **proxy**: other beans call the proxy, the proxy opens the transaction, then
+  calls the real method.
+  **Self-invocation trap:** if a method in the *same* class calls `this.upsert()`, it calls the real object
+  directly, the proxy is skipped, and no transaction starts, silently. That's why the loop is in another bean.
+- **Managed entity / dirty checking** (JPA): an entity loaded inside a transaction is "managed": Hibernate
+  remembers its state, and at commit writes whatever changed (an `UPDATE`) without being asked. So
+  `issueRepository.save(row)` in the update path isn't strictly needed; it's there so the reader sees the write.
+- **Replacing labels in an `@ElementCollection`:** call `labels.clear(); labels.addAll(newLabels)` on the
+  *same* Set. Hibernate replaced our `HashSet` with its own tracking set (`PersistentSet`) when it loaded
+  the row; assigning a brand-new `Set` would throw that tracking away.
+- **`Optional<Issue>`** (Java): "an Issue, or nothing", instead of returning `null`. `isPresent()` / `get()`.
+- **Mockito** (testing): `@Mock IssueRepository` is a fake that does nothing until told;
+  `when(repo.find(...)).thenReturn(...)` gives it an answer; `verify(repo).save(x)` checks it was called.
+  `@InjectMocks` builds the real `IssueService` with the mocks. In `BackfillServiceTest`, `thenAnswer`
+  makes the mock remember saves in a `HashMap`, so the second run can "find" the first run's rows.
+- **`System.nanoTime()` for durations:** `currentTimeMillis()` is wall-clock time and can jump (NTP sync,
+  clock changes); `nanoTime()` only ever moves forward, so it's the right tool for "how long did it take".
+
+### One alternative I rejected
+**One transaction for the whole backfill** (put `@Transactional` on `backfill`). That would keep tens
+of thousands of entities in memory until the end, hold one very long transaction, and one bad issue on
+page 400 would roll back all 400 pages. One transaction per issue is slower, but simple and safe to resume.
+(A middle ground, one transaction per page, is a possible later optimisation.)
+
+### Likely interview questions
+1. **How does your backfill stay safe to run twice?**
+   Every issue is matched on `(source, external_id)`, the same columns as the database's unique constraint.
+   Found -> update, not found -> insert. The test runs the same data twice: the second run inserts 0.
+   If two runs raced, the unique constraint would reject the second insert instead of allowing a duplicate.
+2. **Why didn't you put `backfill` and `upsert` in the same class?**
+   `@Transactional` works through a Spring proxy. A call from inside the same class (`this.upsert()`)
+   bypasses the proxy, so no transaction starts and nothing warns you. Splitting into two beans means
+   `BackfillService` calls `IssueService` through the proxy.
+3. **What is dirty checking?**
+   Hibernate keeps a snapshot of every entity it loaded in the current transaction. At commit it compares
+   each entity with its snapshot and writes an `UPDATE` for whatever changed. So changing a field on a
+   managed entity is enough to save it.

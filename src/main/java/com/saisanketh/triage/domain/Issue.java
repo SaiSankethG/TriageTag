@@ -120,4 +120,34 @@ public class Issue {
     @OnDelete(action = OnDeleteAction.CASCADE)
     @Column(name = "label_name", nullable = false, length = 100)
     private Set<String> labels = new HashSet<>();
+
+    /**
+     * Copies the newer data from {@code newer} onto this row (used when a backfill sees an issue again).
+     * Not copied: id (ours), source and externalId (they are what matched the two).
+     * duplicateOf is only copied when {@code newer} has one: the tracker's JSON never contains it,
+     * so copying null would erase an answer key that an earlier step filled in.
+     */
+    public void updateFrom(Issue newer) {
+        this.repo = newer.repo;
+        this.number = newer.number;
+        this.title = newer.title;
+        this.body = newer.body;
+        this.state = newer.state;
+        this.stateReason = newer.stateReason;
+        this.issueType = newer.issueType;
+        this.authorAssociation = newer.authorAssociation;
+        this.milestone = newer.milestone;
+        this.htmlUrl = newer.htmlUrl;
+        this.createdAt = newer.createdAt;
+        this.updatedAt = newer.updatedAt;
+        this.closedAt = newer.closedAt;
+        this.raw = newer.raw;
+        if (newer.duplicateOf != null) {
+            this.duplicateOf = newer.duplicateOf;
+        }
+        // Change the contents of the set, not the set itself: Hibernate tracks this exact
+        // Set object to work out which issue_label rows to delete and insert.
+        this.labels.clear();
+        this.labels.addAll(newer.labels);
+    }
 }
