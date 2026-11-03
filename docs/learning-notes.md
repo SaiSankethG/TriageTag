@@ -136,3 +136,108 @@ only prove we called methods in a certain order, not that the URL or headers are
    It plugs in a fake HTTP layer that checks the outgoing request (URL, method, headers) and
    returns a canned response. The test is fast, works offline, never hits the rate limit, and can
    simulate cases that are hard to get from the real API, like a 404 or a page without a Link header.
+
+## M1 refactor + pieces 3 and 4: neutral IssueSource, Link-header paging, PR skip, mapper (3 Nov 2026)
+
+Files:
+- moved to `source/`: `IssueSource.java`, `IssuePage.java` (new shape)
+- `github/GitHubIssueSource.java` (paging + PR skip), new `github/GitHubIssueMapper.java`
+- tests: `GitHubIssueSourceTest.java` (8 tests), new `GitHubIssueMapperTest.java` (4 tests),
+  fixtures in `src/test/resources/github/`
+
+### What it does
+- **The interface now speaks only "our" language.**
+  `IssuePage fetchPage(String repo, String cursor)` returns `IssuePage(List<Issue> issues, String nextCursor)`.
+  Callers pass `null` for the first page, then keep passing back `nextCursor` until it is `null`.
+- **Paging (piece 3).** GitHub puts the next page's URL in the `Link` response header:
+  `<https://api.github.com/repositories/6296790/issues?...&after=Y3Vy...%3D&page=2>; rel="next"`.
+  `nextUrl()` finds the part marked `rel="next"` and strips the `< >`. That URL *is* the cursor.
+- **Pull requests skipped (piece 4).** GitHub's issues endpoint also returns PRs; only PRs have a
+  `pull_request` field, so we drop those.
+- **Mapping (piece 4).** `GitHubIssueMapper.toIssue(json)` copies each field into an `Issue`.
+  Nested fields: `type.name` -> issueType, `milestone.title` -> milestone, `labels[].name` -> labels.
+  The whole JSON goes into `raw` unchanged. `duplicate_of` stays null (a later step fills it).
+
+### Why the interface hides GitHub details
+Before the refactor, `IssuePage` returned GitHub JSON and GitHub's `Link` header, and took
+`owner, repo` separately. So any caller (the upsert service, the backfill endpoint) would have
+to know GitHub's JSON field names and how GitHub paging works. Now:
+- **Callers depend only on `Issue` and an opaque cursor.** The upsert service in piece 5 never
+  imports anything from `github/`. If GitHub changes its paging (it already moved from `page=N`
+  to an encoded `after=` cursor), only `GitHubIssueSource` changes.
+- **A Jira source fits without changing callers.** Jira pages with `startAt` numbers, not Link
+  headers. A `JiraIssueSource` can use `"100"` as its cursor; the caller's loop stays the same.
+- **Tests get easier.** Piece 5 can test the upsert with a tiny fake `IssueSource` that returns
+  hand-made `Issue` objects, without any HTTP or JSON.
+- The package name says the same thing: `source` is neutral, `github` is one implementation.
+This is the **Dependency Inversion** idea: high-level code (backfill) depends on an
+abstraction (`IssueSource`), and low-level details (GitHub HTTP) also depend on it.
+
+### Why this way (other choices)
+- **Mapper in its own class**: `GitHubIssueSource` does HTTP and paging; `GitHubIssueMapper` does
+  JSON -> Issue. Each can be tested alone: the mapper test needs no fake server at all.
+- **Repo name taken from GitHub's `repository_url`, not from what the user typed**: GitHub accepts
+  `Spring-Projects/Spring-Boot` in URLs, but then the same repo would be stored under two
+  spellings. GitHub's own value is always the same.
+- **`String.valueOf(json.get("id").asLong())`**: real ids are already bigger than an `int`
+  (#52529 has id 6154714728), so `asInt()` would give a wrong number.
+- **`URI.create(cursor)`, not `.uri(cursor)`**: the cursor is already URL-encoded (`%3D` means `=`).
+  A plain string is treated as a template and encoded *again* (`%3D` -> `%253D`), and GitHub would
+  get a broken cursor. Checked: switching to `.uri(cursor)` makes the paging test fail with
+  exactly that `%253D`.
+- **Only follow cursors that start with `https://api.github.com/`**: every request carries our
+  token. If a bad cursor pointed at another server, we'd send it the token. Note the trailing
+  `/`: without it, `https://api.github.com.evil.example.com` would pass the check.
+- **Loop until `nextCursor` is null, not until a page is empty**: after skipping PRs, a page can
+  have zero issues and still have more pages behind it.
+
+### One alternative I rejected
+**Paging by page number** (`?page=1`, `?page=2`, ... until an empty page). It looks simpler, but
+GitHub's real next links use an `after=` cursor, the Link header is the documented way to page,
+and a "stop on empty page" loop would stop too early on a page that held only PRs.
+
+### Basics: the annotations and libraries used here
+- **`@Component`** (Spring): marks a class so Spring creates one instance of it at startup (a "bean")
+  and can hand it to other classes.
+  *Before:* `GitHubIssueMapper mapper = new GitHubIssueMapper();` written by hand everywhere.
+  *After:* put `@Component` on the class, and Spring creates it once and passes it in.
+- **Constructor injection + `@Autowired`**: Spring calls the constructor and fills each parameter
+  with a matching bean. That's how `GitHubIssueSource` gets the mapper.
+  *Example:* `public GitHubIssueSource(..., GitHubIssueMapper mapper)` -> Spring passes the mapper.
+  `@Autowired` is only needed here because the class has two constructors, so Spring must be told
+  which one to use. With a single constructor, Spring uses it automatically.
+- **`@Value("${github.token}")`** (Spring): fills a parameter from configuration.
+  *Before:* `String token = System.getenv("GITHUB_TOKEN");` *After:* `@Value("${github.token}") String token`,
+  and `application.yml` says `token: ${GITHUB_TOKEN:}` (env var, or empty).
+- **`@Slf4j`** (Lombok): generates a logger field for you.
+  *Before:* `private static final Logger log = LoggerFactory.getLogger(GitHubIssueSource.class);`
+  *After:* `@Slf4j` on the class, then just `log.warn(...)`.
+- **`record`** (Java 16+): a short way to write a class that only holds data.
+  *Before:* a class with 2 private final fields, a constructor, 2 getters, `equals`, `hashCode`, `toString`.
+  *After:* `public record IssuePage(List<Issue> issues, String nextCursor) {}`; read with `page.issues()`.
+- **`JsonNode`** (Jackson 3, package `tools.jackson.databind`): a tree view of any JSON.
+  `json.get("milestone")` gives a child node, `.asString()` / `.asInt()` / `.asLong()` read values,
+  `.has("pull_request")` checks for a field, `.isNull()` is true for JSON `null`.
+  *Example:* `{"type": {"name": "Bug"}}` -> `json.get("type").get("name").asString()` is `"Bug"`.
+  `json.toString()` writes the node back out as JSON text (used for `raw`).
+- **`ParameterizedTypeReference<List<JsonNode>>`** (Spring): Java forgets generic types at runtime,
+  so `List<JsonNode>.class` can't be written. This small anonymous subclass (`{}` at the end)
+  keeps the full type so Spring knows to build a list of `JsonNode`.
+- **`MockRestServiceServer`** (spring-test): sits inside RestClient instead of the real HTTP
+  connection. `expect(requestTo(url))` says what request must arrive, `andRespond(withSuccess(...))`
+  says what to answer. Expectations are checked in order, so the 2-page test also proves page 2
+  was asked for *after* page 1, using exactly the cursor URL.
+
+### Likely interview questions
+1. **Why does `IssueSource` return a cursor string instead of a page number or GitHub's Link header?**
+   Each tracker pages differently (GitHub: Link header URLs with an encoded `after` cursor; Jira:
+   `startAt` numbers). An opaque cursor lets every source keep its own method, while callers
+   always run the same loop: pass the cursor back until it is null.
+2. **What could go wrong if you followed any cursor URL you were given?**
+   Every request sends `Authorization: Bearer <token>`. A cursor pointing at another host would
+   leak the token there (and it's a form of SSRF). So we only follow URLs that start with
+   `https://api.github.com/`, including the slash, so `api.github.com.evil.com` is rejected.
+3. **How do you know a GitHub item is a pull request, and why filter it in the source rather than later?**
+   GitHub's issues endpoint returns PRs too, and only PRs carry a `pull_request` field. Filtering
+   in the GitHub source keeps that GitHub quirk inside the GitHub code: callers only ever see real
+   issues, and a Jira source never needs a PR concept.

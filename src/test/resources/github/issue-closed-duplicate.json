@@ -1,0 +1,23 @@
+{
+  "url": "https://api.github.com/repos/octo-org/hello/issues/42",
+  "repository_url": "https://api.github.com/repos/octo-org/hello",
+  "html_url": "https://github.com/octo-org/hello/issues/42",
+  "id": 2800000042,
+  "number": 42,
+  "title": "Startup fails when port 8080 is in use",
+  "user": {"login": "example-user", "id": 1},
+  "labels": [
+    {"id": 11, "name": "type: bug", "color": "d73a4a"},
+    {"id": 12, "name": "status: duplicate", "color": "cfd3d7"}
+  ],
+  "state": "closed",
+  "milestone": {"id": 7, "number": 3, "title": "3.4.2"},
+  "comments": 2,
+  "created_at": "2024-03-01T10:15:30Z",
+  "updated_at": "2024-03-02T08:00:00Z",
+  "closed_at": "2024-03-02T07:59:59Z",
+  "author_association": "CONTRIBUTOR",
+  "type": {"id": 9, "name": "Bug"},
+  "body": "Steps to reproduce: start two instances.",
+  "state_reason": "duplicate"
+}
