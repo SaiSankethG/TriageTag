@@ -20,6 +20,7 @@ CREATE TABLE issue (
   created_at         timestamptz  NOT NULL,      -- replay test runs in this order
   updated_at         timestamptz  NOT NULL,      -- next backfill fetches only what changed
   closed_at          timestamptz,                -- NULL while open
+  duplicate_of       integer,                    -- answer key: number of the original issue (same repo); NULL unless closed as a duplicate. Filled in M1 step 'store the answer key'
   raw                jsonb        NOT NULL,      -- full GitHub JSON, so we can re-process without re-downloading
   CONSTRAINT uq_issue_source_external UNIQUE (source, external_id)  -- re-runs update, never duplicate
 );
