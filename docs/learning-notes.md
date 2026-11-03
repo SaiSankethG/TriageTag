@@ -71,3 +71,68 @@ Worth switching before M3, see the gotcha below.
    null before save and set after, so the hash changes. Its `toString` can trigger lazy loading
    (or a `LazyInitializationException`) and dump huge fields. Use `@Getter`/`@Setter` and only
    write `equals`/`hashCode` if you need them (based on the id or the natural key).
+
+## M1 piece 2: IssueSource + GitHubIssueSource, one page (3 Nov 2026)
+
+Files:
+- `src/main/java/com/saisanketh/triage/github/IssueSource.java`
+- `src/main/java/com/saisanketh/triage/github/IssuePage.java`
+- `src/main/java/com/saisanketh/triage/github/GitHubIssueSource.java`
+- `src/test/java/com/saisanketh/triage/github/GitHubIssueSourceTest.java`
+- `src/main/resources/application.yml` (new `github:` block)
+
+### What it does
+- `IssueSource` is an interface with one method: `fetchPage(owner, repo)`. The rest of the app
+  will depend on this interface, not on GitHub directly.
+- `IssuePage` is a Java `record` (a small immutable data class) holding two things: the list of
+  issues as raw JSON (`JsonNode`), and the raw `Link` header (which tells us the URL of the next
+  page; piece 3 reads it).
+- `GitHubIssueSource` implements the interface. It sends
+  `GET https://api.github.com/repos/{owner}/{repo}/issues?state=all&per_page=100` with three headers:
+  `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2022-11-28` (pins the API
+  version so GitHub can't change the response under us) and `Authorization: Bearer <token>`.
+- The token comes from the environment: `application.yml` has `token: ${GITHUB_TOKEN:}`, which
+  means "use the env var GITHUB_TOKEN, or empty if it isn't set". The code never contains a token.
+
+### Why this way
+- **RestClient**: Spring's modern synchronous HTTP client (Spring 6.1+). It reads like a sentence
+  (`get().uri(...).retrieve().toEntity(...)`) and throws an exception on 4xx/5xx by default.
+- **`toEntity(...)`, not `body(...)`**: `body` gives only the JSON; `toEntity` also gives the
+  response headers, and we need the `Link` header.
+- **URI template `{owner}/{repo}`**: RestClient fills in and URL-encodes the values, so a strange
+  repo name can't break the URL.
+- **`JsonNode`, not a Java class per field**: we store the full JSON in the `raw` column anyway,
+  and piece 4 picks out the fields it needs. Note: Spring Boot 4 uses **Jackson 3**, so the
+  import is `tools.jackson.databind.JsonNode` (Jackson 2 was `com.fasterxml.jackson...`).
+- **No token = warning, not a crash**: public repos work without a token, but only for 60
+  requests/hour (5,000 with a token). Crashing at startup would also stop work that
+  doesn't touch GitHub.
+- **Two constructors**: Spring uses the public `@Autowired` one, which reads the config. The test
+  uses the package-private one and passes in a `RestClient.Builder` bound to a fake server.
+  Spring Boot 4 only auto-configures a `RestClient.Builder` bean if the `spring-boot-restclient`
+  module is on the classpath, and it isn't (adding it would be a new dependency), so we
+  call `RestClient.builder()` ourselves.
+- **Test with `MockRestServiceServer`**: it replaces the HTTP layer inside RestClient, so the test
+  checks the real URL, headers and JSON parsing, but never touches the network. 4 tests:
+  correct request + items + Link header; last page has no Link header; no token = no
+  `Authorization` header; 404 throws `HttpClientErrorException.NotFound`.
+
+### One alternative I rejected
+**Mocking `RestClient` itself with Mockito.** RestClient is a fluent chain
+(`get()` -> `uri()` -> `retrieve()` -> ...), so you'd have to mock every step, and the test would
+only prove we called methods in a certain order, not that the URL or headers are right.
+`MockRestServiceServer` tests what actually goes over the wire.
+
+### Likely interview questions
+1. **Why put an interface (`IssueSource`) in front of GitHub?**
+   So the code that uses it (backfill, upsert) doesn't depend on GitHub. A Jira source can
+   implement the same interface, and tests can pass in a fake. The tradeoff is one extra file,
+   which is worth it here because the schema is already designed to work with any tracker.
+2. **How do you keep the GitHub token out of the code and out of git?**
+   It is only in an environment variable. `application.yml` says `${GITHUB_TOKEN:}`, so Spring
+   reads it at startup. The repo only contains the variable's *name*. In production it would come
+   from a secret store and be injected as an env var.
+3. **What does `MockRestServiceServer` do, and why is it better than calling the real API in a unit test?**
+   It plugs in a fake HTTP layer that checks the outgoing request (URL, method, headers) and
+   returns a canned response. The test is fast, works offline, never hits the rate limit, and can
+   simulate cases that are hard to get from the real API, like a 404 or a page without a Link header.

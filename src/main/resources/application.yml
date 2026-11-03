@@ -11,6 +11,10 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
 
+github:
+  api-url: https://api.github.com
+  token: ${GITHUB_TOKEN:}   # from the environment; empty if not set. Never put a real token here.
+
 management:
   endpoints:
     web:
