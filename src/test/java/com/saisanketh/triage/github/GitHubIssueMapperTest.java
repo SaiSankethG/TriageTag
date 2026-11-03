@@ -44,6 +44,33 @@ class GitHubIssueMapperTest {
     }
 
     @Test
+    void mapsEveryFieldOfAnOpenIssue() throws IOException {
+        JsonNode node = readFixture("issue-open-reopened.json");
+
+        Issue issue = mapper.toIssue(node);
+
+        assertThat(issue.getId()).isNull();
+        assertThat(issue.getSource()).isEqualTo(SourceType.GITHUB);
+        assertThat(issue.getExternalId()).isEqualTo("2800000044");
+        assertThat(issue.getRepo()).isEqualTo("octo-org/hello");
+        assertThat(issue.getNumber()).isEqualTo(44);
+        assertThat(issue.getTitle()).isEqualTo("Support YAML anchors in config files");
+        assertThat(issue.getBody()).isEmpty();                      // GitHub sent "", not null
+        assertThat(issue.getState()).isEqualTo("open");
+        assertThat(issue.getStateReason()).isEqualTo("reopened");   // open issues can have a reason too
+        assertThat(issue.getIssueType()).isEqualTo("Feature");
+        assertThat(issue.getAuthorAssociation()).isEqualTo("MEMBER");
+        assertThat(issue.getMilestone()).isNull();
+        assertThat(issue.getHtmlUrl()).isEqualTo("https://github.com/octo-org/hello/issues/44");
+        assertThat(issue.getCreatedAt()).isEqualTo(Instant.parse("2025-06-10T14:20:00Z"));
+        assertThat(issue.getUpdatedAt()).isEqualTo(Instant.parse("2025-07-01T09:30:15Z"));
+        assertThat(issue.getClosedAt()).isNull();
+        assertThat(issue.getDuplicateOf()).isNull();
+        assertThat(issue.getLabels()).containsExactly("type: enhancement");
+        assertThat(json.readTree(issue.getRaw())).isEqualTo(node);
+    }
+
+    @Test
     void keepsTheFullJsonInRaw() throws IOException {
         JsonNode node = readFixture("issue-closed-duplicate.json");
 

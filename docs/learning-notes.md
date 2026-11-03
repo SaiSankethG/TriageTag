@@ -392,3 +392,45 @@ but it wasn't asked for, and the retry already covers running out.)
 3. **How do you test code that waits for 30 seconds without the test taking 30 seconds?**
    Inject time and waiting: a fixed `Clock` decides "now", and a fake `Sleeper` records how long
    the code *would* sleep. The test then checks the exact wait (31 s) instantly.
+
+## M1 finish, step C: check the mapper against the list, fill the test gap (4 Nov 2026)
+
+Files: `GitHubIssueMapperTest.java` (5 tests), new fixture `src/test/resources/github/issue-open-reopened.json`.
+
+### What it does
+`GitHubIssueMapper` and the PR skip already existed (pieces 3+4, step A). I checked every item in the
+step C list against the code: source, externalId (id as text), repo, number, title, body, state,
+stateReason, issueType (`type.name`), authorAssociation, milestone (`milestone.title`), htmlUrl, the
+three times as `Instant`, labels, raw, `duplicateOf` left null, PRs skipped and counted. All present.
+The one gap: the open-issue test only checked the null fields. Now there is a **realistic open issue**
+(full GitHub shape: `node_id`, `user`, `assignees`, `reactions`, a full `type` object...) and the test
+checks every field, the same way as the closed-as-duplicate one.
+
+### Things the new fixture proves
+- **Open issues can have a `state_reason`**: a reopened issue is `state: open`, `state_reason: reopened`.
+  So "state_reason is null while open" (as the schema comment says) is *usually* true, not always.
+- **`body` can be `""` as well as `null`**: GitHub sends both for "no description". We store what GitHub
+  sent. (Step-later idea: treat both as "missing details".)
+- **Fields we don't map are still kept**: `raw` read back equals the input, including `reactions` and `user`.
+
+### Basics: test fixtures in `src/test/resources`
+Files in `src/test/resources` are put on the test classpath by Maven. `getClass().getResourceAsStream("/github/x.json")`
+opens `src/test/resources/github/x.json`. It's better than a giant string in the test: the JSON is
+readable, an editor can check it, and several tests can share it.
+
+### One alternative I rejected
+**Saving real GitHub JSON (e.g. spring-boot #52529) as the fixture.** It would be maximally realistic,
+but it includes a real person's login and avatar, and the schema deliberately doesn't store author
+logins. A made-up issue with the real *shape* (field names checked against #52529 with curl) tests
+the same code without personal data.
+
+### Likely interview questions
+1. **How do you know your mapper matches the real API, not just your own test data?**
+   The field names in the fixtures were checked against a real response (`curl` + `jq` on #52529), and
+   the paging shape against a real Link header. The fixtures copy that shape with made-up values.
+2. **Why test with a full realistic JSON instead of only the fields you read?**
+   Real JSON has many extra and nested fields (`type` is an object, labels are objects with colors).
+   A full fixture proves the mapper ignores what it should and that `raw` keeps everything.
+3. **Name a surprising value in GitHub's issue data.**
+   `state_reason: "reopened"` on an *open* issue; `body` is sometimes `""` and sometimes `null`;
+   ids are already bigger than a Java `int`.
