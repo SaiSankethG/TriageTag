@@ -12,7 +12,7 @@ CREATE TABLE issue (
   title              text         NOT NULL,
   body               text,                       -- GitHub allows an empty body
   state              varchar(20)  NOT NULL,      -- open / closed
-  state_reason       varchar(30),                -- completed / not_planned / duplicate / reopened; NULL while open
+  state_reason       varchar(30),                -- completed / not_planned / duplicate / reopened; NULL while open AND on old closed issues (pre-2022), so the replay also uses the "status: duplicate" label
   issue_type         varchar(50),                -- Bug / Feature; NULL when the repo doesn't use issue types
   author_association varchar(30)  NOT NULL,      -- OWNER / MEMBER / CONTRIBUTOR / NONE ...
   milestone          varchar(100),               -- e.g. '3.4.2'; for the "already fixed?" hint
