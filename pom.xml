@@ -10,10 +10,10 @@
         <relativePath/>
     </parent>
     <groupId>com.saisanketh</groupId>
-    <artifactId>incident-copilot</artifactId>
+    <artifactId>issue-triage-assistant</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>incident-copilot</name>
-    <description>AI incident copilot for microservices</description>
+    <name>issue-triage-assistant</name>
+    <description>Maintainer-side GitHub issue triage assistant</description>
     <properties>
         <java.version>21</java.version>
     </properties>

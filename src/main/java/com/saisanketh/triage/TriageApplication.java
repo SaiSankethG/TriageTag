@@ -1,12 +1,12 @@
-package com.saisanketh.incidentcopilot;
+package com.saisanketh.triage;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class IncidentCopilotApplication {
+public class TriageApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(IncidentCopilotApplication.class, args);
+        SpringApplication.run(TriageApplication.class, args);
     }
 }

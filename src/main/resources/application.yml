@@ -1,6 +1,6 @@
 spring:
   application:
-    name: incident-copilot
+    name: issue-triage-assistant
   datasource:
     url: jdbc:postgresql://localhost:5432/copilot
     username: copilot
