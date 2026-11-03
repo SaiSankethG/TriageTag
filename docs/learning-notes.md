@@ -294,3 +294,35 @@ what it left out, so it reports it.
 3. **What happens when you add a field to a Java record that is already used?**
    The canonical constructor gets a new parameter, so every existing `new` call fails to compile
    until it passes a value. It's a breaking change, and the compiler helps by finding every call site.
+
+## Setup change: Postgres on host port 5433, database renamed to `triage` (4 Nov 2026)
+
+### What it does
+`docker-compose.yml` now maps `"5433:5432"`: port 5433 on the Mac goes to port 5432 inside the
+container. `application.yml` connects to `jdbc:postgresql://localhost:5433/triage`.
+
+### Why
+A Homebrew Postgres on the Mac already listens on `localhost:5432`, so the app was connecting
+to *that* one (which has no `copilot` user) instead of the Docker one. The left number in a port
+mapping is the host side, so changing only it avoids the clash; inside the container Postgres
+still uses its normal port. The DB name `copilot` was left over from the old project name.
+
+### Gotcha: `POSTGRES_DB` only works on an empty volume
+The postgres image creates `POSTGRES_DB` only the *first* time it starts with an empty data
+volume. Our volume already existed, so changing `copilot` -> `triage` in the file did nothing on
+its own; I ran `CREATE DATABASE triage OWNER copilot` once. A fresh clone gets `triage`
+automatically. (The old, empty `copilot` database is still in the volume and can be dropped.)
+
+### One alternative I rejected
+**Stopping the Homebrew Postgres** (`brew services stop postgresql`). It works, but it changes
+sai's machine outside this project and breaks again the next time that service starts.
+
+### Likely interview questions
+1. **In `"5433:5432"`, which side is which?** Left = host (your machine), right = container.
+   The app connects to the host side, `localhost:5433`.
+2. **You changed `POSTGRES_DB` but the database didn't appear. Why?** The init step only runs
+   when the data directory is empty; an existing volume keeps its old databases. Create it by
+   hand or (if the data doesn't matter) recreate the volume with `docker-compose down -v`.
+3. **How did you find the port clash?** The error was `role "copilot" does not exist`, which is
+   odd for a DB we created with that user. `lsof -iTCP:5432 -sTCP:LISTEN` showed two
+   listeners: a local `postgres` on 127.0.0.1 and Colima's forwarder on `*`. `localhost` hit the local one first.

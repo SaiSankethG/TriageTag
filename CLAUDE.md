@@ -21,6 +21,7 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 - Build:         `./mvnw -q -DskipTests package`
 - Test:          `./mvnw test`
 - Health check:  `curl localhost:8080/actuator/health`  (expect UP)
+- Note: on sai's Mac use `docker-compose` (not `docker compose`); Docker Postgres is on host port 5433, DB `triage` (5432 is a local Homebrew Postgres).
 
 ## Package layout (com.saisanketh.triage)
 - `github`     GitHub REST client, webhook receiver, signature check

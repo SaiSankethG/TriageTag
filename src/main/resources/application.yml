@@ -2,7 +2,7 @@ spring:
   application:
     name: issue-triage-assistant
   datasource:
-    url: jdbc:postgresql://localhost:5432/copilot
+    url: jdbc:postgresql://localhost:5433/triage
     username: copilot
     password: copilot
   jpa:
