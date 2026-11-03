@@ -36,6 +36,8 @@ It is sai's interview portfolio project. Clarity beats cleverness.
    every line in an interview. So after EVERY piece: explain it in plain, simple English
    (what it does, why this way, one alternative you rejected), then list 3 likely
    interview questions about it with short answers. Add these to docs/learning-notes.md.
+   Assume sai is new to Lombok, JPA/Hibernate annotations and Spring internals: explain
+   each annotation or library from the basics (what it is, a tiny before/after example).
 2. Build one piece at a time, in the order of the build plan. Keep each change small.
    No clever tricks: clarity beats cleverness.
 3. Every service class gets unit tests. Run `./mvnw test` before saying a piece is done.
