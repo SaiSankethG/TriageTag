@@ -326,3 +326,69 @@ sai's machine outside this project and breaks again the next time that service s
 3. **How did you find the port clash?** The error was `role "copilot" does not exist`, which is
    odd for a DB we created with that user. `lsof -iTCP:5432 -sTCP:LISTEN` showed two
    listeners: a local `postgres` on 127.0.0.1 and Colima's forwarder on `*`. `localhost` hit the local one first.
+
+## M1 finish, step B: oldest-first paging and rate limits (4 Nov 2026)
+
+Files: `github/GitHubIssueSource.java`, `GitHubIssueSourceTest.java` (14 tests).
+Link-header paging was already done (pieces 3+4); this step fills the gaps.
+
+### What it does
+- **Oldest first**: the first page URL now ends in `&sort=created&direction=asc`. GitHub keeps
+  those settings inside the next-page cursor, so every page stays in date order. Checked on real
+  data: spring-petclinic's first item is #1 from 2013.
+- **Logs the rate limit every 10 pages**: GitHub sends `X-RateLimit-Remaining` (calls left this
+  hour) and `X-RateLimit-Reset` (when the count refills, as Unix seconds) on every answer. Every
+  10th page we log e.g. `Fetched 50 pages; rate limit remaining: 4950 (resets at 2026-11-04T11:00:00Z)`.
+- **Waits and retries on a rate limit**: if GitHub answers 403 or 429 *because of the rate limit*,
+  we wait and ask for the same page again, at most 3 times. How long we wait, in GitHub's order:
+  1. `Retry-After: 5` -> 5 seconds.
+  2. `X-RateLimit-Remaining: 0` -> until `X-RateLimit-Reset`, plus 1 second in case our clock differs.
+  3. Neither (some "secondary" limits) -> 1 minute, as GitHub's docs advise.
+  After 3 retries we stop with `"GitHub rate limit still exceeded after 3 retries for ..."`.
+- **A 403 that is not a rate limit fails at once** (e.g. "Resource not accessible by personal
+  access token"): retrying would never help, so we throw with a clear message that tells you to
+  check the token. No error message contains the token (a test checks that).
+
+### How we tell "slow down" from "not allowed"
+GitHub uses 403 for both. It counts as a rate limit only if: the status is 429, or it's a 403 *and*
+(`X-RateLimit-Remaining` is `0`, or a `Retry-After` header is present, or the message says
+"rate limit"). Anything else is a real refusal.
+
+### Basics used here
+- **`Supplier<T>`** (Java): an object that holds "some code that gives back a T", run with `get()`.
+  We need it because a retry must run *the same HTTP call again*.
+  *Before:* the call is written once and runs once: `restClient.get()...toEntity(...)`.
+  *After:* `getWithRateLimitRetry("first page", () -> restClient.get()...toEntity(...))`; the helper calls
+  `request.get()` as many times as it needs.
+- **`java.time.Clock`**: "what time is it?" as an object. Code that calls `Instant.now()` can't be tested
+  at a fixed time; code that calls `clock.instant()` can. The app uses `Clock.systemUTC()`, the test uses
+  `Clock.fixed(2026-11-04T10:00:00Z)`, so "reset in 30 s" really means 30 s.
+- **The `Sleeper` interface**: same idea for waiting. The app passes `duration -> Thread.sleep(duration)`;
+  the test passes `waits::add`, which just records the wait. So a test of "wait 31 seconds"
+  finishes in milliseconds and can check the exact number.
+- **`AtomicInteger`**: a counter that stays correct when two threads add to it at once (`count++` on a
+  plain `int` can lose updates). The source is one shared Spring bean, and two backfills could run together.
+- **`Thread.currentThread().interrupt()` after `InterruptedException`**: when someone asks a sleeping thread
+  to stop, Java throws `InterruptedException` and *clears* the "please stop" flag. Setting it again
+  passes the request on to whoever runs the thread, instead of silently swallowing it.
+- **`MockRestServiceServer` with `times(4)`**: the same expectation answers 4 requests, which lets the
+  test simulate "rate limited on every try".
+
+### One alternative I rejected
+**Spring Retry (`@Retryable`)** or **Resilience4j**. Both are good, but they're new dependencies
+(not allowed without asking), and the wait time here comes from *GitHub's headers*, which
+fixed-backoff annotations don't read easily. A 30-line loop is easy to read and test.
+(Another rejected idea: wait proactively when `X-RateLimit-Remaining` gets low. It's nicer to GitHub,
+but it wasn't asked for, and the retry already covers running out.)
+
+### Likely interview questions
+1. **How do you handle GitHub's rate limit?**
+   On 403/429 with rate-limit signs, wait as long as GitHub says (`Retry-After`, else until
+   `X-RateLimit-Reset`, else 1 minute), then retry the same page, at most 3 times; then fail clearly.
+   Every 10 pages we log how many calls are left. With a token the limit is 5,000 requests/hour.
+2. **Why not retry every 403?**
+   A 403 can also mean "your token can't read this repo". Retrying that wastes time and hides the
+   real problem. We only retry when the headers or message say it's a rate limit.
+3. **How do you test code that waits for 30 seconds without the test taking 30 seconds?**
+   Inject time and waiting: a fixed `Clock` decides "now", and a fake `Sleeper` records how long
+   the code *would* sleep. The test then checks the exact wait (31 s) instantly.
