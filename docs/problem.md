@@ -8,6 +8,17 @@ Maintainers spend minutes on every new issue finding duplicates, labelling and a
 missing details; small teams fall behind, and nothing tells them privately, with a score,
 "this is probably #N".
 
+## Why I chose this problem
+I listed about 60 real-world problems my stack (Java, Spring Boot, Kafka, Postgres) could
+help with, across government, fintech and climate. I shortlisted 6 and checked each for two
+things: is there public data, and can I measure whether a solution works? Two survived:
+verifying satellite wildfire alerts (NASA FIRMS) and duplicate-issue triage. I dropped the
+wildfire idea because the ground truth sits with forest departments, so I couldn't prove
+accuracy on my own. I'd also felt the triage pain myself: in my team, people often raised
+issues that were already reported, and it took days to reproduce one and confirm
+"duplicate, already fixed". On GitHub, spring-boot alone has over 2,000 issues that
+maintainers marked as duplicates by hand, a public answer key I can measure against.
+
 ## Who has the pain?
 Maintainers of popular open-source repos. Two kinds:
 - **Large paid teams** (e.g. spring-projects/spring-boot). Triage is fast: in 3 duplicates
