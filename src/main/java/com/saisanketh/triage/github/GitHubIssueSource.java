@@ -68,15 +68,18 @@ public class GitHubIssueSource implements IssueSource {
                 : fetchNextPage(cursor);
 
         List<Issue> issues = new ArrayList<>();
+        int skipped = 0;
         List<JsonNode> items = response.getBody() == null ? List.of() : response.getBody();
         for (JsonNode item : items) {
-            if (!mapper.isPullRequest(item)) {
+            if (mapper.isPullRequest(item)) {
+                skipped++;               // GitHub mixes PRs into the issues list; we only keep issues
+            } else {
                 issues.add(mapper.toIssue(item));
             }
         }
 
         String nextCursor = nextUrl(response.getHeaders().getFirst(HttpHeaders.LINK));
-        return new IssuePage(issues, nextCursor);
+        return new IssuePage(issues, nextCursor, skipped);
     }
 
     private ResponseEntity<List<JsonNode>> fetchFirstPage(String repo) {

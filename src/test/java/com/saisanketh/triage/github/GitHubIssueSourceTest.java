@@ -82,17 +82,34 @@ class GitHubIssueSourceTest {
         assertThat(first.nextCursor()).isEqualTo(SECOND_PAGE_URL);
         assertThat(second.issues()).extracting(Issue::getNumber).containsExactly(3);
         assertThat(second.nextCursor()).isNull();
+        assertThat(first.skipped()).isZero();
+        assertThat(second.skipped()).isZero();
         server.verify();
     }
 
     @Test
-    void skipsPullRequests() {
+    void skipsAndCountsPullRequests() {
         server.expect(requestTo(FIRST_PAGE_URL))
                 .andRespond(withSuccess(array(issue(1), pullRequest(2), issue(3)), MediaType.APPLICATION_JSON));
 
         IssuePage page = source("test-token").fetchPage(REPO, null);
 
         assertThat(page.issues()).extracting(Issue::getNumber).containsExactly(1, 3);
+        assertThat(page.skipped()).isEqualTo(1);
+    }
+
+    @Test
+    void pageWithOnlyPullRequestsStillHasANextCursor() {
+        server.expect(requestTo(FIRST_PAGE_URL))
+                .andRespond(withSuccess(array(pullRequest(1), pullRequest(2)), MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.LINK, "<" + SECOND_PAGE_URL + ">; rel=\"next\""));
+
+        IssuePage page = source("test-token").fetchPage(REPO, null);
+
+        // Empty, but not the end: callers must loop on nextCursor, not on "page is empty".
+        assertThat(page.issues()).isEmpty();
+        assertThat(page.skipped()).isEqualTo(2);
+        assertThat(page.nextCursor()).isEqualTo(SECOND_PAGE_URL);
     }
 
     @Test

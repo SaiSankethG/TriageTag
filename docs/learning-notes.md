@@ -241,3 +241,56 @@ and a "stop on empty page" loop would stop too early on a page that held only PR
    GitHub's issues endpoint returns PRs too, and only PRs carry a `pull_request` field. Filtering
    in the GitHub source keeps that GitHub quirk inside the GitHub code: callers only ever see real
    issues, and a Jira source never needs a PR concept.
+
+## M1 finish, step A: IssuePage gets `skipped`, source types fully neutral (4 Nov 2026)
+
+Files: `source/IssuePage.java`, `source/IssueSource.java`, `github/GitHubIssueSource.java`,
+`GitHubIssueSourceTest.java` (9 tests now).
+
+Most of step A (the move to `source/`, `fetchPage(repo, cursor)`, `List<Issue>` + `nextCursor`)
+was already done in the previous commit. This step adds the last two things.
+
+### What it does
+- `IssuePage` now has a third field: `int skipped`, the number of items the tracker sent on
+  this page that were *not* issues and were left out. For GitHub those are pull requests.
+- `GitHubIssueSource` counts them: each item with a `pull_request` field adds 1 to `skipped`
+  instead of being mapped.
+- The two `source/` types no longer mention anything GitHub-specific, not even in comments.
+  (`IssueSource` used to say "e.g. GitHub sent only pull requests"; now it says
+  "every item on it was skipped".) The word "pull request" now only appears in `github/`.
+
+### Why this way
+- **Why count skipped at all?** The backfill summary (step D) reports pages, inserted, updated
+  and skipped. Without the count, "we stored 30,000 issues" can't be checked against GitHub's
+  total, because GitHub's list mixes issues and PRs.
+- **Why the neutral name `skipped`, not `pullRequestsSkipped`?** A Jira source might skip other
+  things (e.g. sub-tasks). The caller only needs "how many were left out"; *why* is the source's business.
+- **Why count it now, in step A, not in step C?** The code already skipped PRs, so passing `0`
+  would have been a wrong number. Counting is one `skipped++`.
+
+### Basics: adding a field to a `record`
+A record's constructor always takes *all* its fields in order. So
+`record IssuePage(List<Issue> issues, String nextCursor)` -> `new IssuePage(issues, cursor)`
+becomes
+`record IssuePage(List<Issue> issues, String nextCursor, int skipped)` -> `new IssuePage(issues, cursor, skipped)`.
+Every old `new IssuePage(a, b)` stops compiling. That's a good thing: the compiler shows you every
+place that must now decide what `skipped` is, so none can be forgotten. A new accessor
+`page.skipped()` comes for free.
+
+### One alternative I rejected
+**Let the caller work it out as `100 - page.issues().size()`.** This breaks on the last page
+(which usually has fewer than 100 items), it bakes GitHub's page size into neutral code, and it
+mixes up "skipped" with "there were fewer items". The source is the only place that knows
+what it left out, so it reports it.
+
+### Likely interview questions
+1. **How do you keep an abstraction from leaking details of one implementation?**
+   Look at its types and words: here `IssuePage` uses only our `Issue`, a `String` cursor
+   nobody opens, and a count. No `JsonNode`, no Link header, no "pull request". If a Jira
+   implementation would find a word meaningless, it doesn't belong in the interface.
+2. **A page comes back with zero issues. Is the backfill finished?**
+   Not necessarily: it could be a page of only PRs (`skipped = 100`) with more pages after it.
+   The only "finished" signal is `nextCursor == null`. A test checks exactly this case.
+3. **What happens when you add a field to a Java record that is already used?**
+   The canonical constructor gets a new parameter, so every existing `new` call fails to compile
+   until it passes a value. It's a breaking change, and the compiler helps by finding every call site.
