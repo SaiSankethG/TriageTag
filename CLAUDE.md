@@ -16,7 +16,7 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 - Do NOT upgrade Java or Spring Boot. Do NOT add dependencies without asking.
 
 ## Commands
-- Start DB:      `colima start && docker compose up -d`
+- Start DB:      `colima start` then `docker-compose up -d`  (Postgres on localhost:5433, DB `triage`)
 - Run app:       `./mvnw spring-boot:run`
 - Build:         `./mvnw -q -DskipTests package`
 - Test:          `./mvnw test`

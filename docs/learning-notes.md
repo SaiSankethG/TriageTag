@@ -753,3 +753,76 @@ before spending 12 minutes and ~520 API calls on spring-boot. Small first, then 
 3. **What surprised you in the data?**
    Only 178 of 2,041 duplicates have `state_reason=duplicate`. Old ones show `completed`. The duplicate-event direction
    can be reversed. 109 "originals" are newer than their duplicates, which matters for a time-ordered replay.
+
+## M2 step 0: Flyway migrations and real-database tests (4 Nov 2026)
+
+Files: `db/migration/V1__baseline.sql`, `V2__drop_source_check.sql`, `application.yml` (Flyway baseline,
+`ddl-auto: validate`), `pom.xml` (approved dependencies + a `colima` profile), tests in `src/test/java/.../db/`
+(`PostgresContainerConfig`, `PostgresTest`, `IssueRepositoryDbTest` (4), `IssueServiceDbTest` (2)).
+Also: README/CLAUDE.md "Start DB" fixed, docs/problem.md and schema.md corrected (old duplicates show
+`completed`, not NULL), the empty `copilot` database dropped.
+
+### What it does
+- **Flyway owns the schema now.** On startup Flyway looks at its table `flyway_schema_history`, sees which
+  `V<n>__*.sql` files have not run yet, and runs them in order, each exactly once.
+- **V1** is the schema as it was (from `pg_dump --schema-only`), minus Hibernate's `CHECK (source = 'GITHUB')`.
+  **V2** drops that CHECK with `IF EXISTS` (the old DB has it; a fresh one built from V1 doesn't).
+- **The existing DB (44,204 rows) was "baselined":** `baseline-on-migrate: true` + `baseline-version: 1` means
+  "this DB already has V1's tables; record it as version 1 without running V1". Then only V2 ran.
+  Checked: history shows `1 << Flyway Baseline >>` and `2 drop source check`; the CHECK is gone; data intact.
+- **`ddl-auto: validate`**: Hibernate no longer changes tables; at startup it only checks that every entity
+  field has a matching column of a compatible type, and refuses to start otherwise.
+- **Real-DB tests**: Testcontainers starts a throw-away `postgres:16` in Docker; Flyway builds it from V1 + V2
+  (proving the migrations work on an empty DB); the tests run real SQL against it.
+
+### Why not `ddl-auto: update` in production
+- It only ever *adds* (new tables, new columns). It never drops or renames, never changes a type, and never
+  migrates data. Rename a field and you get a second, empty column next to the old one.
+- It's not reviewed or versioned: nobody sees the exact SQL before it runs on the production DB, and you
+  can't tell which schema version a database is at.
+- It adds things you didn't ask for, like our `CHECK (source = 'GITHUB')`, which would have rejected Jira rows,
+  and it would never remove that CHECK by itself.
+- Every app instance tries to change the schema when it starts; with several instances that's a race.
+With Flyway every change is a SQL file in git: reviewed, versioned, run once, in order, on every environment.
+
+### Basics used here
+- **Flyway file names:** `V2__drop_source_check.sql` = version 2, description "drop source check" (two underscores).
+  Never edit a file that has already run: Flyway stores a checksum and refuses to start if it changes. Add V3 instead.
+  *Before:* change `Issue.java`, restart, hope Hibernate does the right thing. *After:* write `V3__add_x.sql`, review it, restart.
+- **Baseline:** "adopt" a database that existed before Flyway. Without it, Flyway would try to run V1's
+  `CREATE TABLE issue` on a DB that already has it, and fail.
+- **Testcontainers:** a Java library that starts real Docker containers for tests and removes them afterwards.
+  *Before:* tests against H2 (an in-memory DB that isn't Postgres: no `jsonb`, different SQL) or a shared dev DB.
+  *After:* `new PostgreSQLContainer("postgres:16")`: the same database as production, fresh for each run.
+- **`@ServiceConnection`** (Spring Boot): put it on a container bean and Boot points the DataSource (and Flyway)
+  at that container. No URLs or passwords in test config.
+- **`@DataJpaTest`**: starts only the database part of the app (entities, repositories, Flyway, JdbcTemplate).
+  Each test runs in a transaction that is **rolled back** at the end, so tests can't see each other's rows.
+  `@AutoConfigureTestDatabase(replace = NONE)` says "use our Postgres, don't swap in an embedded DB".
+- **One container for all tests:** Spring caches a test context and reuses it for every test class with the
+  same configuration. All real-DB classes extend `PostgresTest`, so the container starts once (~3 s), not per class.
+- **Counting SQL statements:** with `hibernate.generate_statistics=true`, `Statistics.getPrepareStatementCount()`
+  counts the statements Hibernate sent. The test asserts **exactly 3** for a page of 20 issues with labels.
+- **`entityManager.flush()` then `clear()`:** flush sends pending SQL now; clear forgets every loaded entity,
+  so the next read really goes to the database (like a new request).
+- **Maven profile with file activation:** the `colima` profile turns itself on only if
+  `~/.colima/default/docker.sock` exists, and tells Testcontainers where Docker is. On a normal Docker machine
+  or in CI it stays off. (Running tests from VS Code doesn't use Maven, so there `DOCKER_HOST` must be set.)
+
+### One alternative I rejected
+**Recreating the database from V1 instead of baselining** (`docker-compose down -v`, then let Flyway run V1, V2
+and re-run the backfill). Clean, but it throws away 44k rows and the answer key and costs ~30 minutes of API
+calls. Baselining keeps the data and still gives a schema that V1 + V2 can rebuild from scratch (the tests prove that).
+Also rejected: H2 for tests. It's fast but isn't Postgres (no `jsonb`, different SQL), so it would test the wrong database.
+
+### Likely interview questions
+1. **How do you introduce Flyway into a project whose database already exists?**
+   Write V1 = the current schema (from `pg_dump --schema-only`), set `baseline-on-migrate` with baseline version 1,
+   so the existing DB is marked as V1 without running it. Further changes are V2, V3... Fresh databases (tests,
+   new environments) run V1 for real. Make sure V1 + V2 give the same schema on both.
+2. **Why `ddl-auto: validate` and not `update`?**
+   `update` only adds, is not reviewed or versioned, races between instances, and even added a CHECK we didn't
+   want. `validate` lets Flyway own the schema and still fails fast if an entity doesn't match the table.
+3. **Why Testcontainers instead of H2 or mocks for repository tests?**
+   Mocks don't run SQL at all; H2 runs a different SQL dialect. Testcontainers runs the real Postgres 16, so the
+   unique constraint, `jsonb`, the JPQL queries and the migrations are all tested for real.

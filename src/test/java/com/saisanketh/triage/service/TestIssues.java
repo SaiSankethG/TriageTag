@@ -7,12 +7,12 @@ import java.time.Instant;
 import java.util.Set;
 
 /** Builds small, valid Issue objects for tests. */
-final class TestIssues {
+public final class TestIssues {
 
     private TestIssues() {
     }
 
-    static Issue issue(int number, String title, String... labels) {
+    public static Issue issue(int number, String title, String... labels) {
         Issue issue = new Issue();
         issue.setSource(SourceType.GITHUB);
         issue.setExternalId(String.valueOf(1000 + number));

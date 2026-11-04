@@ -59,7 +59,8 @@ GitHub stores this: `state=closed`, `state_reason=duplicate` (seen on #52529).
 - **Maintainer minutes saved** (estimate) and **cost per issue in Rs**.
 
 ## Decisions that follow
-- **Answer key:** spring-boot (2,011 labelled duplicates, clean `state_reason`).
+- **Answer key:** spring-boot (2,011 labelled duplicates). Checked in M1: only 178 have
+  `state_reason=duplicate`, so the label is the main signal; 1,036 have a reliable link to the original.
 - **Real users to approach:** smaller Java repos such as LangChain4j, where issues wait.
 - **Default output:** a private triage report, not a public comment.
 - **Progressive autonomy:** 1) shadow (private report, default) -> 2) suggest (opt-in comment with score) -> 3) act (auto-label or close only above a maintainer-set threshold). The bot earns each step with measured precision.
@@ -67,6 +68,7 @@ GitHub stores this: `state=closed`, `state_reason=duplicate` (seen on #52529).
 ## Known limits (say these honestly)
 - Maintainers mostly catch duplicates that *look* alike; ones in different words may never
   get labelled, so the answer key leans towards easier cases.
-- Issues closed before ~2022 may have no `state_reason`; the label is used as a second
-  signal.
+- Old closed duplicates don't say `state_reason=duplicate`: GitHub shows `completed` on them
+  (and 2023-24 ones are often `not_planned`), not NULL. So the `status: duplicate` label is the
+  main signal (checked on real data in M1, see docs/m1-report.md).
 - Our 3-issue sample is tiny; the replay over all labelled duplicates is the real test.
