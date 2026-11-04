@@ -31,18 +31,11 @@ final class MarkdownReport {
                 Each duplicate is searched as if it had just been opened: only earlier issues of the same repo.
 
                 ## Duplicate search: keyword vs vector
-                Candidate filter: %s
-
                 | Method | recall@1 | recall@3 | recall@10 | MRR (top 10) |
                 |---|---|---|---|---|
                 %s
                 %s
                 %s
-                %s
-
-                "with filter" is what the app does: earlier issues with an excluded label (bookkeeping copies) are never
-                candidates. "no filter" searches every earlier issue (the M3 numbers). False alarms and labels below use
-                the filter.
 
                 ## False alarms (vector, top-1 score)
                 Random non-duplicate issues (no `duplicate_of`, not closed as duplicate, no duplicate label). The threshold is
@@ -67,24 +60,33 @@ final class MarkdownReport {
                 """.formatted(
                 r.repo(), r.repo(), r.durationMs() / 1000.0,
                 a.withDuplicateOf(), a.originalNotStored(), a.originalNewer(), a.scored(),
-                filterText(r),
-                row(r.keyword(), "with filter"), row(r.vector(), "with filter"),
-                row(r.keywordUnfiltered(), "no filter"), row(r.vectorUnfiltered(), "no filter"),
+                row(r.keywordUnfiltered(), null), row(r.vectorUnfiltered(), null), filterSection(r),
                 row("External reporters", r.falseAlarms(), a.scored()),
                 row("All issues", r.falseAlarmsAllIssues(), a.scored()),
                 row("External reporters", r.labels()),
                 row("All issues", r.labelsAllIssues()));
     }
 
-    private static String filterText(EvalReport r) {
-        return r.excludedLabels().isEmpty()
-                ? "none configured for this repo."
-                : "issues labelled " + r.excludedLabels().stream().map(l -> "`" + l + "`").collect(Collectors.joining(", "))
-                        + " are not candidates (`triage.candidates.exclude-labels`).";
+    /**
+     * The headline rows search every earlier issue. If the repo has a candidate filter configured, its rows follow as
+     * an experiment; if not, a pointer to the one experiment that was run (M4 step 0).
+     */
+    private static String filterSection(EvalReport r) {
+        if (r.excludedLabels().isEmpty()) {
+            return "\nNo candidate filter is configured for this repo. Experiment (M4 step 0): excluding spring-boot's "
+                    + "`status: forward-port` clones gave vector recall@3 45.6% (vs 46.2%), because maintainers sometimes "
+                    + "name a clone as the original; see docs/learning-notes.md.";
+        }
+        return "\nExperiment, candidate filter on (issues labelled "
+                + r.excludedLabels().stream().map(l -> "`" + l + "`").collect(Collectors.joining(", "))
+                + " are not candidates; false alarms and labels below use it):\n\n"
+                + "| Method | recall@1 | recall@3 | recall@10 | MRR (top 10) |\n|---|---|---|---|---|\n"
+                + row(r.keyword(), "with filter") + "\n" + row(r.vector(), "with filter");
     }
 
     private static String row(SearchScore s, String filter) {
-        return String.format(Locale.ROOT, "| %s, %s | %s (%d) | %s (%d) | %s (%d) | %.3f |", s.method(), filter,
+        return String.format(Locale.ROOT, "| %s | %s (%d) | %s (%d) | %s (%d) | %.3f |",
+                filter == null ? s.method() : s.method() + ", " + filter,
                 pct(s.recallAt1()), s.hitsAt1(), pct(s.recallAt3()), s.hitsAt3(), pct(s.recallAt10()), s.hitsAt10(),
                 s.mrr());
     }

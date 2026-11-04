@@ -1706,3 +1706,8 @@ evaluate; the comment decision only needs a yes/no on the top match.
 2. **What if the LLM is down?** The verdict is UNKNOWN, which counts as "not confirmed": the bot stays silent, the private
    report still shows the top 3.
 3. **Why is the fake LLM's number not reported?** It's word overlap, not a model; it only proves the code path works.
+
+### Follow-up (sai's decision, 4 Nov 2026)
+The spring-boot entry is removed from `triage.candidates.exclude-labels` (now `{}`); the mechanism stays for other repos.
+`docs/m3-results.md` shows the unfiltered numbers as the headline again (recall@3 46.2%, false-alarm threshold 0.825),
+with a one-line note on the filter experiment. When a repo does configure a filter, the report adds its rows as an experiment.
