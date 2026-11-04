@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.time.Instant;
 import java.util.List;
 
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -72,5 +73,15 @@ class IssueControllerTest {
     void rejectsNegativePages() throws Exception {
         mockMvc.perform(get("/repos/octo-org/hello/issues?page=-1"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void qSearchesTitles() throws Exception {
+        when(issueService.searchIssues("octo-org/hello", "datasource", 0, 20)).thenReturn(new IssueList(List.of(), 0, 20, 0));
+
+        mockMvc.perform(get("/repos/octo-org/hello/issues").param("q", "  datasource "))   // trimmed
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+        verify(issueService).searchIssues("octo-org/hello", "datasource", 0, 20);
     }
 }

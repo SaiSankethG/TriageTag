@@ -89,6 +89,12 @@ class TriageServiceDbTest extends PostgresTest {
         TriageReportDto dto = reports.find("Octo-Org/Hello", 3).orElseThrow();
         assertThat(dto.title()).isEqualTo("Datasource url not picked up from yaml");
         assertThat(dto.duplicates().get(0).get("number").asInt()).isEqualTo(1);
+        assertThat(dto.duplicates().get(0).get("state").asString()).isEqualTo("closed");    // looked up when read
+        assertThat(dto.duplicates().get(1).get("state").asString()).isEqualTo("open");
+        assertThat(dto.issue().state()).isEqualTo("open");
+        assertThat(dto.issue().authorAssociation()).isEqualTo("NONE");
+        assertThat(dto.issue().bodyStart()).startsWith("Using Spring Boot 3.4.1.");
+        assertThat(dto.issue().bodyLength()).isEqualTo(dto.issue().bodyStart().length());
         assertThat(dto.missing().get("missing").get(0).asString()).isEqualTo("LOGS_OR_STACK_TRACE");
         assertThat(dto.draftReply().get("sources")).hasSize(2);
         assertThat(dto.costTokens()).isEqualTo(report.costTokens());

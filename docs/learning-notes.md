@@ -2026,3 +2026,49 @@ public comments; an "optimal" number would hide that. A table plus the error lis
 2. **Why doesn't a higher threshold fix false alarms?** The remaining false alarms are near-identical texts (clones), which score
    highest of all; you need a different signal (labels/authorship) to remove them.
 3. **How much did this cost?** About 248k tokens, ~3 US cents on Haiku 5.5, because one pass serves all thresholds.
+
+## M5 (between steps 1 and 2): a friendlier demo page (4 Nov 2026)
+
+sai asked for a page that's easy to follow in the demo video. Files: `static/index.html` (rewritten, still plain HTML/CSS/JS);
+small API additions: `GET /settings` (`SettingsController`), `?q=` title search on `GET /repos/{o}/{r}/issues`
+(`IssueRepository.findIdsByRepoAndTitleContaining`, `IssueService.searchIssues`), and an issue card plus each match's
+current state in `GET /reports/...` (`IssueCard`, `TriageReportRepository.find`); config `triage.duplicates.possible-threshold: 0.75`.
+Tests: `SettingsControllerTest` (1), `IssueSearchDbTest` (1), one more each in `IssueControllerTest`, `TriageServiceDbTest`,
+`ReportControllerTest`, `DemoPageTest`.
+
+### What it does
+- **Verdict banner** in words *and* colour: "Probably not a duplicate (best match 68.8%, needs 90%)" (green), "Possible duplicate
+  of #N" (amber), "Likely duplicate of #N (Claude agrees)" (red: score ≥ 90% and the AI check said yes).
+- **Similarity as a percentage with a High / Medium / Low tag** from the configured thresholds (≥ 90% / ≥ 75%), a one-line
+  "what this means", each match's open/closed state, and the "already fixed?" hint in a highlighted box.
+- **Issue card**: title, state, "opened by an outside reporter / the team", date, labels, the first 300 characters with Show more.
+- **Pick without knowing numbers**: the newest 25 issues, a title search (300 ms after typing stops), and `?repo=&number=` in
+  the URL so a report can be shared or bookmarked.
+- **Missing details as a ✓ / ✗ / – checklist**; the draft in a box with **Copy reply** and its sources as links.
+- **Calm grey note** when AI checks didn't run ("AI checks paused ... daily limit reached, resets 05:30 IST", or "no API key
+  set: stand-in answers"); real errors stay red; a spinner while loading; "no report yet → Create report".
+- Phone width (one column), light/dark, visible keyboard focus, real headings; focus moves to the verdict after loading.
+
+Checked in the browser against spring-boot: #52529 (its marked original #52519 is the top match at 80.7%: "Possible
+duplicate", Medium), #9999 ("Probably not a duplicate", AI-paused note), #9998 (no report → Create report, at phone width
+and in dark mode). One bug found and fixed: 0.7496 showed as "75%" but was tagged "Low"; levels now use the rounded value
+that is shown.
+
+### Basics used here
+- **Don't rely on colour alone** (accessibility): every banner says its verdict in words; tags say High/Medium/Low.
+- **`history.replaceState` + `URLSearchParams`**: change the address bar without reloading, so the current report has a
+  shareable URL. Before: the URL never changed. After: `/?repo=spring-projects/spring-boot&number=52529` opens that report.
+- **Debouncing**: wait until typing pauses (300 ms) before calling the search API, instead of one request per keystroke.
+- **`navigator.clipboard.writeText`**: copies text; it can fail (permissions), so the button says so instead of silently doing nothing.
+
+### One alternative I rejected
+**Computing the verdict on the server** (an extra "verdict" field). It would duplicate the threshold logic in two places for one
+page; the page already gets the thresholds from `/settings` and the scores from the report, and it's easy to read in one function.
+
+### Likely interview questions
+1. **How do you show uncertain AI output to a user?** Lead with a plain-words verdict, show the number and what it means, say
+   whether the AI agreed, and make "the AI didn't run" a calm, explained state rather than an error.
+2. **How do you keep a plain-JS page safe with user-generated text?** All issue and LLM text goes in through `textContent`;
+   only http(s) links become `<a>`; no `innerHTML`; a test checks that.
+3. **Why add endpoints instead of computing on the page?** The page can't know thresholds or an issue's current state; three
+   small read-only endpoints (settings, search, enriched report) keep the page simple and are unit-tested.

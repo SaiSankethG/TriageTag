@@ -17,5 +17,7 @@ class DemoPageTest {
         assertThat(html).contains("fetch(`/reports/${repo}/${number}`");
         assertThat(html).doesNotContain("innerHTML");          // text from issues and the LLM goes in as text only
         assertThat(html).doesNotContain("<script src=");       // no external scripts, no new dependency
+        assertThat(html).contains("fetch('/settings')", "/repos/${repo}/issues?", "URLSearchParams(location.search)");
+        assertThat(html).contains("@media (max-width: 820px)", "prefers-color-scheme: dark", ":focus-visible");
     }
 }

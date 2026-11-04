@@ -1,5 +1,6 @@
 package com.saisanketh.triage.web;
 
+import com.saisanketh.triage.report.IssueCard;
 import com.saisanketh.triage.report.TriageReportDto;
 import com.saisanketh.triage.report.TriageReportRepository;
 import com.saisanketh.triage.report.TriageService;
@@ -10,6 +11,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.Mockito.mock;
@@ -33,7 +35,9 @@ class ReportControllerTest {
     }
 
     private TriageReportDto dto() {
-        return new TriageReportDto("o/r", 5, "Title", "https://github.com/o/r/issues/5", Instant.parse("2026-11-04T00:00:00Z"),
+        IssueCard card = new IssueCard("open", null, "NONE", Instant.parse("2026-11-03T00:00:00Z"), List.of("type: bug"),
+                "Body", 4);
+        return new TriageReportDto("o/r", 5, "Title", "https://github.com/o/r/issues/5", card, Instant.parse("2026-11-04T00:00:00Z"),
                 json.readTree("[{\"number\": 1}]"), null, json.readTree("[]"), json.readTree("{\"status\": \"OK\"}"),
                 null, json.readTree("{\"status\": \"NOTHING_RELEVANT\"}"), "fake", "missing-details-v1", 42, null);
     }
@@ -46,7 +50,9 @@ class ReportControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.duplicates[0].number").value(1))
                 .andExpect(jsonPath("$.missing.status").value("OK"))
-                .andExpect(jsonPath("$.costTokens").value(42));
+                .andExpect(jsonPath("$.costTokens").value(42))
+                .andExpect(jsonPath("$.issue.authorAssociation").value("NONE"))
+                .andExpect(jsonPath("$.issue.labels[0]").value("type: bug"));
     }
 
     @Test

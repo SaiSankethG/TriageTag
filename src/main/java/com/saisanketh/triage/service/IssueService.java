@@ -84,9 +84,21 @@ public class IssueService {
      */
     @Transactional(readOnly = true)
     public IssueList listIssues(String repo, int page, int size) {
-        Page<Long> ids = issueRepository.findIdsByRepo(repo,
-                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "number")));
+        return toList(issueRepository.findIdsByRepo(repo, newestFirst(page, size)), page, size);
+    }
 
+    /** Like listIssues, but only issues whose title contains the text (any case). */
+    @Transactional(readOnly = true)
+    public IssueList searchIssues(String repo, String titleText, int page, int size) {
+        return toList(issueRepository.findIdsByRepoAndTitleContaining(repo, titleText, newestFirst(page, size)),
+                page, size);
+    }
+
+    private static PageRequest newestFirst(int page, int size) {
+        return PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "number"));
+    }
+
+    private IssueList toList(Page<Long> ids, int page, int size) {
         List<IssueSummary> issues = ids.isEmpty()
                 ? List.of()
                 : issueRepository.findByIdInOrderByNumberDesc(ids.getContent()).stream()

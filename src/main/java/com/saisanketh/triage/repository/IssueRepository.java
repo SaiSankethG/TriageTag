@@ -44,6 +44,14 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
             countQuery = "select count(i) from Issue i where lower(i.repo) = lower(:repo)")
     Page<Long> findIdsByRepo(@Param("repo") String repo, Pageable pageable);
 
+    /** Like findIdsByRepo, but only issues whose title contains the text (any case). Used by the demo page's search. */
+    @Query(value = "select i.id from Issue i where lower(i.repo) = lower(:repo)"
+            + " and lower(i.title) like lower(concat('%', :text, '%'))",
+            countQuery = "select count(i) from Issue i where lower(i.repo) = lower(:repo)"
+                    + " and lower(i.title) like lower(concat('%', :text, '%'))")
+    Page<Long> findIdsByRepoAndTitleContaining(@Param("repo") String repo, @Param("text") String text,
+                                               Pageable pageable);
+
     /**
      * Step 2: load those issues and their labels in ONE query (a join), instead of 1 query for the
      * issues plus 1 more per issue for its labels (the N+1 problem).
