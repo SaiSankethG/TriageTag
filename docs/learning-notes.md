@@ -2425,3 +2425,28 @@ histogram buckets can, in Prometheus.
    `histogram_quantile(0.95, sum(rate(triage_webhook_to_report_seconds_bucket[5m])) by (le))`.
 3. **Why not put the issue number in a tag?** High cardinality: every value is a new time series, which blows up Prometheus'
    memory. Per-issue detail belongs in logs and the database.
+
+## M6 step 2: a Grafana dashboard as a file (4 Nov 2026)
+
+Files: `deploy/grafana/triage-dashboard.json` (9 panels), `deploy/grafana/README.md` (how to import); test `GrafanaDashboardTest` (1):
+the file parses, every query uses a metric the app really exports, and every exported metric has a panel.
+
+### What it shows
+Webhook → report latency p50/p95, reports per minute, LLM tokens and estimated cost over 24 h, dead letters (turns red at 1),
+unsent outbox events, Kafka consumer lag, the top-match level of new issues (pie), and comment-mode decisions. The data source
+is an import-time input (`${DS_PROMETHEUS}`), so the file works in any Grafana.
+
+### Basics used here
+- **PromQL** in the panels: `rate(x[5m])` = per-second increase over 5 minutes; `increase(x[1d])` = how much a counter grew in 24 h;
+  `histogram_quantile(0.95, sum(rate(..._bucket[5m])) by (le))` = p95 from histogram buckets.
+- **Dashboards as code**: the JSON is in git, reviewed and tested like code, instead of only living in a Grafana database.
+
+### One alternative I rejected
+**Installing Prometheus and Grafana in k3s now.** On a 2-CPU/12-GB VM that's another ~1 GB and two more things to run; the plan
+makes it optional. The dashboard and the metrics are ready for when it's wanted.
+
+### Likely interview questions
+1. **What's on your dashboard and why?** The user-facing latency first (p50/p95), then cost (tokens, $), then health (lag, dead
+   letters, outbox backlog), then what the product decided (duplicate levels, comment decisions).
+2. **How do you know the dashboard isn't broken?** A test parses it and checks each query's metric names against what the app exports.
+3. **Why a histogram and not an average?** Averages hide slow outliers; p95 shows what the slowest 1 in 20 reports experience.
