@@ -1136,3 +1136,52 @@ same `apache/kafka:4.1.0` image, and Postgres 16, as development does. Also reje
 3. **How fast does the webhook receiver answer, and why does it matter?**
    About 76 ms in the test (verify, insert delivery row, publish and wait for the Kafka ack). GitHub stops waiting after
    10 s and marks the delivery as failed, so the slow work (mapping, DB upsert, later triage) happens in the consumer.
+
+## M2 step 6: real GitHub webhooks through smee.io (4 Nov 2026)
+
+No new code. Set up with `gh` (a repo webhook; a GitHub App comes in M5):
+`gh repo create SaiSankethG/triage-sandbox --public --add-readme`; a smee.io channel; a secret from
+`openssl rand -hex 32` stored in `~/.config/triage/webhook-secret` (mode 600, outside the repo, never printed);
+`gh api repos/SaiSankethG/triage-sandbox/hooks` with events `issues`, content type `json`, url = the smee channel.
+The app was started with `GITHUB_WEBHOOK_SECRET="$(cat ~/.config/triage/webhook-secret)"` and
+`npx smee-client --url <channel> --target http://localhost:8080/webhooks/github` forwarded the deliveries.
+
+### What happened
+| GitHub action (via `gh`) | Delivery | Our answer | Consumer |
+|---|---|---|---|
+| open issue #1 | `1cee70be...` issues/opened | 200 | INSERTED (partition 0, offset 0) |
+| edit the title | `1ef90ea0...` issues/edited | 200 | UPDATED (offset 1) |
+| add label `bug` | `1fb49670...` issues/labeled | 200 | UPDATED (offset 2) |
+| redeliver `1cee70be...` (deliveries API) | same id | 200 "duplicate delivery" | nothing (not queued) |
+Result: **1 issue row** (`App crashes on startup when port 8080 is in use`, open, label `bug`), **3 delivery rows**,
+the redelivery logged as `Ignored repeated webhook delivery`. The real secret appears 0 times in the app log.
+
+### Basics used here
+- **smee.io**: GitHub can't reach `localhost`. smee gives a public URL; GitHub posts there, and `smee-client` on our
+  machine keeps a connection open, receives each delivery and re-posts it, headers and body unchanged, to localhost.
+  (The signature still matches because the bytes are the same.) For development only.
+- **Repo webhook vs GitHub App**: a repo webhook is configured per repository with one secret; a GitHub App is
+  installed on many repos, has its own permissions and identity, and sends webhooks for all of them. The App is
+  the production shape (M5); a repo webhook is enough to prove the pipeline.
+- **Hook deliveries API**: `GET /repos/{o}/{r}/hooks/{id}/deliveries` lists recent deliveries;
+  `POST .../deliveries/{delivery_id}/attempts` redelivers one, with the **same** `X-GitHub-Delivery` GUID.
+  Gotcha: delivery ids are bigger than 2^53, so `jq` rounds them (`...428000` instead of `...428032`). Read the raw
+  JSON to get the exact id.
+- **Two `gh` logins**: `gh` prefers the `GITHUB_TOKEN` env var (a fine-grained token that can only read issues),
+  which can't create repos or hooks. `env -u GITHUB_TOKEN gh ...` uses the keyring login (`repo` scope) instead.
+
+### One alternative I rejected
+**ngrok / Cloudflare Tunnel** to expose localhost. They work too, but need an account or a binary install; smee
+needs only `npx` and is what GitHub's own docs suggest for testing webhooks.
+
+### Likely interview questions
+1. **How do you test GitHub webhooks against a laptop?**
+   A forwarding service (smee.io): GitHub posts to the public smee URL, `smee-client` relays it to localhost unchanged,
+   so the HMAC signature still verifies.
+2. **How did you prove a redelivery is ignored?**
+   Redelivered the "opened" delivery through the hook deliveries API: it has the same delivery GUID, the app answered
+   "duplicate delivery", nothing was queued, and the DB still had 1 issue row and 3 delivery rows.
+3. **Where is the webhook secret kept?**
+   Generated with `openssl rand -hex 32` into `~/.config/triage/webhook-secret` (mode 600, outside the repo), given to
+   GitHub once via the API, and read into the `GITHUB_WEBHOOK_SECRET` env var only when starting the app. Never printed,
+   logged or committed.

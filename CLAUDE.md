@@ -49,7 +49,10 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 8. Do not upgrade Java/Spring Boot or add dependencies without asking sai.
 
 ## Current step (sai updates this line)
-Phase 0, M0 and M1 done (4 Nov 2026, report: docs/m1-report.md). DB holds spring-petclinic (394 issues)
-and spring-boot (43,810 issues; 1,036 with duplicate_of = the answer key; 945 of them point to a stored issue).
-Next: M3 replay needs a decision on the 109 pairs whose "original" is newer than the duplicate
-(see docs/m1-report.md, open questions). Schema: docs/schema.md. Problem: docs/problem.md.
+Phase 0, M0, M1 and M2 done (4 Nov 2026; reports: docs/m1-report.md, docs/m2-report.md).
+DB holds spring-petclinic (394 issues), spring-boot (43,810; 1,036 with duplicate_of = the answer key,
+945 pointing to a stored issue) and SaiSankethG/triage-sandbox (1, from live webhooks).
+Live path works: GitHub repo webhook -> smee -> POST /webhooks/github -> Kafka issue-events -> triage-worker -> DB.
+Schema is Flyway-managed (V1-V3). Webhook secret: ~/.config/triage/webhook-secret (outside the repo).
+Next: M3 replay; it needs a decision on the 109 pairs whose "original" is newer than the duplicate
+(docs/m1-report.md). GitHub App moves to M5. Schema: docs/schema.md. Problem: docs/problem.md.
