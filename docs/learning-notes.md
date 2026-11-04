@@ -1459,3 +1459,60 @@ similar issues were `type: bug`").
 3. **How would this behave on a brand-new repo?**
    With few earlier issues there are few neighbours and weak agreement, so mostly no suggestions: it gets useful as
    labelled history grows. Starting from a related repo's data (or a trained model) would help the cold start.
+
+## M3 step 6: replay evaluation, the resume number (4 Nov 2026)
+
+Files: `eval/EvalService.java`, `eval/Metrics.java`, `eval/EvalReport.java`, `eval/MarkdownReport.java`,
+`web/EvalController.java` (`POST /eval/{owner}/{repo}`), generated `docs/m3-results.md`; tests `MetricsTest` (5),
+`EvalServiceDbTest` (1, real pgvector). Full discussion in docs/m3-report.md.
+
+### What it does
+For every answer-key duplicate, pretend it was just opened: search only earlier issues of the same repo, and see where
+the true original lands. spring-boot, 96 s for everything:
+- **Scored set: 833 pairs** = 1,036 with `duplicate_of` - 91 whose original isn't a stored issue (most likely a PR)
+  - 112 whose "original" isn't older (109 newer + 3 opened in the same second, double submissions).
+- **Recall** (original in the top k) and **MRR**:
+
+  | | recall@1 | recall@3 | recall@10 | MRR |
+  |---|---|---|---|---|
+  | keyword (Postgres full-text) | 19.2% | 26.5% | 37.1% | 0.244 |
+  | **vector (MiniLM + pgvector)** | **31.0%** | **46.2%** | **60.9%** | **0.403** |
+- **False alarms** on 1,000 random non-duplicates **from external reporters**: the threshold for <= 10% false alarms is
+  cosine 0.825; at it, the original is top-1 (and flagged) for 10.8% of duplicates, in the top 3 for 13.6%.
+- **Labels** on the 1,000 most recent external issues with a real label: a suggestion for 30.6%, top label right 69.3%.
+
+### What the data taught (and the fix)
+The first run used *all* issues for false alarms and got a threshold of **0.998**: 10% of random non-duplicates had an
+almost identical earlier issue. They were the spring-boot team's bookkeeping issues: **6,964 forward-port clones** (the
+same issue copied to another branch) and **12,768 "Upgrade to X"** dependency issues, all opened by team members. A triage
+assistant never triages those; it looks at issues from people outside the team. So false alarms and labels are now
+measured on **external reporters** (`author_association` not OWNER/MEMBER/COLLABORATOR), and the all-issues numbers are
+still reported next to them (labels on all issues: 85.5% precision, inflated by easy "dependency-upgrade" cases).
+
+### Basics used here
+- **recall@k**: share of duplicates whose true original is in the top k results. recall@3 = "a maintainer looking at our
+  top 3 would see the right issue".
+- **MRR (mean reciprocal rank)**: average of 1/rank (1st -> 1, 2nd -> 0.5, 3rd -> 0.33, not in top 10 -> 0). One number that
+  rewards ranking the original high.
+- **False-alarm rate**: of issues that are NOT duplicates, how many we'd still flag. Choosing the threshold on non-duplicates
+  (here the 90th percentile of their top-1 scores) and then reading recall at it is the honest way to set an operating point.
+- **Time-ordered replay**: only use what was knowable at the time (earlier issues), otherwise the evaluation leaks the future.
+- **Repeatable random sample**: `ORDER BY md5(id || 'seed')` gives the same "random" 1,000 every run.
+
+### One alternative I rejected
+**Reporting only recall@k** (the flattering 46%/61%). Without false alarms it hides that similar-but-not-duplicate issues
+are common: at a 10% false-alarm budget only 13.6% of duplicates get a confident, correct flag. That's why the default
+output stays a private top-3 (shadow mode) and a public comment needs a high threshold.
+
+### Likely interview questions
+1. **How good is your duplicate detection?**
+   Time-ordered replay over 833 maintainer-confirmed spring-boot duplicates: the original is in our top 3 for 46.2% (vs
+   26.5% for keyword search) and top 10 for 60.9%; MRR 0.403 vs 0.244. At a threshold with 10% false alarms on external
+   issues, 13.6% get a confident correct flag, so we show a private top-3 rather than auto-commenting.
+2. **How did you avoid fooling yourself in the evaluation?**
+   Answer key from GitHub's own records (strict rules, spot-checked); only earlier issues searched; pairs whose original is
+   newer or not an issue excluded and counted; false alarms measured on the population the bot really sees; the same text
+   window for both methods; a repeatable sample.
+3. **What surprised you?**
+   Over 40% of spring-boot's issues are team bookkeeping clones (forward-ports, dependency upgrades) with near-identical
+   twins: they pushed the false-alarm threshold to 0.998 until I measured on external reporters only.

@@ -2,6 +2,7 @@ package com.saisanketh.triage.db;
 
 import com.saisanketh.triage.ClockConfig;
 import com.saisanketh.triage.embedding.IssueEmbeddingRepository;
+import com.saisanketh.triage.eval.EvalService;
 import com.saisanketh.triage.kafka.IssueEventPublisher;
 import com.saisanketh.triage.repository.WebhookDeliveryRepository;
 import com.saisanketh.triage.service.IssueService;
@@ -28,12 +29,14 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *   <li>Kafka isn't part of these tests: the publisher is a Mockito mock ({@code @MockitoBean}).</li>
  * </ul>
  */
-@DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
+@DataJpaTest(properties = {
+        "spring.jpa.properties.hibernate.generate_statistics=true",
+        "triage.eval.results-file=target/test-m3-results.md"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({PostgresContainerConfig.class, ClockConfig.class, IssueService.class,
         WebhookDeliveryRepository.class, WebhookIntakeService.class, KeywordDuplicateSearch.class,
         IssueEmbeddingRepository.class, VectorDuplicateSearch.class, SimilarIssueService.class,
-        LabelSuggester.class})
+        LabelSuggester.class, EvalService.class})
 public abstract class PostgresTest {
 
     @MockitoBean
