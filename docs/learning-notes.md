@@ -1605,3 +1605,39 @@ matter in under 1% of pairs.
    annotating the entry method and testing that every public search method is transactional.
 3. **How do you configure per-tenant behaviour in Spring Boot?** A `@ConfigurationProperties` record with a map keyed by
    tenant (repo), normalised to lower case, with an empty default so unknown tenants get the normal behaviour.
+
+## M4 step 1: TriageLlm, the fake LLM and versioned prompt files (4 Nov 2026)
+
+Files: `ai/TriageLlm.java` (interface), `ai/Prompt.java`, `ai/LlmReply.java`, `ai/LlmException.java`,
+`ai/PromptTemplates.java`, `ai/FakeTriageLlm.java`, `ai/LlmConfig.java`, `src/main/resources/prompts/`;
+tests `PromptTemplatesTest` (5), `FakeTriageLlmTest` (2).
+
+### What it does
+- **`TriageLlm`** is our own two-method interface: `model()` and `complete(Prompt) -> LlmReply(text, inputTokens,
+  outputTokens)`. Every LLM feature (missing details, duplicate check, draft reply) talks only to this.
+- **`FakeTriageLlm`** answers with simple rules per prompt name, estimates tokens as characters / 4, and costs nothing. Tests
+  and the app without an API key use it, so the whole pipeline runs end to end. Its answers are not model quality.
+- **`PromptTemplates`** loads `prompts/<name>-<version>.txt` and fills `{{placeholders}}`. A missing or an unused value is an
+  error (catches typos). A changed prompt is a new file (`-v2`), and every result stores which one produced it.
+- **`LlmConfig`** has a `@Bean` method that returns the fake for now. At STOP A it will return the real provider.
+
+### Basics used here
+- **Interface + fake ("ports and adapters")**: the code depends on our interface, not on a vendor SDK. Before: services call
+  the Anthropic SDK directly and tests need the network and a key. After: tests pass a fake; a provider change is one class.
+- **`@Bean` method in a `@Configuration` class**: tells Spring "this method creates the object of this type". Used instead
+  of putting `@Component` on the class when you want to decide at startup *which* class to create.
+- **`Matcher.appendReplacement` + `Matcher.quoteReplacement`**: replaces matches one by one. `quoteReplacement` matters
+  because an issue body can contain `$1` or `\`, which `appendReplacement` would otherwise treat as special.
+
+### One alternative I rejected
+**LangChain4j's `@AiService` interfaces** (declare a Java interface, LangChain4j generates the LLM call and JSON parsing).
+Less code, but the prompt, retry and parsing would be hidden in a library. I want to show and test each of those, and keep
+the provider swappable without LangChain4j in the core.
+
+### Likely interview questions
+1. **How do you test code that calls an LLM?** Behind our own interface; unit tests use a fake with fixed answers (including
+   broken ones), so they're fast, free and repeatable. The real model is checked separately with a small hand-scored set.
+2. **Why version prompts by file name?** A prompt change changes the output like a code change does. Storing
+   `missing-details-v1` with every result lets me compare versions and explain any old result.
+3. **How do you count tokens?** From the provider's usage numbers on each reply (the fake estimates chars / 4). They feed a
+   daily budget (step 7) and the report's cost column.
