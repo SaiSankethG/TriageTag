@@ -391,6 +391,29 @@
       ...marks.map(([t, name]) => el('div', { class: 'mark', style: `left:${t * 100}%`, title: `${name} from ${pct(t)}` }, el('span', {}, pct(t)))));
   }
 
+  /**
+   * For older issues: what maintainers actually decided (the answer key), next to what the assistant said, so a
+   * "probably not a duplicate" on an issue labelled "status: duplicate" doesn't look like a contradiction.
+   */
+  function groundTruth(r) {
+    const original = r.issue.duplicateOf;
+    if (original == null) return null;
+    const ghLink = link(`https://github.com/${r.repo}/issues/${original}`, `#${original}`);
+    const rank = (r.duplicates || []).findIndex(d => d.number === original) + 1;
+    let outcome;
+    if (!r.issue.originalStored) {
+      outcome = el('span', {}, ` That number is a pull request or an issue the assistant doesn't store, so it could not be suggested.`);
+    } else if (r.issue.originalIsNewer) {
+      outcome = el('span', {}, ` That issue was opened after this one, so the assistant (which only looks at earlier issues) could not have found it.`);
+    } else if (rank > 0) {
+      outcome = el('span', {}, ' ', el('strong', { class: 'yes' }, `The assistant found it`), `: match ${rank} of ${r.duplicates.length} above.`);
+    } else {
+      outcome = el('span', {}, ' ', el('strong', { class: 'no' }, 'The assistant missed it'), ': it is not among the matches above.');
+    }
+    return el('section', { class: 'card pad' }, el('h2', {}, 'What maintainers decided later'),
+      el('p', { style: 'margin:0' }, 'They closed this issue as a duplicate of ', ghLink, '.', outcome));
+  }
+
   /** A calm note when the AI checks didn't run (no key, or today's budget used up). */
   function aiNote(r) {
     const notes = [r.notes, r.missing?.note, r.duplicateCheck?.reason, r.draftReply?.text].filter(Boolean).join(' ');
@@ -423,7 +446,10 @@
     const top = (r.duplicates || [])[0];
     parts.push(el('section', { class: `card verdict ${colour}`, role: 'status', tabindex: '-1' },
       el('div', { class: 'label' }, label), el('div', { class: 'title' }, title), el('div', { class: 'muted' }, detail),
-      top ? meter(top.score) : null));
+      top ? meter(top.score) : null,
+      card.state === 'closed' ? el('div', { class: 'small faint' }, 'This issue is already closed: the report shows what the assistant would have said when it was opened, looking only at issues that existed then.') : null));
+    const truth = groundTruth(r);
+    if (truth) parts.push(truth);
     const note = aiNote(r);
     if (note) parts.push(el('div', { class: 'note' }, note));
 

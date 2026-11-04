@@ -2545,3 +2545,24 @@ the plain-JS page stays readable in one file and is tested for safety (no `inner
    no HTML strings, and tests on the page's safety rules.
 3. **What bug did you find in the redesign?** CSS order: a mobile override placed before the base `position: sticky` rule lost,
    so the sidebar covered the report on phones; caught by checking at phone width.
+
+## "What maintainers decided later" on older issues (4 Nov 2026)
+
+sai: "users will get confused". The screenshot showed #9999 labelled `status: duplicate` while the page said "Probably not a
+duplicate". Both were right: maintainers closed #9999 as a duplicate of #10000, which isn't a stored issue (most likely a pull
+request), so the assistant could never suggest it. The page just didn't say so.
+
+Files: `report/IssueCard.java` (+ `duplicateOf`, `originalStored`, `originalIsNewer`), `TriageReportRepository.find` (two small
+subqueries), `static/index.html`; tests in `TriageServiceDbTest` and `ReportControllerTest`.
+
+Now a report for an issue maintainers closed as a duplicate shows a **"What maintainers decided later"** card next to the
+assistant's answer: "the assistant found it: match 1 of 3" (e.g. #52529 → #52519), "the assistant missed it", "that issue was opened
+after this one, so it could not have been found", or "that number is a pull request or not a stored issue". Closed issues also
+say: the report shows what the assistant would have said when the issue was opened.
+
+### Likely interview questions
+1. **Why show the answer key in the UI?** So people can judge the assistant on real cases (hit or miss) instead of trusting it
+   blindly, and so a "not a duplicate" next to a "duplicate" label doesn't look like a bug.
+2. **Why can't it find some originals?** Time order (the original was opened later) or the original isn't an issue (a pull request);
+   the same exclusions the replay evaluation counts separately.
+3. **How did you find the confusion?** A user's screenshot: when two parts of a page disagree, explain the difference on the page.

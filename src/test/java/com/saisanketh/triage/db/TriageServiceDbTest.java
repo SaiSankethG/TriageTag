@@ -41,6 +41,8 @@ class TriageServiceDbTest extends PostgresTest {
     @Autowired
     private com.saisanketh.triage.service.IssueService issueService;
     @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+    @Autowired
     private com.saisanketh.triage.ai.TokenBudget budget;
 
     private static float[] direction(double angleDegrees) {
@@ -98,6 +100,8 @@ class TriageServiceDbTest extends PostgresTest {
         assertThat(dto.issue().authorAssociation()).isEqualTo("NONE");
         assertThat(dto.issue().bodyStart()).startsWith("Using Spring Boot 3.4.1.");
         assertThat(dto.issue().bodyLength()).isEqualTo(dto.issue().bodyStart().length());
+        assertThat(dto.issue().duplicateOf()).isNull();
+        assertThat(dto.issue().originalIsNewer()).isFalse();
         assertThat(dto.missing().get("missing").get(0).asString()).isEqualTo("LOGS_OR_STACK_TRACE");
         assertThat(dto.draftReply().get("sources")).hasSize(2);
         assertThat(dto.costTokens()).isEqualTo(report.costTokens());
@@ -158,5 +162,22 @@ class TriageServiceDbTest extends PostgresTest {
         assertThat(recent.get(0).topScore()).isGreaterThan(0.99);
         assertThat(issueService.listIssues("octo-org/hello", 0, 10).issues())
                 .extracting(s -> s.number() + ":" + s.hasReport()).containsExactly("2:true", "1:false");
+    }
+
+    @Test
+    void theCardSaysWhatMaintainersDecidedLaterAndWhetherTheOriginalCameAfter() {
+        long older = save(1, "2024-01-01T00:00:00Z", 1, "Logger visibility", "...", "closed", null);
+        save(2, "2024-02-01T00:00:00Z", 2, "Logger visibility again", "...", "open", null);
+        jdbc.update("UPDATE issue SET duplicate_of = 2 WHERE id = ?", older);   // closed in favour of the NEWER #2
+        triageService.create(older);
+
+        var card = reports.find("octo-org/hello", 1).orElseThrow().issue();
+
+        assertThat(card.duplicateOf()).isEqualTo(2);
+        assertThat(card.originalStored()).isTrue();
+        assertThat(card.originalIsNewer()).isTrue();
+
+        jdbc.update("UPDATE issue SET duplicate_of = 999 WHERE id = ?", older);    // e.g. a pull request: not stored
+        assertThat(reports.find("octo-org/hello", 1).orElseThrow().issue().originalStored()).isFalse();
     }
 }

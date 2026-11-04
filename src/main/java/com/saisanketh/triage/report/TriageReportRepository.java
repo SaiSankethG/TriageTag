@@ -79,6 +79,10 @@ public class TriageReportRepository {
         Optional<TriageReportDto> dto = jdbc.query("""
                 SELECT i.repo, i.number, i.title, i.html_url, i.state, i.state_reason, i.author_association,
                        i.created_at AS issue_created_at, left(coalesce(i.body, ''), ?) AS body_start,
+                       i.duplicate_of,
+                       EXISTS (SELECT 1 FROM issue o WHERE o.repo = i.repo AND o.number = i.duplicate_of) AS original_stored,
+                       coalesce((SELECT o.created_at > i.created_at FROM issue o
+                                 WHERE o.repo = i.repo AND o.number = i.duplicate_of), false) AS original_is_newer,
                        length(coalesce(i.body, '')) AS body_length,
                        ARRAY(SELECT l.label_name FROM issue_label l WHERE l.issue_id = i.id ORDER BY l.label_name)
                            AS issue_labels,
@@ -115,7 +119,8 @@ public class TriageReportRepository {
         IssueCard card = new IssueCard(rs.getString("state"), rs.getString("state_reason"),
                 rs.getString("author_association"), rs.getTimestamp("issue_created_at").toInstant(),
                 Arrays.asList((String[]) rs.getArray("issue_labels").getArray()), rs.getString("body_start"),
-                rs.getInt("body_length"));
+                rs.getInt("body_length"), (Integer) rs.getObject("duplicate_of"), rs.getBoolean("original_stored"),
+                rs.getBoolean("original_is_newer"));
         return new TriageReportDto(rs.getString("repo"), rs.getInt("number"), rs.getString("title"),
                 rs.getString("html_url"), card, rs.getTimestamp("created_at").toInstant(),
                 node(rs, "duplicates"), node(rs, "duplicate_check"), node(rs, "labels"), node(rs, "missing"),

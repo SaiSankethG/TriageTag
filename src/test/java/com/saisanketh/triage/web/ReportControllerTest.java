@@ -36,7 +36,7 @@ class ReportControllerTest {
 
     private TriageReportDto dto() {
         IssueCard card = new IssueCard("open", null, "NONE", Instant.parse("2026-11-03T00:00:00Z"), List.of("type: bug"),
-                "Body", 4);
+                "Body", 4, null, false, false);
         return new TriageReportDto("o/r", 5, "Title", "https://github.com/o/r/issues/5", card, Instant.parse("2026-11-04T00:00:00Z"),
                 json.readTree("[{\"number\": 1}]"), null, json.readTree("[]"), json.readTree("{\"status\": \"OK\"}"),
                 null, json.readTree("{\"status\": \"NOTHING_RELEVANT\"}"), "fake", "missing-details-v1", 42, null);
