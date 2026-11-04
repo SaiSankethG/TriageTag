@@ -65,6 +65,20 @@ CREATE TABLE issue_fix (
   fix_version   varchar(100),    -- the PR's milestone, else the issue's milestone
   fetched_at    timestamptz  NOT NULL
 );
+
+-- Added in M4 (Flyway V7): the repo's reference docs, cut into sections, for draft replies (RAG).
+CREATE TABLE doc_chunk (
+  id          bigserial    PRIMARY KEY,
+  repo        varchar(200) NOT NULL,
+  doc_version varchar(50)  NOT NULL,    -- git tag the docs were read from, e.g. 'v4.1.2'
+  source_url  text         NOT NULL,    -- published page + #anchor of the section
+  heading     text         NOT NULL,    -- 'Page > Section > Subsection'
+  text        text         NOT NULL,
+  embedding   vector(384)  NOT NULL,    -- same model as issue_embedding
+  created_at  timestamptz  NOT NULL
+);
+CREATE INDEX idx_doc_chunk_repo ON doc_chunk (repo);
+CREATE INDEX idx_doc_chunk_hnsw ON doc_chunk USING hnsw (embedding vector_cosine_ops);
 ```
 
 ## Why these choices (interview notes)

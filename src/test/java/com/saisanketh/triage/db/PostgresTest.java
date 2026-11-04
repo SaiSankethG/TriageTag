@@ -6,6 +6,7 @@ import com.saisanketh.triage.ai.IssueTextRepository;
 import com.saisanketh.triage.ai.LlmConfig;
 import com.saisanketh.triage.ai.PromptTemplates;
 import com.saisanketh.triage.eval.DuplicateCheckEval;
+import com.saisanketh.triage.docs.DocChunkRepository;
 import com.saisanketh.triage.embedding.IssueEmbeddingRepository;
 import com.saisanketh.triage.eval.EvalService;
 import com.saisanketh.triage.kafka.IssueEventPublisher;
@@ -49,7 +50,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         IssueEmbeddingRepository.class, VectorDuplicateSearch.class, SimilarIssueService.class,
         LabelSuggester.class, EvalService.class, CandidateFilter.class,
         LlmTestConfig.class, LlmConfig.class, PromptTemplates.class, IssueTextRepository.class, DuplicateVerifier.class,
-        DuplicateCheckEval.class, IssueFixRepository.class, FixedHintService.class})
+        DuplicateCheckEval.class, IssueFixRepository.class, FixedHintService.class,
+        DocChunkRepository.class})
 public abstract class PostgresTest {
 
     @MockitoBean

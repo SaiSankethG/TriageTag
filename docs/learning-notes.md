@@ -1748,3 +1748,51 @@ nothing, and can be tested exactly.
 2. **What if the reporter didn't say their version?** The hint says "fixed in X, ask for their version". The missing-details
    check usually flags it too.
 3. **Why not hint on issues closed as "not planned"?** Nothing was fixed there. Telling the reporter to upgrade would be wrong.
+
+## M4 step 4: RAG draft reply from spring-boot's reference docs (4 Nov 2026)
+
+Files: Flyway `V7__doc_chunk.sql`; package `docs`: `DocsProperties`, `DocSource` + `GitHubDocSource`, `AsciidocChunker`,
+`DocSection`, `DocChunkRepository`, `DocIngestService`; `web/DocsController` (`POST /docs/{o}/{r}`, `GET /docs/{o}/{r}/search?q=`);
+`prompts/draft-reply-v1.txt`, `ai/DraftReplyService`, `ai/DraftReply`; tests `AsciidocChunkerTest` (5), `DocIngestServiceTest` (2),
+`GitHubDocSourceTest` (3), `DocChunkRepositoryDbTest` (1), `DraftReplyServiceTest` (5).
+
+### What it does
+1. **Load**: GitHub's git-trees API lists every file of spring-boot at tag **v4.1.2** (one call). The Antora pages of the
+   `ROOT`, `reference` and `how-to` modules are read from raw.githubusercontent.com: 123 pages.
+2. **Chunk**: cut at headings. Each piece keeps its heading path ("SQL Databases > Embedded Database Support") and its
+   published URL with the section's `#anchor` (from the `[[id]]` line before the heading). Long sections are split into
+   ≤ 1,200-character pieces with a 200-character overlap: **1,318 chunks**. Docs macros become plain text, code blocks stay.
+3. **Embed + store**: the same MiniLM model as the issues, in `doc_chunk` with an HNSW index. The whole load takes 13 s and
+   replaces the repo's chunks in one transaction.
+4. **Draft**: the 5 nearest chunks (cosine ≥ 0.55) and the 3 most similar earlier issues (≥ 0.75) become numbered sources.
+   The LLM writes ≤ 120 words citing their URLs. **No source above the thresholds → no LLM call, status NOTHING_RELEVANT.**
+   Links in the draft that aren't sources are listed in `unknownLinks` as a warning.
+
+### Choices made from the data
+- **1,200 characters, not ~500 tokens**: MiniLM reads only the first 256 word pieces. Longer chunks would be cut off by the
+  model, so their ends would never be found.
+- **Threshold 0.55**: on the 300 most recent external issues, the best docs score is 0.42 at p10, 0.59 at the median and 0.71
+  at p90. So 65% of issues get docs sources. A starting point, to check with the hand-scoring at STOP A.
+- **`exclude-pages: ROOT/redirect`**: that page is only a list of old anchors; it was the top hit for many queries.
+- **Retries**: raw downloads failed twice in a row on a network blip (closed connection, failed DNS lookup), so each file gets 3 tries.
+
+### Basics used here
+- **RAG (retrieval-augmented generation)**: before: ask the LLM "answer this issue" and it answers from memory, maybe wrongly
+  or for an old version. After: find the relevant docs sections first, give them to the LLM, and tell it to use only those
+  and cite them. The answer is checkable and tied to a version (the tag).
+- **Chunk overlap**: a sentence cut in half at a chunk border still exists whole in one of the two chunks.
+- **Token scope**: the GitHub token goes only to api.github.com. Raw files are public and fetched without it, and path parts
+  are checked (no `..`, no `?`) before they go into a URL.
+
+### One alternative I rejected
+**Fetching the published HTML from docs.spring.io** and stripping tags. The AsciiDoc source at a git tag is exact, versioned
+and has the section anchors right in it; scraping HTML depends on the site's layout.
+
+### Likely interview questions
+1. **How do you stop the LLM from making things up in the draft?** Only retrieved sources above a similarity threshold go in;
+   the prompt says use only them and cite them; no sources means no draft; links are checked against the sources afterwards.
+   And a maintainer reviews it: it's never auto-posted.
+2. **How did you choose the chunk size?** From the embedding model: MiniLM truncates at 256 word pieces, so ~1,200 characters
+   with 200 overlap, and the heading first so it's always inside the window.
+3. **How would you know if retrieval is good?** The STOP A hand-scoring of 30 real issues (useful / partly / wrong). Next: a
+   small labelled set of issue → right docs section to measure recall@5 of the docs search itself.

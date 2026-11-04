@@ -43,6 +43,20 @@ triage:
     # Comment mode (M5) posts only if the top match scores >= this AND the LLM confirms "same root problem"
     # (sai, 4 Nov 2026: the M3 threshold for <= 10% false alarms on external reporters).
     comment-threshold: 0.825
+  docs:
+    sources:
+      # Reference docs for draft replies (M4 step 4): Antora pages at a fixed release tag.
+      "[spring-projects/spring-boot]":
+        tag: v4.1.2
+        root: documentation/spring-boot-docs/src/docs/antora/modules
+        modules: ROOT, reference, how-to
+        site-url: https://docs.spring.io/spring-boot/4.1
+        exclude-pages: ROOT/redirect   # a page of old anchors only: matches everything, says nothing
+  draft:
+    # A source goes into the draft prompt only above these cosine similarities. Without any, there is no draft.
+    # 0.55: the top docs score of the median recent external issue is 0.59 (0.42 at p10, 0.71 at p90).
+    min-doc-score: 0.55
+    min-issue-score: 0.75
   labels:
     threshold: 0.5            # suggest a label if similar issues holding it have >= 50% of the similarity weight
     ignore-prefixes: "status:"  # workflow labels (status: waiting-for-triage, status: duplicate...) are never suggested

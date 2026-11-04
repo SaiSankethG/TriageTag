@@ -6,6 +6,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -25,6 +26,7 @@ public class FakeTriageLlm implements TriageLlm {
     public FakeTriageLlm() {
         rule(MissingDetailsChecker.PROMPT_NAME, FakeTriageLlm::missingDetails);
         rule(DuplicateVerifier.PROMPT_NAME, FakeTriageLlm::duplicateCheck);
+        rule(DraftReplyService.PROMPT_NAME, FakeTriageLlm::draftReply);
     }
 
     @Override
@@ -90,5 +92,17 @@ public class FakeTriageLlm implements TriageLlm {
             }
         }
         return words;
+    }
+
+    private static final Pattern SOURCE_LINE = Pattern.compile("(?m)^\\[\\d+] \\((?:docs|issue)\\) (.+) \\((https?://\\S+)\\)$");
+
+    /** Lists the given sources with their links: the shape of a real draft, without any understanding. */
+    static String draftReply(Prompt prompt) {
+        StringBuilder reply = new StringBuilder("Thanks for the report! These look related:\n");
+        Matcher m = SOURCE_LINE.matcher(prompt.variables().get("sources"));
+        while (m.find()) {
+            reply.append("- ").append(m.group(1)).append(": ").append(m.group(2)).append('\n');
+        }
+        return reply.append("(Draft by the fake LLM.)").toString();
     }
 }
