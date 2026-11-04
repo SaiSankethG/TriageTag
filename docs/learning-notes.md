@@ -2289,3 +2289,30 @@ maintainer's judgement. It could come later, calibrated against sai's scores.
 2. **Why not just read the new outputs?** Without the old ones next to them, and without blinding, it's easy to see improvement
    that isn't there.
 3. **What does it cost to re-run?** About 90k tokens on Haiku 5.5, a few cents.
+
+## M5 extra C: picking honest demo examples (4 Nov 2026)
+
+File: `docs/demo-script.md` (three duplicate pairs + a 2-minute script for the STOP B video).
+
+### What it does
+Picks three real spring-boot duplicate pairs for the video where **the new issue never mentions the original's number** (title and
+body checked for the number as text), the original is the **top match** in the time-ordered search, and the wording differs: #52515 →
+#15999 (7 years apart), #51234 → #50767, #47624 → #47485. The script presents the honest numbers, including that public
+comments are hard at a 4% duplicate rate.
+
+### Basics used here
+- **Cherry-picking vs choosing examples honestly**: a demo always shows good cases. The way to stay honest is to say how they
+  were chosen (from 256 candidate pairs, rule-based) and to show the overall numbers next to them.
+- **Excluding leaked answers**: if the reporter wrote "duplicate of #15999" in the body, finding #15999 proves nothing; the filter
+  removes such pairs.
+
+### One alternative I rejected
+**Using the highest-scoring pairs** (≥ 0.97). Those are mostly near-identical copies; they look impressive but show nothing a
+keyword search couldn't do.
+
+### Likely interview questions
+1. **How did you choose the demo examples?** Rule-based from the answer key: external reporter, no mention of the original's number,
+   original ranked first, different wording; and I say so in the video next to the overall recall.
+2. **Why show the weak spot (public comments) in a demo?** Because it's the real result and the reason for the design (shadow mode
+   by default); interviewers trust numbers that come with their limits.
+3. **What would you show next?** The replay table (keyword vs vector), and a webhook arriving live from the sandbox repo.
