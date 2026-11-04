@@ -1711,3 +1711,40 @@ evaluate; the comment decision only needs a yes/no on the top match.
 The spring-boot entry is removed from `triage.candidates.exclude-labels` (now `{}`); the mechanism stays for other repos.
 `docs/m3-results.md` shows the unfiltered numbers as the headline again (recall@3 46.2%, false-alarm threshold 0.825),
 with a one-line note on the filter experiment. When a repo does configure a filter, the report adds its rows as an experiment.
+
+## M4 step 3: "already fixed?" hint, without an LLM (4 Nov 2026)
+
+Files: Flyway `V6__issue_fix.sql`, `source/FixInfo.java`, `source/FixSource.java`, `github/GitHubFixSource.java` (GraphQL),
+`triage/Version.java`, `triage/ReporterVersion.java`, `triage/IssueFixRepository.java`, `triage/FixedHint.java`,
+`triage/FixedHintService.java`; tests `VersionTest` (2), `ReporterVersionTest` (2), `GitHubFixSourceTest` (5),
+`FixedHintServiceDbTest` (4).
+
+### What it does
+If the top duplicate match is **closed as completed**, find the version its fix shipped in, and compare it with the version
+the new issue's reporter uses:
+- **Fix version**: GitHub GraphQL `ClosedEvent.closer` (a PR or a commit). The closing PR's milestone wins, else the issue's
+  milestone. Checked on real data: spring-boot #52582 was closed by a commit, milestone `4.0.10`. 75% of spring-boot's
+  completed issues have a milestone. Fetched once per issue and cached in `issue_fix`. If GitHub can't be asked (no token,
+  an error), the stored milestone is used and nothing is cached.
+- **Reporter's version**: regexes for `spring-boot-starter-parent` `<version>`, the Gradle plugin line, `springBootVersion =`,
+  "Spring Boot 3.1.5" and jar names. The first match wins. This part is Spring Boot-specific on purpose.
+- **Hint**: UPGRADE ("#N was fixed in 3.4.2; the reporter uses 3.4.1: try upgrading"), SAME_OR_NEWER ("... already uses
+  3.5.0: a regression, or a different problem") or VERSION_UNKNOWN ("ask for it").
+
+### Basics used here
+- **Comparing versions**: text comparison is wrong ("3.4.10" < "3.4.9" as text). `Version` parses the numbers and the
+  pre-release stage, so SNAPSHOT < M1 < RC1 < release, and it implements `Comparable`.
+- **Cache-aside**: look in our table first; on a miss, fetch from GitHub and store. Don't cache a *fallback* answer, so the
+  real one can still be fetched later.
+- **`INSERT ... ON CONFLICT (issue_id) DO UPDATE`**: Postgres "upsert", so a second save replaces the row instead of failing.
+
+### One alternative I rejected
+**Asking the LLM "is this already fixed?"** It would guess from text. GitHub's records (closer + milestone) are facts, cost
+nothing, and can be tested exactly.
+
+### Likely interview questions
+1. **Where does "fixed in" come from?** GitHub's GraphQL timeline (which PR or commit closed the issue) and the milestone
+   the team assigns; cached per issue so each match costs at most one API call.
+2. **What if the reporter didn't say their version?** The hint says "fixed in X, ask for their version". The missing-details
+   check usually flags it too.
+3. **Why not hint on issues closed as "not planned"?** Nothing was fixed there. Telling the reporter to upgrade would be wrong.

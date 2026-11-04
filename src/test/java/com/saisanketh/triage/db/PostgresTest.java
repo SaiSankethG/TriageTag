@@ -12,7 +12,10 @@ import com.saisanketh.triage.kafka.IssueEventPublisher;
 import com.saisanketh.triage.repository.WebhookDeliveryRepository;
 import com.saisanketh.triage.service.IssueService;
 import com.saisanketh.triage.service.WebhookIntakeService;
+import com.saisanketh.triage.source.FixSource;
 import com.saisanketh.triage.triage.CandidateFilter;
+import com.saisanketh.triage.triage.FixedHintService;
+import com.saisanketh.triage.triage.IssueFixRepository;
 import com.saisanketh.triage.triage.KeywordDuplicateSearch;
 import com.saisanketh.triage.triage.LabelSuggester;
 import com.saisanketh.triage.triage.SimilarIssueService;
@@ -32,7 +35,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  *   <li>Flyway runs V1, V2... on the empty container, and Hibernate {@code validate} then checks the entities
  *       against that schema, so every real-DB test also tests the migrations.</li>
  *   <li>All subclasses have the same configuration, so Spring reuses one context and one container for all of them.</li>
- *   <li>Kafka isn't part of these tests: the publisher is a Mockito mock ({@code @MockitoBean}).</li>
+ *   <li>Kafka and GitHub aren't part of these tests: the publisher and the fix source are Mockito mocks ({@code @MockitoBean}).</li>
  * </ul>
  */
 @DataJpaTest(properties = {
@@ -46,9 +49,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         IssueEmbeddingRepository.class, VectorDuplicateSearch.class, SimilarIssueService.class,
         LabelSuggester.class, EvalService.class, CandidateFilter.class,
         LlmTestConfig.class, LlmConfig.class, PromptTemplates.class, IssueTextRepository.class, DuplicateVerifier.class,
-        DuplicateCheckEval.class})
+        DuplicateCheckEval.class, IssueFixRepository.class, FixedHintService.class})
 public abstract class PostgresTest {
 
     @MockitoBean
     protected IssueEventPublisher publisher;
+
+    /** GitHub isn't called from DB tests: the "what fixed this issue" lookup is a mock. */
+    @MockitoBean
+    protected FixSource fixSource;
 }

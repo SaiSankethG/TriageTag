@@ -55,6 +55,16 @@ CREATE TABLE webhook_delivery (
   repo        varchar(200),                 -- 'owner/name'
   received_at timestamptz  NOT NULL
 );
+
+-- Added in M4 (Flyway V6): how a closed issue was fixed, fetched from GitHub once and cached ("already fixed?" hint).
+CREATE TABLE issue_fix (
+  issue_id      bigint       PRIMARY KEY REFERENCES issue(id) ON DELETE CASCADE,
+  closer_type   varchar(20),     -- 'PullRequest' / 'Commit'; null if unknown
+  closer_number integer,         -- PR number (null for a commit)
+  closer_url    text,
+  fix_version   varchar(100),    -- the PR's milestone, else the issue's milestone
+  fetched_at    timestamptz  NOT NULL
+);
 ```
 
 ## Why these choices (interview notes)
