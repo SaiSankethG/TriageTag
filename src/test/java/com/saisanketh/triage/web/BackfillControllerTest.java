@@ -53,7 +53,7 @@ class BackfillControllerTest {
     @Test
     void runsTheBackfillAndReturnsTheSummaryAsJson() throws Exception {
         when(backfillService.backfill("octo-org/hello"))
-                .thenReturn(new BackfillSummary("octo-org/hello", 2, 3, 0, 1, 1234));
+                .thenReturn(new BackfillSummary("octo-org/hello", 2, 3, 0, 0, 1, 1234));
 
         mockMvc.perform(post("/backfill/octo-org/hello"))
                 .andExpect(status().isOk())

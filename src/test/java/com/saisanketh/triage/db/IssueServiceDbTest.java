@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Instant;
+
 import static com.saisanketh.triage.service.TestIssues.issue;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -61,6 +63,25 @@ class IssueServiceDbTest extends PostgresTest {
         assertThat(page.total()).isEqualTo(25);
         // ids of the page + count + issues with labels. With N+1 it would be 2 + 20 = 22.
         assertThat(stats.getPrepareStatementCount()).isEqualTo(3);
+    }
+
+    @Test
+    void aLateOlderEventDoesNotUndoANewerOne() {
+        Issue newer = issue(1, "Closed as duplicate", "status: duplicate");
+        newer.setState("closed");
+        newer.setUpdatedAt(Instant.parse("2024-06-01T12:00:00Z"));
+        Issue older = issue(1, "Still open", "status: waiting-for-triage");
+        older.setUpdatedAt(Instant.parse("2024-06-01T11:00:00Z"));
+
+        issueService.upsert(newer);
+        flushAndForget();
+        UpsertResult late = issueService.upsert(older);     // e.g. a redelivered "opened" webhook
+        flushAndForget();
+
+        assertThat(late).isEqualTo(UpsertResult.STALE);
+        assertThat(jdbc.queryForObject("select state from issue", String.class)).isEqualTo("closed");
+        assertThat(jdbc.queryForList("select label_name from issue_label", String.class))
+                .containsExactly("status: duplicate");
     }
 
     /** Write pending changes to the DB, then forget all loaded entities (like starting a new request). */

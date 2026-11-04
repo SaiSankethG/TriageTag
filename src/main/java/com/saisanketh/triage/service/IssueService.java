@@ -23,6 +23,11 @@ public class IssueService {
      * Inserts the issue, or updates our existing row for it. The match is on (source, externalId),
      * the same pair as the unique constraint, so running a backfill twice never creates duplicates.
      * One transaction: the lookup and the write succeed or fail together.
+     *
+     * <p>Out-of-order safety: if our row is already newer ({@code updatedAt} later than the incoming one),
+     * nothing is changed and the result is STALE. So a late, older event (a webhook redelivered hours later,
+     * or a backfill page fetched before a webhook arrived) can't undo newer data. Equal times do overwrite:
+     * that's the same data again.
      */
     @Transactional
     public UpsertResult upsert(Issue incoming) {
@@ -31,6 +36,9 @@ public class IssueService {
 
         if (existing.isPresent()) {
             Issue row = existing.get();
+            if (isOlder(incoming, row)) {
+                return UpsertResult.STALE;
+            }
             row.updateFrom(incoming);
             // row is "managed" (loaded in this transaction), so Hibernate would write the changes
             // at commit even without this call; calling save makes the intent obvious.
@@ -40,6 +48,12 @@ public class IssueService {
 
         issueRepository.save(incoming);
         return UpsertResult.INSERTED;
+    }
+
+    /** True if the incoming data was last changed before what we already store. */
+    private static boolean isOlder(Issue incoming, Issue stored) {
+        return incoming.getUpdatedAt() != null && stored.getUpdatedAt() != null
+                && incoming.getUpdatedAt().isBefore(stored.getUpdatedAt());
     }
 
     /**

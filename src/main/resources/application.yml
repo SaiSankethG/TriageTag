@@ -21,6 +21,8 @@ spring:
         max.block.ms: 2000          # max wait for topic metadata before send() gives up
         request.timeout.ms: 4000    # max wait for one broker response
         delivery.timeout.ms: 5000   # max total time for a send, retries included (must be >= linger + request timeout)
+    consumer:
+      auto-offset-reset: earliest   # a new consumer group starts at the oldest message, so nothing sent before it started is missed
 
 github:
   api-url: https://api.github.com

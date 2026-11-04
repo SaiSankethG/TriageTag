@@ -9,10 +9,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static com.saisanketh.triage.service.TestIssues.issue;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -56,5 +58,30 @@ class IssueServiceTest {
         assertThat(existing.getDuplicateOf()).isEqualTo(123);       // not wiped by the null in incoming
         verify(issueRepository).save(existing);
         verify(issueRepository, never()).save(incoming);
+    }
+
+    @Test
+    void anOlderEventDoesNotOverwriteNewerData() {
+        Issue stored = issue(1, "Newer title");
+        stored.setUpdatedAt(Instant.parse("2024-06-01T12:00:00Z"));
+        Issue older = issue(1, "Older title");
+        older.setUpdatedAt(Instant.parse("2024-06-01T11:59:59Z"));
+        when(issueRepository.findBySourceAndExternalId(SourceType.GITHUB, "1001")).thenReturn(Optional.of(stored));
+
+        UpsertResult result = issueService.upsert(older);
+
+        assertThat(result).isEqualTo(UpsertResult.STALE);
+        assertThat(stored.getTitle()).isEqualTo("Newer title");
+        verify(issueRepository, never()).save(any());
+    }
+
+    @Test
+    void theSameUpdatedAtOverwrites() {
+        Issue stored = issue(1, "Title");
+        Issue sameTime = issue(1, "Title, edited within the same second");   // TestIssues: same updatedAt
+        when(issueRepository.findBySourceAndExternalId(SourceType.GITHUB, "1001")).thenReturn(Optional.of(stored));
+
+        assertThat(issueService.upsert(sameTime)).isEqualTo(UpsertResult.UPDATED);
+        assertThat(stored.getTitle()).isEqualTo("Title, edited within the same second");
     }
 }

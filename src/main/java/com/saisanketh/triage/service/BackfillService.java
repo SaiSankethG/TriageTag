@@ -29,6 +29,7 @@ public class BackfillService {
         int pages = 0;
         int inserted = 0;
         int updated = 0;
+        int stale = 0;
         int skipped = 0;
 
         String cursor = null;                 // null = first page
@@ -37,10 +38,10 @@ public class BackfillService {
             pages++;
             skipped += page.skipped();
             for (Issue issue : page.issues()) {
-                if (issueService.upsert(issue) == UpsertResult.INSERTED) {
-                    inserted++;
-                } else {
-                    updated++;
+                switch (issueService.upsert(issue)) {
+                    case INSERTED -> inserted++;
+                    case UPDATED -> updated++;
+                    case STALE -> stale++;   // we already had newer data, e.g. from a webhook
                 }
             }
             if (pages % LOG_EVERY_PAGES == 0) {
@@ -51,7 +52,7 @@ public class BackfillService {
         } while (cursor != null);            // only a null cursor means "no more pages"
 
         long durationMs = (System.nanoTime() - start) / 1_000_000;
-        BackfillSummary summary = new BackfillSummary(repo, pages, inserted, updated, skipped, durationMs);
+        BackfillSummary summary = new BackfillSummary(repo, pages, inserted, updated, stale, skipped, durationMs);
         log.info("Backfill finished: {}", summary);
         return summary;
     }

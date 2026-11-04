@@ -1025,3 +1025,70 @@ thinks the delivery succeeded and will never resend it: the event is lost silent
    Write the business change and the outgoing message into the same database transaction (an outbox table); a
    separate relay publishes outbox rows to the broker. It removes the "DB committed but message not sent" (or the
    reverse) gap of writing to two systems, without distributed transactions.
+
+## M2 step 4: the consumer (triage worker), out-of-order safety, retries and dead letters (4 Nov 2026)
+
+Files: `kafka/IssueEventConsumer.java`, `kafka/KafkaErrorHandlingConfig.java`, `IssueService.upsert` (STALE rule),
+`UpsertResult.STALE`, `BackfillSummary.stale`, `application.yml` (`auto-offset-reset: earliest`). Tests:
+`IssueEventConsumerTest` (5), 2 more `IssueServiceTest`, 1 more real-DB test, and `KafkaErrorHandlingTest` (2) with
+**real Kafka + Postgres containers** (`e2e/FullStackTest` base, shared with step 5).
+
+### What it does
+- `@KafkaListener(topics = "issue-events", groupId = "triage-worker")`: for each message, read the `issue` object,
+  map it with the same `GitHubIssueMapper` the backfill uses, and call `IssueService.upsert`. labeled/unlabeled
+  need nothing special: the issue object always contains its current labels.
+- **Out-of-order safety:** `upsert` now only overwrites if `incoming.updated_at >= stored.updated_at`; otherwise it
+  returns `STALE` and changes nothing. A redelivered "opened" from an hour ago can't reopen a closed issue or bring
+  back removed labels. (Equal times do overwrite: that's the same data, or two changes in the same second, which
+  arrive in order anyway because they share a partition.)
+- **Errors** (`DefaultErrorHandler`):
+  - a broken message (not JSON, no issue, mapper fails) -> `BadIssueEventException` -> **not retried** -> straight to
+    `issue-events.DLT`;
+  - anything else (e.g. the database blinked) -> retried **3 times** after 0.5 s, 1 s, 2 s -> then to the DLT.
+  Either way the consumer moves on to the next message, so one bad message never blocks its partition.
+- Checked on the real docker stack: group `triage-worker` was assigned partitions 0, 1, 2 and processed the two
+  test messages from step 3 in order (`INSERTED`, then `UPDATED`). (The sample row was deleted afterwards.)
+
+### Why at-least-once delivery is safe here
+Kafka's consumer commits its position (the **offset**) *after* processing. If the app crashes after the upsert but
+before the commit, the same message is delivered again after restart: **at least once**, sometimes twice. That's
+fine because processing is **idempotent**:
+1. the upsert matches on `(source, external_id)`, so the second time it updates the same row instead of adding one;
+2. the data is the full issue state, not a change ("add label X"), so applying it twice gives the same row;
+3. older data is ignored (`updated_at` rule), so even a re-delivery that arrives *after* a newer event is harmless.
+"Exactly once" in Kafka needs transactions on both sides; idempotent processing gets the same result much more simply.
+
+### Basics used here
+- **`@KafkaListener`**: Spring calls this method for every message on the topic. Spring Boot's listener container
+  polls Kafka, calls the method, commits the offset, and on an exception hands the message to the error handler.
+  *Before:* write a `while (true) { consumer.poll(...); for each record ...; consumer.commitSync(); }` loop yourself.
+  *After:* `@KafkaListener(topics = "issue-events", groupId = "triage-worker") void onIssueEvent(ConsumerRecord<String,String> r)`.
+- **`ConsumerRecord`**: one message plus where it came from: `key()`, `value()`, `partition()`, `offset()`.
+- **`DefaultErrorHandler` + `ExponentialBackOffWithMaxRetries(3)`**: retry the failed message in the same consumer,
+  waiting longer each time; after the last retry, call the "recoverer".
+- **`DeadLetterPublishingRecoverer`**: the recoverer that sends the failed message to another topic (here
+  `issue-events.DLT`, same partition) with headers explaining why (`kafka_dlt-exception-cause-fqcn`, message, stack trace).
+- **`addNotRetryableExceptions(BadIssueEventException.class)`**: skip the retries for errors that can't fix themselves.
+- **`auto-offset-reset: earliest`**: what a *new* consumer group does when it has no saved position: start at the
+  oldest message (instead of only new ones), so nothing sent before the worker first started is lost.
+- **`@SpringBootTest` + Testcontainers Kafka/Postgres**: the whole app against real infrastructure. `@MockitoSpyBean`
+  wraps the real `IssueService` so a test can make *one* call fail (`doThrow(...).doCallRealMethod()`) and prove the
+  retry works. Waiting uses a plain loop (check every 100 ms, give up after 10 s); no extra library.
+
+### One alternative I rejected
+**Spring Kafka's `@RetryableTopic`** (non-blocking retries: failed messages go to `issue-events-retry-0`, `-retry-1`...
+topics and come back later). It doesn't hold up the partition while waiting, but it **breaks ordering** (a retried
+"opened" could be applied after a newer "closed"), needs more topics, and our STALE rule would then be doing a lot of
+work. Blocking retries of a few seconds keep events in order and are simpler; a broken message still leaves quickly.
+
+### Likely interview questions
+1. **What happens if the consumer crashes after writing to the database but before committing the offset?**
+   The message is delivered again after restart (at-least-once). The upsert is idempotent and ignores older data, so
+   the second run changes nothing.
+2. **How does a poison message not block the whole partition?**
+   Messages that can't be parsed or mapped throw a non-retryable exception and go straight to the DLT; other errors are
+   retried 3 times with backoff and then also go to the DLT. Either way the consumer commits and continues. A test sends
+   a bad message and then a good one with the same key: the good one is stored, the bad one is on the DLT.
+3. **Events for an issue arrive out of order. How do you avoid old data overwriting new?**
+   Same key -> same partition keeps them ordered in normal operation. For the rest (redeliveries, backfill racing a
+   webhook), the upsert compares `updated_at` and ignores anything older than what's stored.
