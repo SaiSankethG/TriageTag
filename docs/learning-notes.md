@@ -2178,3 +2178,50 @@ the plan asked for, and the hand-written version is easier to explain line by li
 2. **Where is the private key?** In a file on the server, mounted from a Kubernetes Secret; its path comes from an env var.
    It's never in git, never logged, and tests use generated keys.
 3. **Why iat 60 s in the past?** Clock drift: if our clock is ahead of GitHub's, a token "issued in the future" is rejected.
+
+## M5 step 4: comment mode, off by default and never twice (4 Nov 2026)
+
+Files: Flyway `V11__comment_mode.sql` (`repo_setting`, `posted_comment`); package `comment`: `CommentService`,
+`CommentRepository`, `GitHubCommentClient`, `CommentProperties`; `TriageService.createIfMissing` calls it; config
+`triage.comments.skip-labels`; tests `CommentServiceDbTest` (4), `CommentServiceTest` (1), `GitHubCommentClientTest` (1).
+
+### What it does
+After the worker creates a new issue's report, `CommentService` may post **one** comment as the GitHub App, only if all of
+these are true (checked in this order):
+1. the repo's mode is `SUGGEST` (no row in `repo_setting` = `SHADOW` = never);
+2. the App is configured (id + key file);
+3. the issue is open and was opened by someone **outside the team**;
+4. it has none of the repo's **skip labels** (spring-boot: `status: forward-port`, `status: back-port`, the clones that were
+   21 of 48 confirmed false alarms in step 1);
+5. the top match scores ≥ **0.90** AND the LLM check said **yes**;
+6. a `posted_comment` row can be **reserved** for the issue (INSERT ... ON CONFLICT DO NOTHING): only then post, then mark
+   POSTED (or FAILED, not retried).
+
+The comment: "This looks like it may be a duplicate of #N (title), similarity 93%. A bot suggested this after an automated
+check; it can be wrong. The maintainers decide."
+
+### Why these choices
+- **Reserve before posting = at most once.** If the app crashes after posting but before recording, the row is PENDING and
+  nothing posts again. The opposite order (post, then record) could post twice on a Kafka redelivery. A missing comment is
+  cheap; a double bot comment on someone's issue is embarrassing.
+- **No HTTP endpoint to switch it on.** Turning on public comments is a deliberate operator act (`INSERT INTO repo_setting
+  VALUES ('owner/name', 'SUGGEST')`), so nobody on the internet can flip it.
+- **Only for reports from the worker**: regenerating a report by hand (`POST /reports`) never comments.
+
+### Basics used here
+- **At-most-once vs at-least-once**: Kafka and the outbox are at-least-once (repeat rather than lose); for a public side effect
+  we want at-most-once (lose rather than repeat). A unique key reserved before the side effect gives that.
+- **Feature flag in data**: a row per repo, defaulting to off, read on each decision; no redeploy to change it.
+- **Guard clauses**: each check returns a named `Decision` (SHADOW_MODE, TEAM_AUTHOR, SKIP_LABEL...), so logs and tests say exactly
+  why nothing was posted.
+
+### One alternative I rejected
+**Posting from the report endpoint or the demo page.** Comment decisions belong to the event pipeline, once per new issue;
+a button would make double posts and accidental posts easy.
+
+### Likely interview questions
+1. **How do you make sure the bot never comments twice?** A row keyed by issue id is inserted before posting with ON CONFLICT DO
+   NOTHING; only the caller that inserted it may post. Redeliveries, retries and a second instance all find the row and stop.
+2. **When does it comment at all?** Only in repos switched to SUGGEST by the operator, only on open issues from outside the team
+   that aren't bookkeeping clones, and only when the match is ≥ 0.90 and the LLM agrees. Everything else stays in the private report.
+3. **What if posting fails?** The row becomes FAILED with the error, and it's not retried. The private report still has the match.

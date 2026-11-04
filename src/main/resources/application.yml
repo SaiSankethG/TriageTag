@@ -78,6 +78,14 @@ triage:
     min-issue-score: 0.75
   fixed-hint:
     min-score: 0.75   # the "already fixed?" hint looks at the top match only if it is at least this similar
+  comments:
+    # Comment mode (off by default; per repo with SQL: INSERT INTO repo_setting VALUES ('owner/name', 'SUGGEST')).
+    # Issues with these labels never get a comment: the team's per-branch clones, which the LLM rightly calls "the same
+    # problem" (21 of 48 confirmed false alarms in M5 step 1).
+    skip-labels:
+      "[spring-projects/spring-boot]":
+        - "status: forward-port"
+        - "status: back-port"
   labels:
     threshold: 0.5            # suggest a label if similar issues holding it have >= 50% of the similarity weight
     ignore-prefixes: "status:"  # workflow labels (status: waiting-for-triage, status: duplicate...) are never suggested

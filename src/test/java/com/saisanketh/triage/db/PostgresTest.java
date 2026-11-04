@@ -9,7 +9,11 @@ import com.saisanketh.triage.eval.DuplicateCheckEval;
 import com.saisanketh.triage.ai.DraftReplyService;
 import com.saisanketh.triage.ai.MissingDetailsChecker;
 import com.saisanketh.triage.ai.TokenBudget;
+import com.saisanketh.triage.comment.CommentRepository;
+import com.saisanketh.triage.comment.CommentService;
+import com.saisanketh.triage.comment.GitHubCommentClient;
 import com.saisanketh.triage.docs.DocChunkRepository;
+import com.saisanketh.triage.github.GitHubAppAuth;
 import com.saisanketh.triage.docs.DocIngestService;
 import com.saisanketh.triage.docs.DocSource;
 import com.saisanketh.triage.report.TriageReportRepository;
@@ -51,7 +55,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         "spring.jpa.properties.hibernate.generate_statistics=true",
         "triage.eval.results-file=target/test-m3-results.md",
         "triage.candidates.exclude-labels[octo-org/hello]=status: forward-port",
-        "triage.eval.duplicate-check-file=target/test-m4-duplicate-check.md"})
+        "triage.eval.duplicate-check-file=target/test-m4-duplicate-check.md",
+        "triage.comments.skip-labels[octo-org/hello]=status: forward-port"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({PostgresContainerConfig.class, ClockConfig.class, IssueService.class,
         WebhookDeliveryRepository.class, WebhookIntakeService.class, KeywordDuplicateSearch.class,
@@ -61,7 +66,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         DuplicateCheckEval.class, IssueFixRepository.class, FixedHintService.class,
         DocChunkRepository.class, DocIngestService.class, DraftReplyService.class, MissingDetailsChecker.class,
         TriageReportRepository.class, TriageService.class, TokenBudget.class,
-        OutboxRepository.class})
+        OutboxRepository.class, CommentRepository.class, CommentService.class})
 public abstract class PostgresTest {
 
     @MockitoBean
@@ -73,4 +78,11 @@ public abstract class PostgresTest {
 
     @MockitoBean
     protected DocSource docSource;
+
+    /** Comment mode's GitHub side: never called for real from DB tests. */
+    @MockitoBean
+    protected GitHubAppAuth appAuth;
+
+    @MockitoBean
+    protected GitHubCommentClient commentClient;
 }

@@ -116,6 +116,23 @@ CREATE TABLE outbox_event (
   last_error  text
 );
 CREATE INDEX idx_outbox_event_unsent ON outbox_event (id) WHERE sent_at IS NULL;
+
+-- Added in M5 (Flyway V11): comment mode. No repo_setting row = SHADOW. Changed by SQL only (no HTTP endpoint).
+CREATE TABLE repo_setting (
+  repo varchar(200) PRIMARY KEY,                          -- lower case
+  mode varchar(20)  NOT NULL DEFAULT 'SHADOW' CHECK (mode IN ('SHADOW', 'SUGGEST'))
+);
+-- Reserved BEFORE posting; issue_id is the key, so at most one comment per issue, ever.
+CREATE TABLE posted_comment (
+  issue_id    bigint      PRIMARY KEY REFERENCES issue(id) ON DELETE CASCADE,
+  report_id   bigint      NOT NULL REFERENCES triage_report(id) ON DELETE CASCADE,
+  status      varchar(20) NOT NULL CHECK (status IN ('PENDING', 'POSTED', 'FAILED')),
+  comment_id  bigint,
+  comment_url text,
+  error       text,
+  created_at  timestamptz NOT NULL,
+  posted_at   timestamptz
+);
 ```
 
 ## Why these choices (interview notes)
