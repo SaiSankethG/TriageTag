@@ -39,7 +39,9 @@ public class GuardedTriageLlm implements TriageLlm {
             throw new LlmException("daily token budget of " + budget.dailyLimit() + " tokens reached; LLM step skipped");
         }
         LlmReply reply = delegate.complete(prompt);
-        budget.record(reply.totalTokens());
+        if (!FakeTriageLlm.MODEL.equals(delegate.model())) {
+            budget.record(reply.totalTokens());   // the fake's estimated tokens cost nothing: they don't use up the budget
+        }
         metrics.llmCall(delegate.model(), reply.inputTokens(), reply.outputTokens(),
                 (reply.inputTokens() * inputUsdPerMillion + reply.outputTokens() * outputUsdPerMillion) / 1_000_000);
         return reply;

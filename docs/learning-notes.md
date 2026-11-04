@@ -2450,3 +2450,19 @@ makes it optional. The dashboard and the metrics are ready for when it's wanted.
    letters, outbox backlog), then what the product decided (duplicate levels, comment decisions).
 2. **How do you know the dashboard isn't broken?** A test parses it and checks each query's metric names against what the app exports.
 3. **Why a histogram and not an average?** Averages hide slow outliers; p95 shows what the slowest 1 in 20 reports experience.
+
+## M6 (small fix): the fake LLM doesn't use up the daily token budget (4 Nov 2026)
+
+Files: `ai/GuardedTriageLlm.java`; test in `GuardedTriageLlmTest`; M5 report open question 4 closed.
+
+The daily budget exists to limit **real** spend. The fake LLM (no API key, tests, load tests) estimates tokens but costs nothing,
+yet its estimates were added to `llm_usage`: a local run without a key could "use up" the budget and pause the real model on the
+same database. Now only real-model calls are recorded there. The fake's tokens still appear in the metrics (`model="fake"`), and
+the fake is still refused when real usage is over the budget, so the budget behaviour stays testable.
+
+### Likely interview questions
+1. **Why did a fake LLM affect the real budget?** Both shared one per-day counter in the database; the fix records only calls that
+   cost money.
+2. **Why still refuse the fake when over budget?** So "budget reached" behaves the same with or without a key, and tests can check it.
+3. **How did you find it?** A local app without a key showed "AI checks paused" after a load of fake reports: reading the counter
+   showed fake tokens in it.

@@ -151,5 +151,5 @@ Script and three duplicate pairs: `docs/demo-script.md`.
 1. **HTTPS option** (Cloudflare Tunnel vs Let's Encrypt on a domain), see STOP B step 3.
 2. **Prompt v3 is now the default** for drafts; if sai's blind scores prefer v2, switching back is a one-line change.
 3. **Comment mode on a real repo** needs a maintainer to install the App; until then only the sandbox.
-4. The `llm_usage` counter is shared by every app instance on the same database, including local runs with the fake LLM (the
-   fake's estimated tokens count too). Fine for a budget; for cost reports, count only real-model rows (future: a `model` column).
+4. ~~The fake LLM's estimated tokens counted in `llm_usage`.~~ Fixed in M6: only real-model tokens use up the daily budget (the
+   fake's still show in the metrics, tagged `model="fake"`).

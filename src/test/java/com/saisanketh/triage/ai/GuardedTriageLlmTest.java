@@ -46,4 +46,16 @@ class GuardedTriageLlmTest {
         assertThat(delegate.prompts).isEmpty();
         verify(budget, never()).record(org.mockito.ArgumentMatchers.anyInt());
     }
+
+    @Test
+    void theFakeLlmsTokensDoNotUseUpTheBudgetButStillShowInTheMetrics() {
+        when(budget.hasRoom()).thenReturn(true);
+        GuardedTriageLlm llm = new GuardedTriageLlm(new FakeTriageLlm(), budget, new TriageMetrics(registry), 0, 0);
+
+        llm.complete(PROMPT);
+
+        verify(budget, never()).record(org.mockito.ArgumentMatchers.anyInt());
+        assertThat(registry.get("triage.llm.tokens").tag("model", "fake").tag("direction", "input").counter().count())
+                .isPositive();
+    }
 }
