@@ -96,9 +96,21 @@ public class FakeTriageLlm implements TriageLlm {
 
     private static final Pattern SOURCE_LINE = Pattern.compile("(?m)^\\[\\d+] \\((?:docs|issue)\\) (.+) \\((https?://\\S+)\\)$");
 
-    /** Lists the given sources with their links: the shape of a real draft, without any understanding. */
+    /**
+     * Lists the given sources with their links: the shape of a real draft, without any understanding. From prompt v3 on it
+     * starts with the similar issue's first line when there is one, and repeats the missing-details instruction.
+     */
     static String draftReply(Prompt prompt) {
-        StringBuilder reply = new StringBuilder("Thanks for the report! These look related:\n");
+        StringBuilder reply = new StringBuilder();
+        String top = prompt.variables().get("top_match");
+        if (top != null && top.startsWith("#")) {
+            reply.append("This looks like ").append(top.lines().findFirst().orElse("")).append(".\n");
+        }
+        String missing = prompt.variables().get("missing");
+        if (missing != null && missing.startsWith("Ask only for: ")) {
+            reply.append("Could you add: ").append(missing.substring("Ask only for: ".length())).append('\n');
+        }
+        reply.append("These look related:\n");
         Matcher m = SOURCE_LINE.matcher(prompt.variables().get("sources"));
         while (m.find()) {
             reply.append("- ").append(m.group(1)).append(": ").append(m.group(2)).append('\n');

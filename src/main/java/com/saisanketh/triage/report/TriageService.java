@@ -2,6 +2,7 @@ package com.saisanketh.triage.report;
 
 import com.saisanketh.triage.ai.DraftReply;
 import com.saisanketh.triage.ai.DraftReplyService;
+import com.saisanketh.triage.ai.DraftReplyService.TopMatch;
 import com.saisanketh.triage.ai.DuplicateCheck;
 import com.saisanketh.triage.ai.DuplicateVerifier;
 import com.saisanketh.triage.ai.IssueText;
@@ -26,6 +27,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -127,7 +129,7 @@ public class TriageService {
         MissingDetails missing = missingDetailsChecker.check(repo, issue.title(), issue.body());
         FixedHint fixedHint = top.filter(t -> t.score() >= fixedHintMinScore)
                 .flatMap(t -> fixedHintService.hint(repo, t.number(), issue.body())).orElse(null);
-        DraftReply draft = draftReplyService.draft(repo, issue, similar);
+        DraftReply draft = draftReplyService.draft(repo, issue, similar, topMatch(repo, top, duplicateCheck), missing);
 
         Set<String> prompts = new LinkedHashSet<>();
         int tokens = 0;
@@ -148,6 +150,17 @@ public class TriageService {
         log.info("Triage report for {}#{}: {} duplicates, {} labels, {} missing, draft {}, {} tokens", repo,
                 issue.number(), duplicates.size(), labels.size(), missing.missing().size(), draft.status(), tokens);
         return report;
+    }
+
+    /** The best match with its CURRENT state, for the draft prompt; null if there is no match. */
+    private TopMatch topMatch(String repo, Optional<SimilarIssue> top, DuplicateCheck check) {
+        if (top.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> state = jdbc.queryForMap(
+                "SELECT state, state_reason FROM issue WHERE repo = ? AND number = ?", repo, top.get().number());
+        return new TopMatch(top.get().number(), top.get().title(), (String) state.get("state"),
+                (String) state.get("state_reason"), top.get().score(), check);
     }
 
     static String issueUrl(String repo, int number) {

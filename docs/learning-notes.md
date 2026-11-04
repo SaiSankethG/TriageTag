@@ -2225,3 +2225,41 @@ a button would make double posts and accidental posts easy.
 2. **When does it comment at all?** Only in repos switched to SUGGEST by the operator, only on open issues from outside the team
    that aren't bookkeeping clones, and only when the match is ≥ 0.90 and the LLM agrees. Everything else stays in the private report.
 3. **What if posting fails?** The row becomes FAILED with the error, and it's not retried. The private report still has the match.
+
+## M5 extra A: draft-reply prompt v3 (4 Nov 2026)
+
+Files: `prompts/draft-reply-v3.txt` (v1 and v2 unchanged), `ai/DraftReplyService.java` (`TopMatch`, `topMatchText`,
+`missingText`, `stateText`), `report/TriageService.java` (passes the top match with its current state, the LLM check and the
+missing-details result), `FakeTriageLlm` (the fake draft now follows the v3 inputs); tests: 3 new in `DraftReplyServiceTest`,
+`TriageServiceDbTest` updated.
+
+### Why a v3
+Reading the real #52529 report: the v2 draft (1) ignored that the top match #52519 was the marked original and closed as not
+planned, (2) talked like a bot ("the sources I have cover..."), and (3) asked for the Spring Boot version although the
+missing-details check had said it wasn't needed. v2 simply never saw those facts.
+
+### What v3 changes
+- The prompt gets **`<similar_issue>`**: number, title, link, similarity with its level (medium ≥ 75%, high ≥ 90%), its current
+  state in words ("closed as not planned"), and the AI duplicate check's verdict. Below 75% it says "None", so a weak match
+  isn't presented as a duplicate.
+- It gets **`<missing_details>`**: "Ask only for: version." / "None: do not ask for more details." / "Unknown: do not ask".
+- Instructions: write as a maintainer; never mention sources, retrieval or being an AI; lead with the similar issue ("This looks
+  like #N, which was closed as ..."); ask only for what's missing; links only from the given sources.
+
+### Basics used here
+- **Give the model the facts you already computed.** An LLM can't know the duplicate search result or the missing-details
+  result unless they're in the prompt. Before: separate parts of the report contradicted each other. After: the draft builds on them.
+- **New prompt file instead of editing the old one**: v2 stays, so stored reports with `draft-reply-v2` remain explainable and the two
+  can be compared side by side (next commit).
+
+### One alternative I rejected
+**Fixing it after the fact** (strip "the sources I have", remove version questions with regexes). Brittle and invisible; the right
+place is the instructions and the inputs.
+
+### Likely interview questions
+1. **How do you improve an LLM feature?** Read real outputs, name the failures, trace each to a missing input or a missing
+   instruction, change one prompt version, and compare old vs new on the same issues.
+2. **Why pass the missing-details result into the draft prompt?** So the two parts agree; otherwise the draft asks for things
+   another part of the same report says are already there.
+3. **How do you keep the draft from claiming a weak match?** Below medium similarity the prompt says "None", so the model never
+   sees a weak match as a candidate.
