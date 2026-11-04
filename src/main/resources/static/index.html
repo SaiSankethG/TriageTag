@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Issue Triage Report</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+    --accent: #2f5fd0; --good: #1e7a3e; --warn: #9a6200; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --card: #1f1f1d; --text: #ecece8; --muted: #a0a09a; --line: #34342f;
+      --accent: #7ea2ff; --good: #5cc884; --warn: #e2a64a; --bad: #ff7b72;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+          background: var(--card); color: var(--text); }
+  #repo { flex: 1 1 260px; }
+  #number { width: 120px; }
+  button { font: inherit; padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent);
+           color: #fff; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  button:disabled { opacity: .6; cursor: wait; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+            margin-bottom: 12px; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 4px 0; border-top: 1px solid var(--line); vertical-align: top; }
+  td.score { width: 70px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  a { color: var(--accent); }
+  .muted { color: var(--muted); }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line);
+         margin: 0 6px 6px 0; font-size: 13px; }
+  .ok { color: var(--good); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  pre { white-space: pre-wrap; word-break: break-word; margin: 0; font: inherit; }
+  #message { margin: 8px 0 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Issue triage report</h1>
+  <p class="sub">What the assistant would privately tell a maintainer about one issue.</p>
+
+  <form id="form">
+    <input id="repo" value="spring-projects/spring-boot" aria-label="Repository (owner/name)" required>
+    <input id="number" type="number" min="1" placeholder="Issue #" aria-label="Issue number" required>
+    <button id="show" type="submit">Show report</button>
+  </form>
+  <div id="message"></div>
+  <div id="report"></div>
+</main>
+
+<script>
+  // Plain DOM building with textContent everywhere: issue titles and LLM text are never inserted as HTML.
+  const $ = (id) => document.getElementById(id);
+
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) {
+      if (key === 'class') node.className = value; else node.setAttribute(key, value);
+    }
+    for (const child of children) {
+      if (child != null) node.append(child instanceof Node ? child : String(child));
+    }
+    return node;
+  }
+
+  function link(url, text) {
+    // Only http(s) links are made clickable.
+    return /^https?:\/\//.test(url) ? el('a', { href: url, target: '_blank', rel: 'noopener' }, text) : text;
+  }
+
+  function section(title, ...content) {
+    return el('section', {}, el('h2', {}, title), ...content);
+  }
+
+  function setMessage(text, kind) {
+    $('message').replaceChildren(text ? el('span', { class: kind || 'muted' }, text) : '');
+  }
+
+  async function load(method) {
+    const repo = $('repo').value.trim();
+    const number = $('number').value.trim();
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || !/^\d+$/.test(number)) {
+      setMessage('Enter a repo like owner/name and an issue number.', 'bad');
+      return;
+    }
+    $('show').disabled = true;
+    setMessage(method === 'POST' ? 'Creating the report (runs the LLM steps)...' : 'Loading...');
+    $('report').replaceChildren();
+    try {
+      const response = await fetch(`/reports/${repo}/${number}`, { method });
+      if (response.status === 404) {
+        if (method === 'POST') {
+          setMessage(`Issue #${number} isn't stored for ${repo}. Backfill the repo first.`, 'bad');
+        } else {
+          const create = el('button', { class: 'secondary', type: 'button' }, 'Create report');
+          create.addEventListener('click', () => load('POST'));
+          $('message').replaceChildren(el('span', { class: 'muted' }, 'No report yet for this issue. '), create);
+        }
+        return;
+      }
+      if (!response.ok) {
+        setMessage(`The server answered ${response.status}.`, 'bad');
+        return;
+      }
+      setMessage('');
+      render(await response.json());
+    } catch (e) {
+      setMessage('Could not reach the server: ' + e.message, 'bad');
+    } finally {
+      $('show').disabled = false;
+    }
+  }
+
+  function render(r) {
+    const parts = [];
+    parts.push(section('Issue',
+      el('div', {}, link(r.url, `#${r.number} ${r.title}`)),
+      el('div', { class: 'muted' }, `Report created ${new Date(r.createdAt).toLocaleString()}`)));
+
+    const dupRows = (r.duplicates || []).map(d =>
+      el('tr', {}, el('td', {}, link(d.url, `#${d.number} ${d.title}`)), el('td', { class: 'score' }, d.score.toFixed(3))));
+    const dupContent = [dupRows.length ? el('table', {}, ...dupRows) : el('div', { class: 'muted' }, 'No earlier issues to compare with.')];
+    if (r.duplicateCheck) {
+      const c = r.duplicateCheck;
+      const cls = c.verdict === 'YES' ? 'ok' : c.verdict === 'NO' ? 'bad' : 'warn';
+      dupContent.push(el('p', {}, 'LLM check of the top match: ', el('strong', { class: cls }, c.verdict), ` - ${c.reason}`));
+    } else if (dupRows.length) {
+      dupContent.push(el('p', { class: 'muted' }, 'Top match is below the comment threshold: no LLM check.'));
+    }
+    parts.push(section('Possible duplicates (cosine similarity)', ...dupContent));
+
+    const labels = r.labels || [];
+    parts.push(section('Suggested labels', labels.length
+      ? el('div', {}, ...labels.map(l => el('span', { class: 'tag' }, `${l.label} (${Math.round(l.share * 100)}%)`)))
+      : el('div', { class: 'muted' }, 'No label above the vote threshold.')));
+
+    const m = r.missing || {};
+    let missingContent;
+    if (m.status !== 'OK') {
+      missingContent = el('div', { class: 'warn' }, `Unknown: ${m.note || 'no answer'}`);
+    } else if (!m.missing.length) {
+      missingContent = el('div', { class: 'ok' }, 'Nothing missing.');
+    } else {
+      missingContent = el('div', {}, 'Ask the reporter for: ',
+        ...m.missing.map(d => el('span', { class: 'tag' }, d.toLowerCase().replaceAll('_', ' '))));
+    }
+    parts.push(section('Missing details', missingContent));
+
+    if (r.fixedHint) {
+      parts.push(section('Already fixed?', el('div', {}, r.fixedHint.text),
+        r.fixedHint.closerUrl ? el('div', {}, link(r.fixedHint.closerUrl, 'What closed it')) : null));
+    }
+
+    const draft = r.draftReply || {};
+    const draftContent = [el('pre', { class: draft.status === 'OK' ? '' : 'muted' }, draft.text || '')];
+    if ((draft.unknownLinks || []).length) {
+      draftContent.push(el('p', { class: 'bad' }, 'Links that are not among the sources: ' + draft.unknownLinks.join(', ')));
+    }
+    if ((draft.sources || []).length) {
+      draftContent.push(el('h2', { style: 'margin-top:12px' }, 'Sources'),
+        el('table', {}, ...draft.sources.map(s => el('tr', {},
+          el('td', {}, `${s.kind}: `, link(s.url, s.title)), el('td', { class: 'score' }, s.score.toFixed(3))))));
+    }
+    parts.push(section('Draft reply (for the maintainer to edit)', ...draftContent));
+
+    parts.push(el('p', { class: 'muted' },
+      `Model: ${r.llmModel} · prompts: ${r.promptVersions} · tokens: ${r.costTokens}` + (r.notes ? ` · ${r.notes}` : '')));
+    $('report').replaceChildren(...parts);
+  }
+
+  $('form').addEventListener('submit', (e) => { e.preventDefault(); load('GET'); });
+</script>
+</body>
+</html>

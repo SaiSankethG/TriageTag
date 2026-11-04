@@ -1837,3 +1837,30 @@ written together, never queried inside. jsonb is simpler here, and the plan's sc
    (issue_id) as a backstop.
 3. **Why run the LLM duplicate check only above a threshold?** Cost and purpose: it exists to decide a public comment, which
    needs a high score anyway. Below it, the maintainer still sees the private top 3.
+
+## M4 step 6: demo page (4 Nov 2026)
+
+Files: `src/main/resources/static/index.html` (one file, plain HTML + JavaScript, no libraries); test `DemoPageTest` (1).
+
+### What it does
+Open http://localhost:8080/, enter a repo and an issue number, and the page shows the stored report (`GET /reports/...`):
+possible duplicates with scores and links, the LLM check of the top match (or "below the comment threshold"), labels, missing
+details, the "already fixed?" hint, the draft reply with its sources, and model/prompt/tokens. If there's no report yet, a
+**Create report** button calls `POST /reports/...`. Light and dark mode follow the system setting.
+
+### Basics used here
+- **Spring Boot serves `src/main/resources/static/` at `/`**: no controller needed. Before: a Thymeleaf template and a
+  controller method. After: a static file whose JavaScript `fetch`es the JSON API.
+- **XSS safety**: issue titles, bodies and LLM text are written with `textContent` (via `document.createElement`), never
+  `innerHTML`, and only `http(s)` URLs become links. A malicious issue title like `<img onerror=...>` shows as text. The test
+  checks the file never uses `innerHTML`.
+
+### One alternative I rejected
+**A React/Vite front end.** A build tool, node_modules and a second project for one read-only page; the plan said no new dependency.
+
+### Likely interview questions
+1. **Why plain JS?** One page that reads one JSON endpoint; no build step, nothing to keep up to date, easy to read in an interview.
+2. **How do you stop a malicious issue from injecting script into the page?** Everything goes in as text nodes, never as
+   HTML; links are allowed only for http(s) URLs.
+3. **Is the page secured?** Not yet: it's a local demo. In M5 the deployed app would sit behind auth (or the page would
+   only show public data, which it does today).
