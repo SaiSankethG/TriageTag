@@ -25,4 +25,13 @@ class DemoPageTest {
         assertThat(html).doesNotContain("localStorage");
         assertThat(html).doesNotContainPattern("URLSearchParams\\([^)]*[Tt]oken");
     }
+
+    @Test
+    void theGuidePageIsThereAndLinkedFromTheReportsPage() throws Exception {
+        String guide = new ClassPathResource("static/guide.html").getContentAsString(StandardCharsets.UTF_8);
+        String page = new ClassPathResource("static/index.html").getContentAsString(StandardCharsets.UTF_8);
+
+        assertThat(page).contains("href=\"/guide.html\"", "fetch(`/reports/${repo}?limit=50`)");
+        assertThat(guide).contains("How to read a report", "What is private, what is public").doesNotContain("<script");
+    }
 }

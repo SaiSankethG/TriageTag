@@ -39,6 +39,8 @@ class TriageServiceDbTest extends PostgresTest {
     @Autowired
     private TriageReportRepository reports;
     @Autowired
+    private com.saisanketh.triage.service.IssueService issueService;
+    @Autowired
     private com.saisanketh.triage.ai.TokenBudget budget;
 
     private static float[] direction(double angleDegrees) {
@@ -140,5 +142,21 @@ class TriageServiceDbTest extends PostgresTest {
         assertThat(report.duplicates()).isNotEmpty();                 // no LLM needed
         assertThat(report.labels()).isNotEmpty();
         assertThat(report.costTokens()).isZero();
+    }
+
+    @Test
+    void recentReportsListTheIssueAndItsBestMatchAndListsFlagWhichIssuesHaveAReport() {
+        save(1, "2024-01-01T00:00:00Z", 1, "Datasource url not picked up", "...", "open", null);
+        long id = save(2, "2024-06-01T00:00:00Z", 0, "Datasource url not picked up from yaml", "...", "open", null);
+        triageService.create(id);
+
+        var recent = reports.recent("Octo-Org/Hello", 10);
+
+        assertThat(recent).hasSize(1);
+        assertThat(recent.get(0).number()).isEqualTo(2);
+        assertThat(recent.get(0).topNumber()).isEqualTo(1);
+        assertThat(recent.get(0).topScore()).isGreaterThan(0.99);
+        assertThat(issueService.listIssues("octo-org/hello", 0, 10).issues())
+                .extracting(s -> s.number() + ":" + s.hasReport()).containsExactly("2:true", "1:false");
     }
 }

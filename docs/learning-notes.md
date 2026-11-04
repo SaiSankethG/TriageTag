@@ -2505,3 +2505,43 @@ send 1,200 webhooks/s here, which is plenty for one VM.
    database and the LLM (rate limits, cost) become the next limits.
 3. **What did the load test teach you?** That dead letters were silent: only the metric caught them. Now they're logged with the
    cause, and the dashboard turns red at the first one.
+
+## Demo page redesign and the in-app guide (4 Nov 2026)
+
+sai: "the UI still looks bad". Files: `static/index.html` (rewritten), `static/guide.html` (new), `docs/user-guide.md`; small API
+additions: `GET /reports/{owner}/{repo}` (newest reports with their best match), `authorAssociation` and `hasReport` in the issue
+list (`IssueRepository.findIdsWithReport`, one extra query per page); the Ingress also routes `/guide.html`. Tests: list endpoint and
+flag (`TriageServiceDbTest`, `ReportControllerTest`), guide checks (`DemoPageTest`), Ingress paths (`K3sManifestsTest`).
+
+### What changed for the user
+- A **top bar** with the product name and "Reports / How to use".
+- A **welcome view** (nothing selected): one sentence on what it does, three numbers (46% vs 26%, < 1 s, private by default), and
+  "Try an example" with real reports whose best match is at least Medium, taken from the live list, so they always exist.
+- A **sidebar** with tabs: *With a report* (the newest reports with a "best match 80.7%" pill) and *All issues* (search by
+  title), titles cut to two lines, open/closed dots.
+- The **report as a dashboard**: issue header (state, who opened it, labels, the text folded away), a **verdict card** with a
+  similarity meter and the 75% / 90% marks, match cards with bars and states next to "Details the reporter gave" and labels, and
+  the draft with Copy (sources folded away).
+- A **"How to use" page** in the same style: what it does, how to read the coloured box, what's private.
+- Checked in the browser at 1280 px (light) and phone width (dark). Two bugs found and fixed: the sidebar stayed "sticky" on
+  phones and slid over the report (the mobile CSS rule came before the sticky rule, so the sticky one won); the 75%/90% labels
+  overlapped on phones (now just the numbers, names in a tooltip).
+
+### Basics used here
+- **Visual hierarchy**: the answer first (verdict), then evidence (matches), then actions (draft). Before: everything looked
+  equally important. After: size, colour and position say what to read first.
+- **Progressive disclosure**: details people rarely need (issue text, sources) are folded into `<details>`.
+- **CSS cascade order**: for the same selector, the later rule wins, also across media queries; put responsive overrides
+  after the base rule, or scope the base rule to a media query.
+
+### One alternative I rejected
+**A UI framework (React + a component library).** Nicer components for free, but a build step and new dependencies for one page;
+the plain-JS page stays readable in one file and is tested for safety (no `innerHTML`).
+
+### Likely interview questions
+1. **How did you decide what goes at the top?** By the maintainer's first question, "is this a duplicate?": a verdict in words with
+   a meter, then the evidence, then the draft.
+2. **How do you keep a plain-JS page maintainable?** One small `el()` helper to build elements, one render function per section,
+   no HTML strings, and tests on the page's safety rules.
+3. **What bug did you find in the redesign?** CSS order: a mobile override placed before the base `position: sticky` rule lost,
+   so the sidebar covered the report on phones; caught by checking at phone width.

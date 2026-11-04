@@ -36,7 +36,7 @@ class IssueControllerTest {
     @Test
     void returnsAPageOfIssuesAsJson() throws Exception {
         IssueSummary summary = new IssueSummary(7, "Startup fails", "closed", "duplicate",
-                List.of("status: duplicate"), Instant.parse("2024-03-01T10:15:30Z"), 3);
+                List.of("status: duplicate"), Instant.parse("2024-03-01T10:15:30Z"), 3, "NONE", true);
         when(issueService.listIssues("octo-org/hello", 0, 20)).thenReturn(new IssueList(List.of(summary), 0, 20, 1));
 
         mockMvc.perform(get("/repos/octo-org/hello/issues"))   // defaults: page=0, size=20

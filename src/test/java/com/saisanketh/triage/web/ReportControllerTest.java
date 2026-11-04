@@ -68,4 +68,15 @@ class ReportControllerTest {
         when(triageService.create("o/r", 7)).thenReturn(Optional.empty());
         mockMvc.perform(post("/reports/o/r/7")).andExpect(status().isNotFound());
     }
+
+    @Test
+    void listsRecentReportsWithALimitOfAtMost100() throws Exception {
+        when(reports.recent("o/r", 100)).thenReturn(List.of(new com.saisanketh.triage.report.TriageReportRepository.ReportListItem(
+                5, "Title", "open", "NONE", Instant.parse("2026-11-04T00:00:00Z"), 3, 0.81)));
+
+        mockMvc.perform(get("/reports/o/r?limit=500"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].number").value(5))
+                .andExpect(jsonPath("$[0].topNumber").value(3));
+    }
 }

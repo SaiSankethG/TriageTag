@@ -6,136 +6,200 @@
 <title>Issue Triage Assistant</title>
 <style>
   :root {
-    --bg: #f6f6f3; --card: #ffffff; --text: #1c1c1a; --muted: #66665f; --line: #deded7; --soft: #efefea;
-    --accent: #2f5fd0; --accent-text: #ffffff;
-    --green: #1e7a3e; --green-bg: #e7f4ea; --amber: #8a5a00; --amber-bg: #fdf1dc; --red: #b3261e; --red-bg: #fbe9e7;
-    --grey-bg: #ececea;
+    --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f8f9fb; --text: #16181d; --muted: #5f6672; --faint: #8a909b;
+    --line: #e2e5ea; --brand: #3451c7; --brand-soft: #e8ecfb; --on-brand: #ffffff;
+    --green: #1d7a46; --green-soft: #e6f4ec; --amber: #925f00; --amber-soft: #fdf2dc; --red: #b42318; --red-soft: #fdecea;
+    --grey-soft: #eef0f3; --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #151514; --card: #1e1e1c; --text: #ecece8; --muted: #a3a39c; --line: #34342f; --soft: #262624;
-      --accent: #7ea2ff; --accent-text: #10131a;
-      --green: #6fd08f; --green-bg: #17301f; --amber: #f0b45a; --amber-bg: #33280f; --red: #ff8a80; --red-bg: #3a1a17;
-      --grey-bg: #2a2a27;
+      --bg: #111316; --surface: #1a1d22; --surface-2: #20242a; --text: #eceef1; --muted: #a5abb5; --faint: #7d838d;
+      --line: #2e333a; --brand: #8ea2ff; --brand-soft: #232a45; --on-brand: #0d1020;
+      --green: #6fd496; --green-soft: #15291d; --amber: #f2b75b; --amber-soft: #302510; --red: #ff8f85; --red-soft: #351816;
+      --grey-soft: #262a30; --shadow: none;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
-  header h1 { font-size: 22px; margin: 0; }
-  header p { color: var(--muted); margin: 2px 0 16px; }
-  h2 { font-size: 16px; margin: 0 0 10px; }
-  h3 { font-size: 14px; margin: 14px 0 6px; }
-  a { color: var(--accent); }
-  .layout { display: grid; grid-template-columns: 320px 1fr; gap: 16px; align-items: start; }
-  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } .issue-list { max-height: 30vh; } }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  input { font: inherit; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
-          background: var(--card); color: var(--text); }
-  .row { display: flex; gap: 8px; margin-bottom: 10px; }
-  .row > * { flex: 1; }
-  button { font: inherit; padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent);
-           color: var(--accent-text); cursor: pointer; }
-  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
-  button.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; }
-  button:disabled { opacity: .6; cursor: wait; }
-  :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-  .issue-list { list-style: none; margin: 8px 0 0; padding: 0; max-height: 60vh; overflow-y: auto; }
-  .issue-list li + li { border-top: 1px solid var(--line); }
-  .issue-list button { display: block; width: 100%; text-align: left; background: none; color: var(--text);
-                       padding: 8px 4px; border-radius: 4px; }
-  .issue-list button:hover, .issue-list button[aria-current="true"] { background: var(--soft); }
-  .num { color: var(--muted); font-variant-numeric: tabular-nums; }
-  .muted { color: var(--muted); }
-  .small { font-size: 13px; }
-  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line);
-         margin: 2px 6px 2px 0; font-size: 12px; white-space: nowrap; }
-  .tag.high { color: var(--red); border-color: var(--red); }
-  .tag.medium { color: var(--amber); border-color: var(--amber); }
-  .tag.low { color: var(--green); border-color: var(--green); }
-  .tag.open { color: var(--green); border-color: var(--green); }
-  .tag.closed { color: var(--muted); }
-  .banner { border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; border: 1px solid; }
-  .banner strong { font-size: 17px; display: block; }
-  .banner.green { background: var(--green-bg); border-color: var(--green); }
-  .banner.amber { background: var(--amber-bg); border-color: var(--amber); }
-  .banner.red { background: var(--red-bg); border-color: var(--red); }
-  .banner.grey { background: var(--grey-bg); border-color: var(--line); }
-  .note { background: var(--grey-bg); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; color: var(--muted); }
-  .error { background: var(--red-bg); color: var(--red); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
-  .hint { background: var(--amber-bg); border-left: 4px solid var(--amber); border-radius: 6px; padding: 10px 12px; margin: 10px 0; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: top; }
-  td.score { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .checklist { list-style: none; margin: 0; padding: 0; }
-  .checklist li { padding: 3px 0; }
-  .mark { display: inline-block; width: 1.4em; font-weight: 700; }
-  .yes { color: var(--green); } .no { color: var(--red); } .na { color: var(--muted); }
-  .draft { white-space: pre-wrap; word-break: break-word; background: var(--soft); border: 1px solid var(--line);
-           border-radius: 8px; padding: 12px; margin: 0 0 8px; font: inherit; }
-  .body { white-space: pre-wrap; word-break: break-word; background: var(--soft); border-radius: 8px; padding: 10px;
-          margin: 8px 0 0; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
-  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--line);
-             border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite;
-             vertical-align: -3px; margin-right: 6px; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand); text-underline-offset: 2px; }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+  button { font: inherit; cursor: pointer; }
+  input { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+          padding: 8px 10px; width: 100%; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Top bar */
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .topbar-inner { max-width: 1240px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; color: var(--text); text-decoration: none; }
+  .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); color: var(--on-brand); display: grid;
+          place-items: center; font-weight: 700; font-size: 15px; }
+  .topbar nav { display: flex; gap: 4px; margin-left: auto; }
+  .topbar nav a { color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 6px; }
+  .topbar nav a:hover, .topbar nav a[aria-current="page"] { background: var(--grey-soft); color: var(--text); }
+  .repo-chip { font-size: 13px; color: var(--muted); }
+
+  /* Layout */
+  .layout { max-width: 1240px; margin: 0 auto; padding: 20px 16px 48px; display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } .list { max-height: 34vh; } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+  .pad { padding: 16px 18px; }
+  h1 { font-size: 24px; line-height: 1.25; margin: 0 0 6px; }
+  h2 { font-size: 16px; margin: 0 0 12px; }
+  h3 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .muted { color: var(--muted); } .faint { color: var(--faint); } .small { font-size: 13px; }
+
+  /* Sidebar */
+  @media (min-width: 821px) { .sidebar { position: sticky; top: 16px; } }   /* sticky only beside the report, never on phones */
+  .tabs { display: flex; gap: 4px; padding: 4px; background: var(--grey-soft); border-radius: 9px; margin-bottom: 10px; }
+  .tabs button { flex: 1; border: 0; background: none; color: var(--muted); padding: 6px 8px; border-radius: 7px; font-size: 13px; }
+  .tabs button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); font-weight: 600; }
+  .goto { display: flex; gap: 8px; margin-bottom: 10px; }
+  .goto input { flex: 1; }
+  .btn { border: 1px solid transparent; background: var(--brand); color: var(--on-brand); padding: 8px 14px; border-radius: 8px; font-weight: 600; }
+  .btn.ghost { background: var(--surface); color: var(--brand); border-color: var(--line); }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  .list { list-style: none; margin: 8px -6px 0; padding: 0; max-height: 62vh; overflow-y: auto; }
+  .list button { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--text);
+                 padding: 9px 8px; border-radius: 8px; }
+  .list button:hover, .list button[aria-current="true"] { background: var(--brand-soft); }
+  .list .title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .list .meta { font-size: 12px; color: var(--faint); margin-top: 2px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .dot.open { background: var(--green); } .dot.closed { background: var(--faint); }
+  .admin { margin-top: 12px; font-size: 13px; }
+  .admin summary { color: var(--muted); cursor: pointer; }
+
+  /* Pills */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px;
+          font-weight: 600; background: var(--grey-soft); color: var(--muted); white-space: nowrap; }
+  .pill.high { background: var(--red-soft); color: var(--red); }
+  .pill.medium { background: var(--amber-soft); color: var(--amber); }
+  .pill.low { background: var(--green-soft); color: var(--green); }
+  .pill.open { background: var(--green-soft); color: var(--green); }
+  .pill.label { background: var(--brand-soft); color: var(--brand); font-weight: 500; }
+  .pills { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  /* Welcome */
+  .hero { padding: 28px; }
+  .hero p { max-width: 62ch; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+  @media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }
+  .stat { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
+  .stat b { display: block; font-size: 24px; line-height: 1.2; }
+  .examples { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  @media (max-width: 640px) { .examples { grid-template-columns: 1fr; } }
+  .example { text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px; color: var(--text); }
+  .example:hover { border-color: var(--brand); }
+
+  /* Report */
+  .stack { display: grid; gap: 16px; }
+  .issue-head h1 a { color: var(--text); text-decoration: none; }
+  .issue-head h1 a:hover { text-decoration: underline; }
+  .verdict { padding: 18px 20px; border-left: 6px solid var(--line); }
+  .verdict.green { border-left-color: var(--green); } .verdict.amber { border-left-color: var(--amber); }
+  .verdict.red { border-left-color: var(--red); } .verdict.grey { border-left-color: var(--faint); }
+  .verdict .label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+  .verdict.green .label { color: var(--green); } .verdict.amber .label { color: var(--amber); }
+  .verdict.red .label { color: var(--red); } .verdict.grey .label { color: var(--faint); }
+  .verdict .title { font-size: 20px; font-weight: 650; margin: 2px 0 4px; }
+  .meter { position: relative; height: 10px; background: var(--grey-soft); border-radius: 999px; margin: 14px 0 22px; }
+  .meter .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; }
+  .meter .mark { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--muted); }
+  .meter .mark span { position: absolute; top: 16px; transform: translateX(-50%); font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .fill.high { background: var(--red); } .fill.medium { background: var(--amber); } .fill.low { background: var(--green); }
+  .grid2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; }
+  @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } }
+  .match { padding: 12px 0; border-top: 1px solid var(--line); }
+  .match:first-of-type { border-top: 0; padding-top: 0; }
+  .match .top { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+  .match .score { font-variant-numeric: tabular-nums; font-weight: 650; white-space: nowrap; }
+  .bar { height: 6px; background: var(--grey-soft); border-radius: 999px; margin-top: 8px; overflow: hidden; }
+  .bar > div { height: 100%; border-radius: 999px; }
+  .hint { background: var(--amber-soft); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .check { list-style: none; margin: 0; padding: 0; }
+  .check li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); }
+  .check li:first-child { border-top: 0; }
+  .mark { width: 20px; font-weight: 800; text-align: center; }
+  .yes { color: var(--green); } .no { color: var(--red); } .na { color: var(--faint); }
+  .draft { white-space: pre-wrap; word-break: break-word; background: var(--surface-2); border: 1px solid var(--line);
+           border-radius: 10px; padding: 14px; margin: 0; font: inherit; }
+  .head-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .head-row h2 { margin: 0; }
+  details.more { margin-top: 12px; }
+  details.more summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  .body { white-space: pre-wrap; word-break: break-word; font: 14px/1.6 system-ui, sans-serif; background: var(--surface-2);
+          border-radius: 10px; padding: 12px; margin: 10px 0 0; }
+  .note { background: var(--grey-soft); color: var(--muted); border-radius: 10px; padding: 12px 14px; }
+  .error { background: var(--red-soft); color: var(--red); border-radius: 10px; padding: 12px 14px; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--line); border-top-color: var(--brand);
+             border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
-  footer { color: var(--muted); font-size: 13px; }
-  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  footer.meta { font-size: 12px; color: var(--faint); }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Issue Triage Assistant</h1>
-    <p>What the assistant would privately tell a maintainer about a new GitHub issue.</p>
-  </header>
-
-  <div class="layout">
-    <!-- Left: pick an issue -->
-    <section class="card" aria-labelledby="pick-heading">
-      <h2 id="pick-heading">Pick an issue</h2>
-      <form id="number-form">
-        <div class="row">
-          <div><label for="repo">Repository</label><input id="repo" value="spring-projects/spring-boot" autocomplete="off"></div>
-        </div>
-        <div class="row">
-          <div><label for="number">Issue number</label><input id="number" type="number" min="1" inputmode="numeric"></div>
-          <div style="flex:0 0 auto; align-self:end"><button id="show" type="submit">Show</button></div>
-        </div>
-      </form>
-      <label for="search">Or search recent issues by title</label>
-      <input id="search" type="search" placeholder="e.g. datasource, actuator" autocomplete="off">
-      <div id="list-status" class="small muted" aria-live="polite"></div>
-      <ul id="issue-list" class="issue-list" aria-label="Issues"></ul>
-      <details class="small" style="margin-top:12px">
-        <summary>Admin (create new reports)</summary>
-        <label for="admin-token" style="margin-top:6px">Admin token (kept only in this browser tab)</label>
-        <input id="admin-token" type="password" autocomplete="off">
-      </details>
-    </section>
-
-    <!-- Right: the report -->
-    <div>
-      <div id="status" aria-live="polite"></div>
-      <div id="report"></div>
-    </div>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/" aria-label="Issue Triage Assistant, home"><span class="logo" aria-hidden="true">T</span>Issue Triage Assistant</a>
+    <span class="repo-chip" id="repo-chip"></span>
+    <nav aria-label="Main">
+      <a href="/" aria-current="page">Reports</a>
+      <a href="/guide.html">How to use</a>
+    </nav>
   </div>
-</main>
+</header>
+
+<div class="layout">
+  <!-- Left: choose an issue -->
+  <aside class="sidebar card pad" aria-labelledby="pick-heading">
+    <h2 id="pick-heading" class="visually-hidden">Choose an issue</h2>
+    <form id="number-form" class="goto">
+      <label for="number" class="visually-hidden">Issue number</label>
+      <input id="number" type="number" min="1" inputmode="numeric" placeholder="Issue number, e.g. 52529">
+      <button id="show" class="btn" type="submit">Open</button>
+    </form>
+    <div class="tabs" role="tablist" aria-label="Which issues">
+      <button id="tab-reports" role="tab" aria-selected="true" type="button">With a report</button>
+      <button id="tab-all" role="tab" aria-selected="false" type="button">All issues</button>
+    </div>
+    <div id="search-box" hidden>
+      <label for="search" class="visually-hidden">Search titles</label>
+      <input id="search" type="search" placeholder="Search titles, e.g. datasource" autocomplete="off">
+    </div>
+    <div id="list-status" class="small faint" aria-live="polite" style="margin-top:8px"></div>
+    <ul id="issue-list" class="list" aria-label="Issues"></ul>
+    <details class="admin">
+      <summary>Admin</summary>
+      <label for="repo" class="small muted" style="display:block;margin:8px 0 4px">Repository</label>
+      <input id="repo" value="spring-projects/spring-boot" autocomplete="off">
+      <label for="admin-token" class="small muted" style="display:block;margin:8px 0 4px">Admin token (to create new reports; kept only in this tab)</label>
+      <input id="admin-token" type="password" autocomplete="off">
+    </details>
+  </aside>
+
+  <!-- Right: welcome or report -->
+  <main>
+    <div id="status" aria-live="polite"></div>
+    <div id="report" class="stack"></div>
+  </main>
+</div>
 
 <script>
   // Every piece of issue or LLM text is inserted with textContent (via el()), never as HTML.
   const $ = (id) => document.getElementById(id);
   let settings = null;          // from GET /settings: thresholds, model, budget
   let searchTimer = null;
+  let tab = 'reports';          // which list the sidebar shows
 
   function el(tag, attrs = {}, ...children) {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
       if (value == null) continue;
       if (key === 'class') node.className = value;
+      else if (key === 'style') node.style.cssText = value;
       else if (key.startsWith('on')) node.addEventListener(key.slice(2), value);
       else node.setAttribute(key, value);
     }
@@ -155,16 +219,14 @@
   const fmtDate = (iso) => new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 
   function level(score) {
-    if (!settings) return null;
+    if (!settings) return ['low', 'Low'];
     if (rounded(score) >= settings.commentThreshold) return ['high', 'High'];
     if (rounded(score) >= settings.possibleThreshold) return ['medium', 'Medium'];
     return ['low', 'Low'];
   }
 
-  function authorText(association) {
-    return ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(association)
-      ? 'opened by the team' : 'opened by an outside reporter';
-  }
+  const isTeam = (association) => ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(association);
+  const stateText = (state, reason) => state === 'closed' && reason ? `closed · ${reason.replace('_', ' ')}` : state;
 
   function setStatus(node) { $('status').replaceChildren(...(node ? [node] : [])); }
   function loading(text) { setStatus(el('div', { class: 'note' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), text)); }
@@ -185,34 +247,82 @@
     history.replaceState(null, '', `?${params}`);
   }
 
-  // --- the issue list ---
+  // --- the sidebar list ---
+  function setTab(which) {
+    tab = which;
+    $('tab-reports').setAttribute('aria-selected', String(which === 'reports'));
+    $('tab-all').setAttribute('aria-selected', String(which === 'all'));
+    $('search-box').hidden = which !== 'all';
+    loadList();
+  }
+
+  function listItem(number, title, metaParts, onClick) {
+    return el('li', {}, el('button', { type: 'button', 'data-number': number, onclick: onClick },
+      el('div', { class: 'title' }, el('span', { class: 'faint' }, `#${number} `), title),
+      el('div', { class: 'meta' }, ...metaParts)));
+  }
+
   async function loadList() {
     const repo = repoValue();
-    if (!validRepo(repo)) { $('list-status').textContent = 'Enter a repository like owner/name.'; return; }
-    const q = $('search').value.trim();
+    $('repo-chip').textContent = validRepo(repo) ? repo : '';
+    if (!validRepo(repo)) { $('list-status').textContent = 'Enter a repository like owner/name (Admin).'; return; }
     $('list-status').textContent = 'Loading...';
     try {
-      const params = new URLSearchParams({ size: '25' });
+      if (tab === 'reports') {
+        const response = await fetch(`/reports/${repo}?limit=50`);
+        if (!response.ok) throw new Error(`server answered ${response.status}`);
+        const items = await response.json();
+        $('issue-list').replaceChildren(...items.map(r => {
+          const lv = r.topScore != null ? level(r.topScore) : null;
+          return listItem(r.number, r.title, [
+            el('span', { class: `dot ${r.state}`, 'aria-hidden': 'true' }), r.state,
+            lv ? el('span', { class: `pill ${lv[0]}` }, `best match ${pct(r.topScore)}`) : null], () => showReport(repo, r.number));
+        }));
+        $('list-status').textContent = items.length ? `The ${items.length} newest reports` : 'No reports yet for this repository.';
+        return items;
+      }
+      const q = $('search').value.trim();
+      const params = new URLSearchParams({ size: '50' });
       if (q) params.set('q', q);
       const response = await fetch(`/repos/${repo}/issues?${params}`);
       if (!response.ok) throw new Error(`server answered ${response.status}`);
       const page = await response.json();
-      $('issue-list').replaceChildren(...page.issues.map(issue => el('li', {},
-        el('button', { type: 'button', 'data-number': issue.number, onclick: () => showReport(repo, issue.number) },
-          el('span', { class: 'num' }, `#${issue.number} `), issue.title,
-          el('div', { class: 'small muted' }, `${issue.state} · ${fmtDate(issue.createdAt)}`)))));
+      $('issue-list').replaceChildren(...page.issues.map(issue => listItem(issue.number, issue.title, [
+        el('span', { class: `dot ${issue.state}`, 'aria-hidden': 'true' }), issue.state, fmtDate(issue.createdAt),
+        isTeam(issue.authorAssociation) ? 'team' : 'outside reporter',
+        issue.hasReport ? el('span', { class: 'pill label' }, 'report') : null], () => showReport(repo, issue.number))));
       $('list-status').textContent = page.total === 0
         ? (q ? `No titles contain "${q}".` : 'No stored issues for this repository.')
         : `${q ? 'Matching' : 'Newest'} ${page.issues.length} of ${page.total.toLocaleString()}`;
     } catch (e) {
-      $('list-status').textContent = 'Could not load the issue list: ' + e.message;
+      $('list-status').textContent = 'Could not load the list: ' + e.message;
     }
+    return [];
   }
 
   function markCurrent(number) {
     for (const b of document.querySelectorAll('#issue-list button')) {
       b.setAttribute('aria-current', String(b.dataset.number === String(number)));
     }
+  }
+
+  // --- the welcome view (nothing selected yet) ---
+  function renderWelcome(reports) {
+    const repo = repoValue();
+    const examples = reports.filter(r => r.topScore != null && rounded(r.topScore) >= (settings ? settings.possibleThreshold : 0.75)).slice(0, 4);
+    $('report').replaceChildren(el('section', { class: 'card hero' },
+      el('h1', {}, 'Triage new GitHub issues in seconds'),
+      el('p', { class: 'muted' }, 'When an issue is opened, the assistant privately prepares a note for the maintainers: '
+        + 'earlier issues that look like the same problem, which details the reporter left out, whether a similar issue was '
+        + 'already fixed, and a draft reply based on the project\'s own docs. Nothing is posted publicly unless a maintainer turns it on.'),
+      el('div', { class: 'stats' },
+        el('div', { class: 'stat' }, el('b', {}, '46%'), el('span', { class: 'small muted' }, 'of real duplicates have the original in the top 3 (keyword search: 26%)')),
+        el('div', { class: 'stat' }, el('b', {}, '< 1 s'), el('span', { class: 'small muted' }, 'to a report, plus a few seconds for the AI checks')),
+        el('div', { class: 'stat' }, el('b', {}, 'Private'), el('span', { class: 'small muted' }, 'by default: notes for maintainers, no bot comments'))),
+      el('h2', {}, examples.length ? 'Try an example' : 'Pick an issue on the left'),
+      examples.length ? el('div', { class: 'examples' }, ...examples.map(r => el('button', { type: 'button', class: 'example', onclick: () => showReport(repo, r.number) },
+        el('div', { class: 'small faint' }, `#${r.number} · best match ${pct(r.topScore)}`), el('div', {}, r.title)))) : null,
+      el('p', { class: 'small muted', style: 'margin-top:18px' }, 'New here? ', el('a', { href: '/guide.html' }, 'Read how to use it'), ' (2 minutes).')));
   }
 
   // --- the report ---
@@ -234,7 +344,7 @@
           setStatus(el('div', { class: 'note' }, `There's no report for #${number} yet. Only existing reports can be viewed on the public demo.`));
         } else {
           setStatus(el('div', { class: 'note' }, `There's no report for #${number} yet. `,
-            el('button', { type: 'button', class: 'secondary', onclick: () => showReport(repo, number, true) }, 'Create report')));
+            el('button', { type: 'button', class: 'btn ghost', onclick: () => showReport(repo, number, true) }, 'Create report')));
         }
         return;
       }
@@ -248,31 +358,40 @@
       const report = await response.json();
       setStatus(null);
       render(report);
-      $('report').querySelector('.banner')?.focus();   // the answer first, for keyboard and screen-reader users
+      $('report').querySelector('.verdict')?.focus();   // the answer first, for keyboard and screen-reader users
+      if (create) loadList();
     } catch (e) {
       errorBox('Something went wrong: ' + e.message + '. Is the app running?');
     }
   }
 
-  /** The one-line answer at the top: is this a duplicate? Colour AND words, never colour alone. */
+  /** The one-line answer: is this a duplicate? Colour AND words, never colour alone. */
   function verdict(r) {
     const top = (r.duplicates || [])[0];
-    if (!top) return ['grey', 'No earlier issues to compare with', 'This is one of the first issues stored for this repository.'];
+    if (!top) return ['grey', 'No comparison', 'No earlier issues to compare with', 'This is one of the first issues stored for this repository.'];
     const check = r.duplicateCheck;
-    const best = `best match #${top.number} at ${pct(top.score)}`;
     if (settings && rounded(top.score) >= settings.commentThreshold) {
-      if (check && check.verdict === 'YES') return ['red', `Likely duplicate of #${top.number} (Claude agrees)`, `Similarity ${pct(top.score)}, and the AI check says it is the same root problem.`];
-      const said = check ? { NO: 'says it is a different problem', UNSURE: 'is not sure', UNKNOWN: 'could not decide' }[check.verdict] : 'was not run';
-      return ['amber', `Possible duplicate of #${top.number}`, `Similarity ${pct(top.score)} is high, but the AI check ${said}.`];
+      if (check && check.verdict === 'YES') return ['red', 'Likely duplicate', `Likely a duplicate of #${top.number}`, `High similarity (${pct(top.score)}), and the AI check says it is the same root problem.`];
+      const said = check ? { NO: 'says it is a different problem', UNSURE: 'is not sure', UNKNOWN: 'could not decide' }[check.verdict] : 'did not run';
+      return ['amber', 'Possible duplicate', `Possibly a duplicate of #${top.number}`, `High similarity (${pct(top.score)}), but the AI check ${said}.`];
     }
     if (settings && rounded(top.score) >= settings.possibleThreshold) {
-      return ['amber', `Possible duplicate of #${top.number}`, `Medium similarity (${pct(top.score)}); a maintainer should take a look.`];
+      return ['amber', 'Possible duplicate', `Possibly related to #${top.number}`, `Medium similarity (${pct(top.score)}): worth a look before answering.`];
     }
-    const needs = settings ? `, needs ${pct(settings.commentThreshold)}` : '';
-    return ['green', 'Probably not a duplicate', `${best[0].toUpperCase()}${best.slice(1)}${needs}.`];
+    const needs = settings ? ` (a likely duplicate needs ${pct(settings.commentThreshold)})` : '';
+    return ['green', 'New problem', 'Probably not a duplicate', `The best match is #${top.number} at ${pct(top.score)}${needs}.`];
   }
 
-  /** A calm grey note when the AI checks didn't run (no key, or today's budget used up). */
+  function meter(score) {
+    const lv = level(score)[0];
+    const marks = settings ? [[settings.possibleThreshold, 'medium'], [settings.commentThreshold, 'high']] : [];
+    return el('div', { class: 'meter', role: 'img', 'aria-label': `Similarity ${pct(score)}` },
+      el('div', { class: `fill ${lv}`, style: `width:${Math.max(2, Math.min(100, score * 100))}%` }),
+      // Short labels ("75%", "90%") so they never overlap on a phone; the level names are in the tooltip and the note below.
+      ...marks.map(([t, name]) => el('div', { class: 'mark', style: `left:${t * 100}%`, title: `${name} from ${pct(t)}` }, el('span', {}, pct(t)))));
+  }
+
+  /** A calm note when the AI checks didn't run (no key, or today's budget used up). */
   function aiNote(r) {
     const notes = [r.notes, r.missing?.note, r.duplicateCheck?.reason, r.draftReply?.text].filter(Boolean).join(' ');
     if (/daily token budget/.test(notes)) {
@@ -280,123 +399,116 @@
       return `AI checks paused for this report (daily limit reached, resets ${resets}). Duplicates, labels and the "already fixed?" hint don't need AI and are complete.`;
     }
     if (r.llmModel === 'fake') {
-      return 'AI checks are using a stand-in (no API key set), so the missing-details and draft parts below are placeholders, not real AI output.';
+      return 'AI checks used a stand-in (no API key set), so the missing-details and draft parts are placeholders, not real AI output.';
     }
     return null;
   }
 
   function render(r) {
+    const card = r.issue;
     const parts = [];
-    const [colour, title, detail] = verdict(r);
-    parts.push(el('div', { class: `banner ${colour}`, role: 'status', tabindex: '-1' }, el('strong', {}, title), el('span', {}, detail)));
+
+    // Issue header
+    parts.push(el('section', { class: 'card pad issue-head' },
+      el('div', { class: 'small faint' }, `#${r.number} · opened ${fmtDate(card.createdAt)} · ${isTeam(card.authorAssociation) ? 'by the team' : 'by an outside reporter'}`),
+      el('h1', {}, link(r.url, r.title)),
+      el('div', { class: 'pills' }, el('span', { class: `pill ${card.state}` }, stateText(card.state, card.stateReason)),
+        ...card.labels.map(l => el('span', { class: 'pill label' }, l))),
+      el('details', { class: 'more' }, el('summary', {}, 'Show the issue text'),
+        el('pre', { class: 'body' }, card.bodyStart || '(no description)'),
+        card.bodyLength > card.bodyStart.length ? el('div', { class: 'small muted', style: 'margin-top:6px' }, 'Shortened. Full text on ', link(r.url, 'GitHub'), '.') : null)));
+
+    // Verdict
+    const [colour, label, title, detail] = verdict(r);
+    const top = (r.duplicates || [])[0];
+    parts.push(el('section', { class: `card verdict ${colour}`, role: 'status', tabindex: '-1' },
+      el('div', { class: 'label' }, label), el('div', { class: 'title' }, title), el('div', { class: 'muted' }, detail),
+      top ? meter(top.score) : null));
     const note = aiNote(r);
     if (note) parts.push(el('div', { class: 'note' }, note));
 
-    // Issue card
-    const card = r.issue;
-    const bodyShort = card.bodyStart.length > 300 ? card.bodyStart.slice(0, 300) + '…' : card.bodyStart;
-    const body = el('pre', { class: 'body' }, bodyShort || '(no description)');
-    const more = card.bodyStart.length > 300 || card.bodyLength > card.bodyStart.length;
-    let expanded = false;
-    const toggle = more ? el('button', { type: 'button', class: 'link small', 'aria-expanded': 'false', onclick: () => {
-      expanded = !expanded;
-      body.textContent = expanded ? card.bodyStart + (card.bodyLength > card.bodyStart.length ? '\n…' : '') : bodyShort;
-      toggle.textContent = expanded ? 'Show less' : 'Show more';
-      toggle.setAttribute('aria-expanded', String(expanded));
-    } }, 'Show more') : null;
-    parts.push(el('section', { class: 'card', 'aria-labelledby': 'issue-heading' },
-      el('h2', { id: 'issue-heading', tabindex: '-1' }, link(r.url, `#${r.number} ${r.title}`)),
-      el('div', {}, el('span', { class: `tag ${card.state}` }, card.state === 'closed' && card.stateReason ? `closed (${card.stateReason.replace('_', ' ')})` : card.state),
-        el('span', { class: 'small muted' }, ` ${authorText(card.authorAssociation)} · ${fmtDate(card.createdAt)}`)),
-      card.labels.length ? el('div', {}, ...card.labels.map(l => el('span', { class: 'tag' }, l))) : null,
-      body, toggle,
-      card.bodyLength > card.bodyStart.length ? el('div', { class: 'small muted' }, 'Long description: the full text is on ', link(r.url, 'GitHub'), '.') : null));
-
-    // Duplicates
-    const dupRows = (r.duplicates || []).map(d => {
-      const lv = level(d.score);
-      return el('tr', {},
-        el('td', {}, link(d.url, `#${d.number} ${d.title}`), ' ',
-          d.state ? el('span', { class: `tag ${d.state}` }, d.state === 'closed' && d.stateReason ? `closed (${d.stateReason.replace('_', ' ')})` : d.state) : null),
-        el('td', { class: 'score' }, pct(d.score), ' ', lv ? el('span', { class: `tag ${lv[0]}` }, lv[1]) : null));
+    // Similar issues | details + labels
+    const matches = (r.duplicates || []).map(d => {
+      const [lv, lvText] = level(d.score);
+      return el('div', { class: 'match' },
+        el('div', { class: 'top' }, el('div', {}, link(d.url, `#${d.number} ${d.title}`)), el('span', { class: 'score' }, pct(d.score))),
+        el('div', { class: 'pills', style: 'margin-top:6px' }, el('span', { class: `pill ${lv}` }, lvText),
+          d.state ? el('span', { class: `pill ${d.state}` }, stateText(d.state, d.stateReason)) : null),
+        el('div', { class: 'bar' }, el('div', { class: `fill ${lv}`, style: `width:${Math.max(2, d.score * 100)}%` })));
     });
-    const dupSection = [el('h2', {}, 'Similar earlier issues')];
-    if (r.fixedHint) {
-      dupSection.push(el('div', { class: 'hint' }, el('strong', {}, 'Already fixed? '), r.fixedHint.text, ' ',
-        r.fixedHint.closerUrl ? link(r.fixedHint.closerUrl, '(what fixed it)') : null));
-    }
-    dupSection.push(dupRows.length ? el('table', {}, el('caption', { class: 'visually-hidden' }, 'Similar issues with similarity'), el('tbody', {}, ...dupRows))
-      : el('p', { class: 'muted' }, 'None.'));
-    if (r.duplicateCheck) {
-      dupSection.push(el('p', { class: 'small' }, el('strong', {}, 'AI check of the best match: '),
-        `${r.duplicateCheck.verdict.toLowerCase()}. ${r.duplicateCheck.reason}`));
-    }
-    if (settings) {
-      dupSection.push(el('p', { class: 'small muted' }, `Similarity compares the meaning of the two issues' text (100% = the same). `
-        + `High ≥ ${pct(settings.commentThreshold)}: the level at which the assistant would consider a public comment, and only if the AI check agrees. `
-        + `Medium ≥ ${pct(settings.possibleThreshold)}: worth a look. Low: probably a different problem.`));
-    }
-    parts.push(el('section', { class: 'card' }, ...dupSection));
+    const similar = el('section', { class: 'card pad' }, el('h2', {}, 'Similar earlier issues'),
+      r.fixedHint ? el('div', { class: 'hint' }, el('strong', {}, 'Already fixed? '), r.fixedHint.text, ' ',
+        r.fixedHint.closerUrl ? link(r.fixedHint.closerUrl, 'What fixed it') : null) : null,
+      ...(matches.length ? matches : [el('p', { class: 'muted' }, 'None.')]),
+      r.duplicateCheck ? el('p', { class: 'small', style: 'margin:12px 0 0' }, el('strong', {}, 'AI check of the best match: '),
+        `${r.duplicateCheck.verdict.toLowerCase()}. ${r.duplicateCheck.reason}`) : null,
+      settings ? el('p', { class: 'small faint', style: 'margin:12px 0 0' }, `Similarity compares what the two issues are about (100% = the same text). `
+        + `Medium ≥ ${pct(settings.possibleThreshold)}: worth a look. High ≥ ${pct(settings.commentThreshold)}: likely the same, if the AI check agrees.`) : null);
 
-    // Labels + missing details
-    const labels = r.labels || [];
     const m = r.missing || {};
-    const names = { VERSION: 'Version', STEPS_TO_REPRODUCE: 'Steps to reproduce', EXPECTED_VS_ACTUAL: 'Expected vs actual behaviour', LOGS_OR_STACK_TRACE: 'Logs or stack trace' };
-    let checklist;
-    if (m.status !== 'OK') {
-      checklist = el('p', { class: 'muted' }, 'Not checked: ' + (m.note || 'no answer from the AI check') + '.');
-    } else {
-      checklist = el('ul', { class: 'checklist' }, ...Object.keys(names).map(key => {
-        const answer = m.details[key];
-        const [mark, cls, word] = answer === 'PRESENT' ? ['✓', 'yes', 'given'] : answer === 'MISSING' ? ['✗', 'no', 'missing'] : ['–', 'na', 'not needed'];
-        return el('li', {}, el('span', { class: `mark ${cls}`, 'aria-hidden': 'true' }, mark), `${names[key]} `, el('span', { class: 'small muted' }, `(${word})`));
-      }));
-    }
-    parts.push(el('section', { class: 'card' },
-      el('h2', {}, 'Suggested labels'),
-      labels.length ? el('div', {}, ...labels.map(l => el('span', { class: 'tag' }, `${l.label} · ${pct(l.share)} of similar issues`)))
-        : el('p', { class: 'muted' }, 'No label is clear enough to suggest.'),
-      el('h3', {}, 'Details the reporter gave'), checklist));
+    const names = { VERSION: 'Version', STEPS_TO_REPRODUCE: 'Steps to reproduce', EXPECTED_VS_ACTUAL: 'Expected vs actual', LOGS_OR_STACK_TRACE: 'Logs or stack trace' };
+    const checklist = m.status !== 'OK'
+      ? el('p', { class: 'muted' }, 'Not checked: ' + (m.note || 'no answer from the AI check') + '.')
+      : el('ul', { class: 'check' }, ...Object.keys(names).map(key => {
+          const answer = m.details[key];
+          const [mark, cls, word] = answer === 'PRESENT' ? ['✓', 'yes', 'given'] : answer === 'MISSING' ? ['✗', 'no', 'missing: ask for it'] : ['–', 'na', 'not needed here'];
+          return el('li', {}, el('span', { class: `mark ${cls}`, 'aria-hidden': 'true' }, mark),
+            el('span', {}, names[key], ' ', el('span', { class: 'small faint' }, word)));
+        }));
+    const labels = r.labels || [];
+    const side = el('section', { class: 'card pad' },
+      el('h2', {}, 'Details the reporter gave'), checklist,
+      el('h2', { style: 'margin-top:20px' }, 'Suggested labels'),
+      labels.length ? el('div', { class: 'pills' }, ...labels.map(l => el('span', { class: 'pill label', title: `${pct(l.share)} of similar issues have it` }, l.label)))
+        : el('p', { class: 'muted small' }, 'No label is clear enough to suggest.'));
+    parts.push(el('div', { class: 'grid2' }, similar, side));
 
     // Draft reply
     const draft = r.draftReply || {};
-    const draftSection = [el('h2', {}, 'Draft reply (for the maintainer to edit)')];
+    const draftSection = el('section', { class: 'card pad' });
+    const head = el('div', { class: 'head-row' }, el('h2', {}, 'Draft reply'));
+    draftSection.append(head);
     if (draft.status === 'OK') {
-      const copy = el('button', { type: 'button', class: 'secondary', onclick: async () => {
+      const copy = el('button', { type: 'button', class: 'btn ghost', onclick: async () => {
         try { await navigator.clipboard.writeText(draft.text); copy.textContent = 'Copied'; }
-        catch { copy.textContent = 'Copy failed: select the text instead'; }
+        catch { copy.textContent = 'Copy failed: select the text'; }
         setTimeout(() => { copy.textContent = 'Copy reply'; }, 2000);
       } }, 'Copy reply');
-      draftSection.push(el('pre', { class: 'draft' }, draft.text), copy);
+      head.append(copy);
+      draftSection.append(el('p', { class: 'small faint', style: 'margin:-6px 0 10px' }, 'For a maintainer to read, edit and post. Nothing is posted automatically.'),
+        el('pre', { class: 'draft' }, draft.text));
       if ((draft.unknownLinks || []).length) {
-        draftSection.push(el('p', { class: 'small no' }, 'Check these links: they are not among the sources: ' + draft.unknownLinks.join(', ')));
+        draftSection.append(el('p', { class: 'small no' }, 'Check these links: they are not among the sources: ' + draft.unknownLinks.join(', ')));
       }
     } else {
-      draftSection.push(el('p', { class: 'muted' }, draft.text || 'No draft.'));
+      draftSection.append(el('p', { class: 'muted' }, draft.text || 'No draft.'));
     }
     if ((draft.sources || []).length) {
-      draftSection.push(el('h3', {}, 'Sources the draft could use'),
-        el('ul', {}, ...draft.sources.map(s => el('li', {}, `${s.kind === 'docs' ? 'Docs' : 'Issue'}: `, link(s.url, s.title), el('span', { class: 'small muted' }, ` (${pct(s.score)})`)))));
+      draftSection.append(el('details', { class: 'more' }, el('summary', {}, `Sources the draft could use (${draft.sources.length})`),
+        el('ul', { class: 'small' }, ...draft.sources.map(s => el('li', {}, `${s.kind === 'docs' ? 'Docs' : 'Issue'}: `, link(s.url, s.title), el('span', { class: 'faint' }, ` (${pct(s.score)})`))))));
     }
-    parts.push(el('section', { class: 'card' }, ...draftSection));
+    parts.push(draftSection);
 
-    parts.push(el('footer', {}, `Report made ${new Date(r.createdAt).toLocaleString()} · model ${r.llmModel} · ${r.costTokens.toLocaleString()} tokens · prompts ${r.promptVersions}`));
+    parts.push(el('footer', { class: 'meta' }, `Report made ${new Date(r.createdAt).toLocaleString()} · model ${r.llmModel} · ${r.costTokens.toLocaleString()} tokens · prompts ${r.promptVersions}`));
     $('report').replaceChildren(...parts);
   }
 
   // --- wiring ---
   $('number-form').addEventListener('submit', (e) => { e.preventDefault(); showReport(repoValue(), $('number').value.trim()); });
   $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadList, 300); });
-  $('repo').addEventListener('change', loadList);
+  $('repo').addEventListener('change', () => loadList());
   $('admin-token').addEventListener('input', rememberToken);
+  $('tab-reports').addEventListener('click', () => setTab('reports'));
+  $('tab-all').addEventListener('click', () => setTab('all'));
 
   (async function start() {
     try { $('admin-token').value = sessionStorage.getItem('triage-admin-token') || ''; } catch { /* storage blocked */ }
     try { settings = await (await fetch('/settings')).json(); } catch { settings = null; }
     const params = new URLSearchParams(location.search);
     if (params.get('repo')) $('repo').value = params.get('repo');
-    await loadList();
+    const reports = await loadList();
     if (params.get('number')) showReport(repoValue(), params.get('number'));
+    else renderWelcome(reports || []);
   })();
 </script>
 </body>

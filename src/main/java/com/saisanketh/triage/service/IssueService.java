@@ -10,7 +10,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 
 /** Saves issues. "Upsert" = update if we have it, insert if we don't. */
@@ -99,18 +101,20 @@ public class IssueService {
     }
 
     private IssueList toList(Page<Long> ids, int page, int size) {
-        List<IssueSummary> issues = ids.isEmpty()
-                ? List.of()
-                : issueRepository.findByIdInOrderByNumberDesc(ids.getContent()).stream()
-                        .map(IssueService::toSummary)
-                        .toList();
+        if (ids.isEmpty()) {
+            return new IssueList(List.of(), page, size, ids.getTotalElements());
+        }
+        Set<Long> withReport = new HashSet<>(issueRepository.findIdsWithReport(ids.getContent()));
+        List<IssueSummary> issues = issueRepository.findByIdInOrderByNumberDesc(ids.getContent()).stream()
+                .map(issue -> toSummary(issue, withReport.contains(issue.getId())))
+                .toList();
 
         return new IssueList(issues, page, size, ids.getTotalElements());
     }
 
-    private static IssueSummary toSummary(Issue issue) {
+    private static IssueSummary toSummary(Issue issue, boolean hasReport) {
         return new IssueSummary(issue.getNumber(), issue.getTitle(), issue.getState(), issue.getStateReason(),
                 issue.getLabels().stream().sorted().toList(),   // sorted, so the API output is stable
-                issue.getCreatedAt(), issue.getDuplicateOf());
+                issue.getCreatedAt(), issue.getDuplicateOf(), issue.getAuthorAssociation(), hasReport);
     }
 }

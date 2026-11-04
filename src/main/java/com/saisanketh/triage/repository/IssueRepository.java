@@ -59,6 +59,10 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     @EntityGraph(attributePaths = "labels")
     List<Issue> findByIdInOrderByNumberDesc(Collection<Long> ids);
 
+    /** Which of these issues already have a triage report (one query for a whole page, for the demo page's list). */
+    @Query(value = "select issue_id from triage_report where issue_id in (:ids)", nativeQuery = true)
+    List<Long> findIdsWithReport(@Param("ids") Collection<Long> ids);
+
     /** Sets duplicate_of on one row with a single UPDATE (no need to load the issue and its labels). */
     @Transactional
     @Modifying

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How to use · Issue Triage Assistant</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f8f9fb; --text: #16181d; --muted: #5f6672; --faint: #8a909b;
+    --line: #e2e5ea; --brand: #3451c7; --brand-soft: #e8ecfb; --on-brand: #ffffff; --grey-soft: #eef0f3;
+    --green: #1d7a46; --amber: #925f00; --red: #b42318; --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111316; --surface: #1a1d22; --surface-2: #20242a; --text: #eceef1; --muted: #a5abb5; --faint: #7d838d;
+      --line: #2e333a; --brand: #8ea2ff; --brand-soft: #232a45; --on-brand: #0d1020; --grey-soft: #262a30;
+      --green: #6fd496; --amber: #f2b75b; --red: #ff8f85; --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand); text-underline-offset: 2px; }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--line); }
+  .topbar-inner { max-width: 1240px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; color: var(--text); text-decoration: none; }
+  .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); color: var(--on-brand); display: grid;
+          place-items: center; font-weight: 700; font-size: 15px; }
+  .topbar nav { display: flex; gap: 4px; margin-left: auto; }
+  .topbar nav a { color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 6px; }
+  .topbar nav a:hover, .topbar nav a[aria-current="page"] { background: var(--grey-soft); color: var(--text); }
+  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 64px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
+  h2 { font-size: 20px; margin: 36px 0 10px; }
+  .lead { color: var(--muted); font-size: 18px; margin: 0 0 24px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; margin: 14px 0; }
+  ol, ul { padding-left: 22px; } li { margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; border-top: 0; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  code { background: var(--grey-soft); padding: 1px 6px; border-radius: 5px; font-size: 14px; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/" aria-label="Issue Triage Assistant, home"><span class="logo" aria-hidden="true">T</span>Issue Triage Assistant</a>
+    <nav aria-label="Main">
+      <a href="/">Reports</a>
+      <a href="/guide.html" aria-current="page">How to use</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <h1>How to use the Issue Triage Assistant</h1>
+  <p class="lead">A two-minute guide for maintainers: what the assistant does, how to read a report, and what stays private.</p>
+
+  <h2>What it does</h2>
+  <p>When someone opens an issue in your repository, the assistant prepares a short note for the maintainers, usually within a
+     few seconds:</p>
+  <ul>
+    <li><strong>Similar earlier issues</strong>: the three earlier issues that look most like the new one, each with a similarity score.</li>
+    <li><strong>Details the reporter gave</strong>: whether the issue has a version, steps to reproduce, expected vs actual behaviour, and logs.</li>
+    <li><strong>Already fixed?</strong>: if a very similar issue was fixed, in which version, compared with the reporter's version.</li>
+    <li><strong>Suggested labels</strong>: labels that similar issues had.</li>
+    <li><strong>A draft reply</strong>: a short first answer that links only to your own documentation and earlier issues. You edit it before posting.</li>
+  </ul>
+
+  <h2>How to read a report</h2>
+  <ol>
+    <li><strong>Start with the coloured box at the top.</strong> It answers "is this a duplicate?" in words:
+      <div class="card">
+        <table>
+          <tr><th>Box</th><th>Meaning</th><th>What to do</th></tr>
+          <tr><td><span class="swatch" style="background:var(--red)"></span>Likely duplicate</td><td>Very similar (90%+) and the AI check agrees it is the same problem.</td><td>Open the match; close as duplicate if it fits.</td></tr>
+          <tr><td><span class="swatch" style="background:var(--amber)"></span>Possible duplicate</td><td>Similar (75%+), or very similar but the AI check isn't sure.</td><td>Have a look at the match before answering.</td></tr>
+          <tr><td><span class="swatch" style="background:var(--green)"></span>Probably not a duplicate</td><td>Nothing earlier is close enough.</td><td>Triage it as a new issue.</td></tr>
+        </table>
+      </div>
+    </li>
+    <li><strong>Check the similar issues.</strong> The bar shows how close each one is. The tag next to it says whether that issue is
+        open or how it was closed (fixed, not planned, duplicate). A yellow "Already fixed?" box appears when the best match was fixed in a release.</li>
+    <li><strong>Look at "Details the reporter gave".</strong> ✓ = given, ✗ = missing (worth asking for), – = not needed for this kind of issue.</li>
+    <li><strong>Use the draft reply if it helps.</strong> Press <em>Copy reply</em>, paste it into GitHub, and edit it. Its sources are listed under it.</li>
+  </ol>
+
+  <h2>Finding an issue on this page</h2>
+  <ul>
+    <li><strong>With a report</strong> (left side): the newest issues the assistant has looked at.</li>
+    <li><strong>All issues</strong>: every stored issue, with a search by title.</li>
+    <li><strong>Issue number</strong>: type it at the top left and press <em>Open</em>.</li>
+    <li>Every report has its own link (<code>?repo=…&amp;number=…</code>), so you can share it.</li>
+  </ul>
+
+  <h2>What is private, what is public</h2>
+  <ul>
+    <li>It only reads <strong>public</strong> issues and your public documentation.</li>
+    <li>By default it <strong>never posts anything</strong> on GitHub (shadow mode). Reports are only on this page.</li>
+    <li>A maintainer can switch on <strong>comment mode</strong> for one repository. Then the assistant posts at most one comment per issue,
+        only for issues from outside the team, and only when the match is 90%+ and the AI check agrees. The comment says that a bot suggested it.</li>
+    <li>Creating new reports on this page needs an admin token, so visitors can't run up costs.</li>
+  </ul>
+
+  <h2>How good is it?</h2>
+  <p>Measured on Spring Boot's history, on 833 issues that maintainers closed as duplicates, each searched as if it had just been
+     opened: the real original is in the top 3 for <strong>46%</strong> of them (keyword search: 26%) and in the top 10 for 61%.
+     It is a helper, not a judge: duplicates are rare, so a high score alone is often wrong. That's why it is private by default.</p>
+
+  <h2>Try it on your repository</h2>
+  <p class="muted">The assistant is in a free trial phase. If you maintain a public Java project and would like a two-week private
+     trial (read-only, nothing posted), get in touch through the project's GitHub page.</p>
+  <p><a href="/">← Back to the reports</a></p>
+</main>
+</body>
+</html>

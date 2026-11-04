@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.time.Instant;
 
 /**
  * The triage_report table (Flyway V8). Each part is written as JSON (Jackson) into a jsonb column and read back as a
@@ -51,6 +52,26 @@ public class TriageReportRepository {
                 """, r.issueId(), Timestamp.from(r.createdAt()), toJson(r.duplicates()), toJson(r.duplicateCheck()),
                 toJson(r.labels()), toJson(r.missing()), toJson(r.fixedHint()), toJson(r.draftReply()), r.llmModel(),
                 r.promptVersions(), r.costTokens(), r.notes());
+    }
+
+    /** One line of the demo page's "has a report" list: the issue and its best match. */
+    public record ReportListItem(int number, String title, String state, String authorAssociation, Instant reportCreatedAt,
+                                 Integer topNumber, Double topScore) {
+    }
+
+    /** The most recent reports of a repo, newest first, for the demo page's sidebar. */
+    public List<ReportListItem> recent(String repo, int limit) {
+        return jdbc.query("""
+                SELECT i.number, i.title, i.state, i.author_association, r.created_at,
+                       (r.duplicates -> 0 ->> 'number')::int AS top_number,
+                       (r.duplicates -> 0 ->> 'score')::float8 AS top_score
+                FROM triage_report r JOIN issue i ON i.id = r.issue_id
+                WHERE lower(i.repo) = lower(?)
+                ORDER BY r.created_at DESC
+                LIMIT ?
+                """, (rs, row) -> new ReportListItem(rs.getInt("number"), rs.getString("title"), rs.getString("state"),
+                rs.getString("author_association"), rs.getTimestamp("created_at").toInstant(),
+                (Integer) rs.getObject("top_number"), (Double) rs.getObject("top_score")), repo, limit);
     }
 
     /** The report of an issue (by repo + number), joined with the issue's title, link and card. */

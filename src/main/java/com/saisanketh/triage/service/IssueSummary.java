@@ -8,5 +8,6 @@ import java.util.List;
  * these fields, has no lazy collections, and changing the entity can't silently change the API.
  */
 public record IssueSummary(int number, String title, String state, String stateReason,
-                           List<String> labels, Instant createdAt, Integer duplicateOf) {
+                           List<String> labels, Instant createdAt, Integer duplicateOf,
+                           String authorAssociation, boolean hasReport) {
 }

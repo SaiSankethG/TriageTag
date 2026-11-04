@@ -51,9 +51,9 @@ class IssueServiceListTest {
         assertThat(list.size()).isEqualTo(2);
         assertThat(list.issues()).containsExactly(
                 new IssueSummary(12, "Newer", "open", null, List.of("status: duplicate", "type: bug"),
-                        Instant.parse("2024-01-01T00:00:00Z"), 3),
+                        Instant.parse("2024-01-01T00:00:00Z"), 3, "NONE", false),
                 new IssueSummary(11, "Older", "open", null, List.of(),
-                        Instant.parse("2024-01-01T00:00:00Z"), null));
+                        Instant.parse("2024-01-01T00:00:00Z"), null, "NONE", false));
     }
 
     @Test

@@ -62,8 +62,8 @@ class IssueServiceDbTest extends PostgresTest {
         assertThat(page.issues()).hasSize(20);
         assertThat(page.issues().get(0).labels()).containsExactly("label-a", "label-b");   // labels really loaded
         assertThat(page.total()).isEqualTo(25);
-        // ids of the page + count + issues with labels. With N+1 it would be 2 + 20 = 22.
-        assertThat(stats.getPrepareStatementCount()).isEqualTo(3);
+        // ids of the page + count + issues with labels + which have a report. With N+1 it would be 3 + 20 = 23.
+        assertThat(stats.getPrepareStatementCount()).isEqualTo(4);
     }
 
     @Test
