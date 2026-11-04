@@ -127,6 +127,16 @@
             </activation>
             <build>
                 <plugins>
+                    <!-- build-image talks to Docker too: point it at Colima's socket -->
+                    <plugin>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-maven-plugin</artifactId>
+                        <configuration>
+                            <docker>
+                                <host>unix://${user.home}/.colima/default/docker.sock</host>
+                            </docker>
+                        </configuration>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>
@@ -160,6 +170,12 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <!-- ./mvnw spring-boot:build-image: a container image with Cloud Native Buildpacks, no Dockerfile.
+                         arm64, because the target VM (Oracle Always Free, Ampere) and sai's Mac are both ARM. -->
+                    <image>
+                        <name>issue-triage-assistant:${project.version}</name>
+                        <imagePlatform>linux/arm64</imagePlatform>
+                    </image>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>

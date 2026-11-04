@@ -2072,3 +2072,34 @@ page; the page already gets the thresholds from `/settings` and the scores from 
    only http(s) links become `<a>`; no `innerHTML`; a test checks that.
 3. **Why add endpoints instead of computing on the page?** The page can't know thresholds or an issue's current state; three
    small read-only endpoints (settings, search, enriched report) keep the page simple and are unit-tested.
+
+## M5 step 1: container image with buildpacks (4 Nov 2026)
+
+Files: `pom.xml` (`spring-boot-maven-plugin` `<image>` settings; the `colima` profile points it at Colima's Docker socket).
+
+### What it does
+`./mvnw spring-boot:build-image` builds `issue-triage-assistant:0.0.1-SNAPSHOT` for **linux/arm64** with Cloud Native Buildpacks
+(Paketo's `builder-noble-java-tiny`), no Dockerfile. 44 s, 1.2 GB (the JDK runtime, ONNX Runtime and the MiniLM model). Checked
+by running it against the local Postgres: health UP after 44 s, and a docs search ran the embedding model inside the container
+(so the native ONNX library works on the "tiny" base image).
+
+### Basics used here
+- **Buildpacks vs a Dockerfile**: before: you write `FROM eclipse-temurin...`, `COPY app.jar`, pick a JVM, set memory flags.
+  After: the buildpack detects a Spring Boot jar, picks a JRE, splits the jar into layers (dependencies change rarely, so pushes
+  are small), and adds a **memory calculator** that sizes the heap from the container's memory limit at start.
+- **arm64**: Oracle's free VMs are Ampere (ARM) and so is sai's Mac. An image built for amd64 wouldn't start there.
+  `<imagePlatform>linux/arm64</imagePlatform>` makes it explicit.
+- **Colima**: the plugin talks to Docker through a socket; Colima's isn't at `/var/run/docker.sock`, so the Maven profile that
+  switches on when Colima's socket exists also sets `<docker><host>` for the plugin.
+
+### One alternative I rejected
+**A multi-stage Dockerfile on eclipse-temurin:21** (the plan's fallback). Buildpacks worked first time on Colima, and the memory
+calculator and layering would have to be written by hand in a Dockerfile.
+
+### Likely interview questions
+1. **How do you containerise the app?** `spring-boot:build-image`: buildpacks make a layered, non-root image for linux/arm64 with a
+   JVM memory calculator. No Dockerfile to maintain.
+2. **How do you know the image works and isn't just built?** Ran it against Postgres: health UP and an embedding call works,
+   which exercises the native ONNX library, the riskiest part on a minimal base image.
+3. **Why is it 1.2 GB?** The JRE plus ONNX Runtime and the embedding model. They live in layers that rarely change, so updates
+   only move the small application layer.
