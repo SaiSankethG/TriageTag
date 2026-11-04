@@ -826,3 +826,67 @@ Also rejected: H2 for tests. It's fast but isn't Postgres (no `jsonb`, different
 3. **Why Testcontainers instead of H2 or mocks for repository tests?**
    Mocks don't run SQL at all; H2 runs a different SQL dialect. Testcontainers runs the real Postgres 16, so the
    unique constraint, `jsonb`, the JPQL queries and the migrations are all tested for real.
+
+## M2 step 1: Kafka in docker-compose, topics `issue-events` and `issue-events.DLT` (4 Nov 2026)
+
+Files: `docker-compose.yml` (service `kafka`), `kafka/KafkaTopicsConfig.java`, test `KafkaTopicsConfigTest` (2).
+
+### What it does
+- `docker-compose up -d` now also starts **one Kafka broker** (`apache/kafka:4.1.0`) on `localhost:9092`, in
+  **KRaft mode**: the broker keeps its own metadata (which topics exist, who leads which partition), so no
+  separate ZooKeeper service is needed.
+- When the app starts, Spring's `KafkaAdmin` creates the two `NewTopic` beans if they don't exist:
+  `issue-events` (3 partitions) and `issue-events.DLT` (3 partitions, for messages that keep failing).
+  Checked with `kafka-topics.sh --describe`: both topics exist, 3 partitions, leader = broker 1.
+- Auto-creating topics is switched off in the broker, so a typo in a topic name fails loudly.
+
+### Partitions, keys and consumer groups: a small example
+A **topic** is a named log of messages. It is split into **partitions**; each partition is an ordered list,
+and Kafka only guarantees order *within* one partition.
+The **key** decides the partition: `partition = hash(key) % 3`. We'll use the key `owner/repo#number`:
+```
+issue-events   partition 0: [octo/hello#7 opened] [octo/hello#7 labeled] [octo/hello#7 closed]   <- one issue, in order
+               partition 1: [octo/hello#2 opened] [octo/web#5 edited]
+               partition 2: [octo/hello#9 opened]
+```
+All events of issue #7 have the same key, so they land in the same partition and are read in the order they
+were written: "closed" can't be processed before "opened".
+A **consumer group** is a team of consumers sharing the work. Kafka gives each partition to exactly one member:
+```
+group "triage-worker", 1 instance  -> it reads partitions 0, 1, 2
+group "triage-worker", 3 instances -> each reads one partition (3x the throughput)
+group "triage-worker", 4 instances -> one sits idle: never more busy consumers than partitions
+another group, e.g. "analytics"   -> gets its OWN copy of every message, independent of triage-worker
+```
+So partitions are the unit of parallelism (3 here), keys keep related messages in order, and groups let
+different jobs each read everything.
+
+### Basics used here
+- **`NewTopic` + `TopicBuilder`** (Spring Kafka): describe a topic in code; `KafkaAdmin` creates it at startup.
+  *Before:* run `kafka-topics.sh --create --topic issue-events --partitions 3 ...` by hand on every machine.
+  *After:* `TopicBuilder.name("issue-events").partitions(3).replicas(1).build()` as a `@Bean`.
+- **`@Configuration` + `@Bean`**: a class whose `@Bean` methods return objects for Spring to manage.
+- **Replication factor**: how many brokers keep a copy of each partition. 1 here (one broker); production uses 3
+  so a broker can die without losing messages.
+- **Dead-letter topic (DLT)**: where a message goes after its retries are used up, so one bad message doesn't
+  stop everything behind it in the partition. Same partition count as the main topic, because by default a
+  failed message is sent to the *same partition number* in the DLT.
+- **KRaft listeners**: `PLAINTEXT://:9092` is for clients, `CONTROLLER://:9093` for the broker's internal voting;
+  `ADVERTISED_LISTENERS=localhost:9092` is the address the broker tells clients to use (the app runs on the Mac).
+
+### One alternative I rejected
+**The Bitnami or Confluent images, or ZooKeeper-based Kafka.** The prompt asks for the official Apache image,
+it's what the Kafka project itself publishes, and ZooKeeper was removed in Kafka 4.0, so KRaft is the only
+option going forward. Also rejected: a Docker volume for Kafka data. The image runs as a non-root user, so a fresh
+volume needs ownership fixes, and in development Postgres, not Kafka, is the source of truth.
+
+### Likely interview questions
+1. **How do you keep events for one issue in order with 3 partitions?**
+   Use the issue as the message key (`owner/repo#number`). The same key always hashes to the same partition, and
+   Kafka keeps order within a partition. Different issues can still be processed in parallel.
+2. **What happens if you run 5 consumers in a group on a 3-partition topic?**
+   3 get one partition each; 2 are idle (standby). Partitions limit parallelism, so pick the count for the
+   throughput you expect. Adding partitions later changes which partition a key maps to.
+3. **What is KRaft?**
+   Kafka's built-in consensus (Raft) for cluster metadata, replacing ZooKeeper. A node can be broker, controller
+   or both; here one node is both. Since Kafka 4.0 it's the only mode.
