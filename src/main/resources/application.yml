@@ -39,6 +39,9 @@ triage:
     # Nothing is configured: excluding spring-boot's forward-port clones LOWERED recall (45.6% vs 46.2% at top 3),
     # because maintainers sometimes name a clone as the original (M4 step 0, docs/learning-notes.md).
     exclude-labels: {}
+  llm:
+    # Cost guard: above this many tokens (input + output) per UTC day, LLM calls are refused and reports say so.
+    daily-token-budget: 200000
   duplicates:
     # Comment mode (M5) posts only if the top match scores >= this AND the LLM confirms "same root problem"
     # (sai, 4 Nov 2026: the M3 threshold for <= 10% false alarms on external reporters).

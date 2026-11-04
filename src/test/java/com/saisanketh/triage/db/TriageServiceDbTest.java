@@ -38,6 +38,8 @@ class TriageServiceDbTest extends PostgresTest {
     private TriageService triageService;
     @Autowired
     private TriageReportRepository reports;
+    @Autowired
+    private com.saisanketh.triage.ai.TokenBudget budget;
 
     private static float[] direction(double angleDegrees) {
         float[] v = new float[384];
@@ -114,5 +116,22 @@ class TriageServiceDbTest extends PostgresTest {
         assertThat(triageService.createIfMissing(id)).isFalse();
         assertThat(triageService.create("octo-org/hello", 999)).isEmpty();
         assertThat(reports.find("octo-org/hello", 999)).isEmpty();
+    }
+
+    @Test
+    void overTheDailyBudgetTheLlmStepsAreSkippedAndTheReportSaysSo() {
+        budget.record(999_999_999);   // today's budget is used up
+        save(1, "2024-01-01T00:00:00Z", 1, "Datasource url not picked up", "...", "open", null, "type: bug");
+        long id = save(2, "2024-06-01T00:00:00Z", 0, "Datasource url not picked up from yaml", "...", "open", null);
+
+        TriageReport report = triageService.create(id);
+
+        assertThat(report.notes()).contains("daily token budget");
+        assertThat(report.missing().status()).isEqualTo(MissingDetails.Status.UNKNOWN);
+        assertThat(report.missing().note()).contains("daily token budget");
+        assertThat(report.duplicateCheck().verdict()).isEqualTo(Verdict.UNKNOWN);
+        assertThat(report.duplicates()).isNotEmpty();                 // no LLM needed
+        assertThat(report.labels()).isNotEmpty();
+        assertThat(report.costTokens()).isZero();
     }
 }

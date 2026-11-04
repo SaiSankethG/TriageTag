@@ -96,6 +96,13 @@ CREATE TABLE triage_report (
   cost_tokens     integer      NOT NULL,
   notes           text
 );
+
+-- Added in M4 (Flyway V9): LLM tokens per UTC day, for the daily token budget (cost guard).
+CREATE TABLE llm_usage (
+  day    date    PRIMARY KEY,
+  tokens bigint  NOT NULL,
+  calls  integer NOT NULL
+);
 ```
 
 ## Why these choices (interview notes)

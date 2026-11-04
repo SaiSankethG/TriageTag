@@ -8,6 +8,7 @@ import com.saisanketh.triage.ai.PromptTemplates;
 import com.saisanketh.triage.eval.DuplicateCheckEval;
 import com.saisanketh.triage.ai.DraftReplyService;
 import com.saisanketh.triage.ai.MissingDetailsChecker;
+import com.saisanketh.triage.ai.TokenBudget;
 import com.saisanketh.triage.docs.DocChunkRepository;
 import com.saisanketh.triage.docs.DocIngestService;
 import com.saisanketh.triage.docs.DocSource;
@@ -58,7 +59,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         LlmTestConfig.class, LlmConfig.class, PromptTemplates.class, IssueTextRepository.class, DuplicateVerifier.class,
         DuplicateCheckEval.class, IssueFixRepository.class, FixedHintService.class,
         DocChunkRepository.class, DocIngestService.class, DraftReplyService.class, MissingDetailsChecker.class,
-        TriageReportRepository.class, TriageService.class})
+        TriageReportRepository.class, TriageService.class, TokenBudget.class})
 public abstract class PostgresTest {
 
     @MockitoBean

@@ -8,6 +8,7 @@ import com.saisanketh.triage.ai.IssueText;
 import com.saisanketh.triage.ai.IssueTextRepository;
 import com.saisanketh.triage.ai.MissingDetails;
 import com.saisanketh.triage.ai.MissingDetailsChecker;
+import com.saisanketh.triage.ai.TokenBudget;
 import com.saisanketh.triage.ai.TriageLlm;
 import com.saisanketh.triage.report.TriageReport.Duplicate;
 import com.saisanketh.triage.triage.FixedHint;
@@ -32,7 +33,8 @@ import java.util.Set;
  * it scores above the comment threshold), labels, missing details, the "already fixed?" hint, and a RAG draft reply.
  *
  * <p>Every LLM step handles its own failures (the part says UNKNOWN), so a report is always written; only a database
- * error stops it (and the Kafka worker then retries the message).
+ * error stops it (and the Kafka worker then retries the message). Over the daily token budget, the LLM steps are refused
+ * and the report's notes say so.
  */
 @Slf4j
 @Service
@@ -50,6 +52,7 @@ public class TriageService {
     private final DraftReplyService draftReplyService;
     private final TriageReportRepository reports;
     private final TriageLlm llm;
+    private final TokenBudget budget;
     private final Clock clock;
     private final double commentThreshold;
     private final double fixedHintMinScore;
@@ -57,7 +60,8 @@ public class TriageService {
     public TriageService(JdbcTemplate jdbc, IssueTextRepository issueTexts, VectorDuplicateSearch vectorSearch,
                          LabelSuggester labelSuggester, DuplicateVerifier duplicateVerifier,
                          MissingDetailsChecker missingDetailsChecker, FixedHintService fixedHintService,
-                         DraftReplyService draftReplyService, TriageReportRepository reports, TriageLlm llm, Clock clock,
+                         DraftReplyService draftReplyService, TriageReportRepository reports, TriageLlm llm,
+                         TokenBudget budget, Clock clock,
                          @Value("${triage.duplicates.comment-threshold:0.825}") double commentThreshold,
                          @Value("${triage.fixed-hint.min-score:0.75}") double fixedHintMinScore) {
         this.jdbc = jdbc;
@@ -70,6 +74,7 @@ public class TriageService {
         this.draftReplyService = draftReplyService;
         this.reports = reports;
         this.llm = llm;
+        this.budget = budget;
         this.clock = clock;
         this.commentThreshold = commentThreshold;
         this.fixedHintMinScore = fixedHintMinScore;
@@ -98,6 +103,10 @@ public class TriageService {
     public TriageReport create(long issueId) {
         String repo = jdbc.queryForObject("SELECT repo FROM issue WHERE id = ?", String.class, issueId);
         IssueText issue = issueTexts.byId(issueId).orElseThrow();
+        // Over budget: the LLM steps still run, but GuardedTriageLlm refuses each call, so each part says UNKNOWN with
+        // the reason, and the report says why at the top. Duplicates, labels and the fixed hint need no LLM.
+        String notes = budget.hasRoom() ? null
+                : "LLM steps skipped: the daily token budget (" + budget.dailyLimit() + " tokens) is used up.";
 
         List<SimilarIssue> similar = vectorSearch.findSimilar(issueId, DUPLICATES);
         List<Duplicate> duplicates = similar.stream()
@@ -129,7 +138,7 @@ public class TriageService {
         }
 
         TriageReport report = new TriageReport(issueId, clock.instant(), duplicates, duplicateCheck, labels, missing,
-                fixedHint, draft, llm.model(), String.join(",", prompts), tokens, null);
+                fixedHint, draft, llm.model(), String.join(",", prompts), tokens, notes);
         reports.save(report);
         log.info("Triage report for {}#{}: {} duplicates, {} labels, {} missing, draft {}, {} tokens", repo,
                 issue.number(), duplicates.size(), labels.size(), missing.missing().size(), draft.status(), tokens);

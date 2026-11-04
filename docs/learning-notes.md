@@ -1864,3 +1864,37 @@ details, the "already fixed?" hint, the draft reply with its sources, and model/
    HTML; links are allowed only for http(s) URLs.
 3. **Is the page secured?** Not yet: it's a local demo. In M5 the deployed app would sit behind auth (or the page would
    only show public data, which it does today).
+
+## M4 step 7: cost guard, a daily token budget (4 Nov 2026)
+
+Files: Flyway `V9__llm_usage.sql`, `ai/TokenBudget.java`, `ai/GuardedTriageLlm.java`, `LlmConfig` (wraps the LLM),
+`TriageService` (notes); config `triage.llm.daily-token-budget: 200000`; tests `GuardedTriageLlmTest` (2),
+`TokenBudgetDbTest` (1), one new case in `TriageServiceDbTest`.
+
+### What it does
+Every LLM call goes through `GuardedTriageLlm`. Before the call it asks `TokenBudget` whether today (UTC) is still under
+the budget; after the call it adds the call's tokens to today's row in `llm_usage`. Over the budget, the call is refused
+with an `LlmException`. Each LLM part of the report then says UNKNOWN with "daily token budget ... reached", the report's
+`notes` explain it, and duplicates, labels and the fixed hint (no LLM) are still there. The evals use the same guard, so a
+replay run can't overspend either.
+
+### Basics used here
+- **Decorator pattern**: a class with the same interface that wraps another and adds behaviour. Before: every service checks
+  the budget itself (and one forgets). After: `LlmConfig` returns `new GuardedTriageLlm(realLlm, budget)`, and every caller
+  is guarded without knowing it.
+- **Counting in the database, not in memory**: survives restarts and works with several app instances. `INSERT ... ON
+  CONFLICT (day) DO UPDATE SET tokens = llm_usage.tokens + EXCLUDED.tokens` is an atomic increment.
+- **UTC days**: the "day" must not depend on the server's time zone (a test inserted the day in IST and missed it).
+
+### One alternative I rejected
+**Only the provider's monthly spend cap.** It's the last line of defence (sai's account has prepaid credit with auto-reload
+off), but it stops everything at once, at the end. A daily budget in the app fails gracefully and early, and shows why in the report.
+
+### Likely interview questions
+1. **How do you control LLM cost?** Prompts only where needed (the duplicate check only above the threshold, no draft without
+   relevant sources), bodies cut to a few thousand characters, a daily token budget enforced by a decorator, tokens stored
+   per report, and a hard spend cap at the provider.
+2. **Can the budget be exceeded?** By at most the in-flight calls: the check is before the call and the count after. Fine for
+   a cost brake; an exact meter would need reserving tokens up front.
+3. **What does a maintainer see when the budget is hit?** The report still has duplicates, labels and the fixed hint; the LLM
+   parts say "skipped: daily token budget reached", and so does the note at the top.
