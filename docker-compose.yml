@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:16
+    # Postgres 16 + the pgvector extension. "-trixie" = Debian 13, the same OS (glibc 2.41) as the postgres:16 image
+    # the data was created with; the plain pg16 tag is Debian 12 (glibc 2.36), which warns about a collation mismatch.
+    image: pgvector/pgvector:pg16-trixie
     environment:
       POSTGRES_DB: triage
       POSTGRES_USER: copilot

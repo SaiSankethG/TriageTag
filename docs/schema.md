@@ -2,7 +2,7 @@
 
 Decided 3 Nov 2026. Source-neutral, so Jira can be added later without changes.
 Since M2 the schema is managed by Flyway (`src/main/resources/db/migration`): V1 = this schema,
-V2 drops Hibernate's `CHECK (source = 'GITHUB')`, V3 adds `webhook_delivery`.
+V2 drops Hibernate's `CHECK (source = 'GITHUB')`, V3 adds `webhook_delivery`, V4 adds pgvector + `issue_embedding`.
 
 ```sql
 CREATE TABLE issue (
@@ -36,6 +36,16 @@ CREATE TABLE issue_label (
 );
 
 CREATE INDEX idx_issue_label_name ON issue_label (label_name);     -- "all issues labelled X"
+
+-- Added in M3 (Flyway V4): pgvector + one embedding per issue (all-MiniLM-L6-v2 -> 384 numbers).
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE TABLE issue_embedding (
+  issue_id   bigint       PRIMARY KEY REFERENCES issue(id) ON DELETE CASCADE,
+  model      varchar(100) NOT NULL,       -- which model made it, so a model change can re-embed
+  embedding  vector(384)  NOT NULL,
+  created_at timestamptz  NOT NULL
+);
+CREATE INDEX idx_issue_embedding_hnsw ON issue_embedding USING hnsw (embedding vector_cosine_ops);
 
 -- Added in M2 (Flyway V3): one row per accepted GitHub webhook delivery.
 CREATE TABLE webhook_delivery (

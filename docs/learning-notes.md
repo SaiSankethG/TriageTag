@@ -1222,3 +1222,52 @@ event re-creating the row, but every query would need `WHERE NOT deleted`, and s
 3. **Hard delete or soft delete?**
    Hard delete here: simpler queries, and we don't need history of deleted issues. Soft delete would keep an audit
    trail and block late events from resurrecting the row, at the cost of a filter on every query.
+
+## M3 step 1: pgvector (4 Nov 2026)
+
+Files: `docker-compose.yml` (`pgvector/pgvector:pg16-trixie`), `V4__pgvector_issue_embedding.sql`, Testcontainers on
+the same image, docs/schema.md; test `PgvectorSchemaDbTest` (3).
+
+### What it does
+- The Postgres container now runs an image that is the official Postgres 16 **plus the pgvector extension**. Same
+  major version and same Docker volume, so the data stayed: before and after, 44,205 issues (43,810 spring-boot + 394
+  petclinic + 1 sandbox), 54,668 labels, 1,036 `duplicate_of`.
+- V4: `CREATE EXTENSION vector`, table `issue_embedding(issue_id PK/FK ON DELETE CASCADE, model, embedding vector(384),
+  created_at)`, and an **HNSW** index with `vector_cosine_ops`. pgvector version 0.8.7.
+
+### The gotcha: collation versions
+The first try used `pgvector/pgvector:pg16`. Postgres warned: *"database triage has a collation version mismatch:
+created using 2.41, the OS provides 2.36"*. Text sorting comes from the C library (glibc) of the OS image: `postgres:16`
+is Debian 13 (glibc 2.41), the plain `pg16` pgvector tag is Debian 12 (glibc 2.36). If sort rules differ, B-tree indexes
+on text columns (our unique key, the label indexes) can silently become wrong. Fix: use `pg16-trixie` (Debian 13,
+glibc 2.41, same as before). Nothing had written to the DB in between, so no REINDEX was needed; otherwise the fix is
+`REINDEX DATABASE triage; ALTER DATABASE triage REFRESH COLLATION VERSION;`.
+
+### Basics used here
+- **Embedding**: a list of numbers (here 384) that represents the meaning of a text; texts that mean similar things get
+  vectors pointing in similar directions. *Before:* compare issues by shared words. *After:* compare their vectors.
+- **Cosine distance** (`<=>` in pgvector): 0 = same direction (very similar), 1 = unrelated, 2 = opposite.
+  Similarity = 1 - distance. The test checks exactly that: same vector -> 0, negated vector -> 2.
+- **`vector(384)`**: a column type from pgvector; written as text like `'[0.1,0.2,...]'::vector`.
+- **HNSW index** (Hierarchical Navigable Small World): a graph where each vector links to near neighbours, in layers
+  (few long links on top, many short ones below). A search walks the graph instead of comparing with every row:
+  much faster, slightly approximate. `vector_cosine_ops` builds it for cosine distance.
+- **`ON DELETE CASCADE`** on `issue_embedding.issue_id`: deleting an issue (e.g. the `deleted` webhook) removes its vector.
+- **`asCompatibleSubstituteFor("postgres")`** (Testcontainers): "this image behaves like the official postgres image",
+  so the Postgres module accepts it.
+
+### One alternative I rejected
+**A separate vector database** (Qdrant, Pinecone, Weaviate). Another service to run and keep in sync with Postgres,
+for 44k vectors that Postgres handles easily. With pgvector the vectors sit next to the issues, so "same repo, created
+before X" filters and joins are plain SQL, in one transaction, with one backup.
+
+### Likely interview questions
+1. **Why pgvector instead of a dedicated vector database?**
+   Tens of thousands of vectors, filters on normal columns (repo, created_at), and one database to run and back up.
+   pgvector gives an HNSW index and SQL joins; a separate store would need syncing and adds an operational piece.
+2. **What is an HNSW index?**
+   An approximate nearest-neighbour index: a multi-layer graph of vectors linked to near neighbours. Searches walk it
+   from coarse to fine layers, visiting a small part of the data. Trade-off: speed vs a little recall (tunable with `ef_search`).
+3. **You changed the Postgres image under existing data. What could go wrong?**
+   A different major version can't read the files (we kept 16). A different OS can change text collation, which can
+   corrupt text indexes: Postgres warned about it, and the fix was an image on the same Debian release (or REINDEX).
