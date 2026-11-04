@@ -28,6 +28,10 @@ github:
   api-url: https://api.github.com
   token: ${GITHUB_TOKEN:}   # from the environment; empty if not set. Never put a real token here.
   webhook-secret: ${GITHUB_WEBHOOK_SECRET:}   # shared secret for webhook signatures; empty = refuse all webhooks
+  app:
+    # The GitHub App that posts comments in comment mode (M5). Both empty = shadow mode only.
+    id: ${GITHUB_APP_ID:}
+    private-key-path: ${GITHUB_APP_PRIVATE_KEY_PATH:}   # a .pem file outside the repo, never committed
 
 triage:
   outbox:

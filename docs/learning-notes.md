@@ -2142,3 +2142,39 @@ no `kubectl apply --dry-run`; the test parses the files and checks them instead.
    k3s and the OS; Kafka's heap is capped at 512 MB; the JVM heap follows the container limit through the buildpack.
 3. **How do secrets get to the pod?** A Kubernetes Secret created on the server from a template (never committed), injected as
    env vars; the GitHub App key is mounted as a read-only file.
+
+## M5 step 3: GitHub App authentication without a new library (4 Nov 2026)
+
+Files: `github/GitHubAppAuth.java`, `github/PemKeys.java`, config `github.app.id` / `github.app.private-key-path` (from the
+`GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY_PATH` env vars); tests `GitHubAppAuthTest` (3), `PemKeysTest` (4). The tests make
+their own throwaway RSA key; no real key exists anywhere in the repo.
+
+### What it does
+1. **App JWT**: `{"alg":"RS256"}` . `{"iat": now - 60 s, "exp": now + 9 min, "iss": "<app id>"}`, each base64url, signed with
+   the App's private key using `java.security.Signature("SHA256withRSA")`. It proves "I am this App".
+2. **Installation token**: with the JWT, `GET /repos/{owner}/{repo}/installation` → installation id (cached), then
+   `POST /app/installations/{id}/access_tokens` → a 1-hour token that can act on that repo with the App's permissions.
+3. **Cache**: the token is reused until 5 minutes before `expires_at`. Tested with a clock the test moves: 54 min = cached,
+   56 min = refreshed.
+4. **Key format**: GitHub downloads keys as PKCS#1 (`BEGIN RSA PRIVATE KEY`), Java reads only PKCS#8. `PemKeys` adds the small
+   PKCS#8 header (version + "rsaEncryption" + the key as an OCTET STRING) by hand. The test checks the result is byte-for-byte
+   what Java itself produces.
+
+### Basics used here
+- **JWT**: three base64url parts, `header.payload.signature`. The server checks the signature with the App's public key and the
+  `exp` time; nobody can change the payload without the private key.
+- **RS256**: an RSA signature over the SHA-256 hash of `header.payload`.
+- **DER/ASN.1**: the binary format keys are stored in. Each value is tag + length + bytes; lengths ≥ 128 use a "long form"
+  (0x82 0x04 0xA6 = 1,190).
+- **`synchronized`**: two threads asking for a token at the same time won't both fetch one (the cache is a plain HashMap).
+
+### One alternative I rejected
+**A JWT library (jjwt / nimbus) or BouncyCastle for PEM.** Both are new dependencies for ~60 lines of standard-library code that
+the plan asked for, and the hand-written version is easier to explain line by line.
+
+### Likely interview questions
+1. **How does a GitHub App authenticate?** Sign a short-lived JWT with the App's private key, exchange it for an installation
+   token per installation, and use that (1 hour) for API calls; cache it and refresh shortly before expiry.
+2. **Where is the private key?** In a file on the server, mounted from a Kubernetes Secret; its path comes from an env var.
+   It's never in git, never logged, and tests use generated keys.
+3. **Why iat 60 s in the past?** Clock drift: if our clock is ahead of GitHub's, a token "issued in the future" is rejected.
