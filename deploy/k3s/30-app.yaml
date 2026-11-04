@@ -1,0 +1,100 @@
+# The triage assistant: webhook receiver + Kafka worker + API + demo page, one replica.
+apiVersion: v1
+kind: Service
+metadata:
+  name: triage-app
+  namespace: triage
+spec:
+  selector:
+    app: triage-app
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: triage-app
+  namespace: triage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: triage-app
+  template:
+    metadata:
+      labels:
+        app: triage-app
+    spec:
+      containers:
+        - name: app
+          # Built on the Mac with ./mvnw spring-boot:build-image (linux/arm64) and imported into k3s
+          # (docker save | gzip, copy to the VM, sudo k3s ctr images import): no registry needed.
+          image: docker.io/library/issue-triage-assistant:0.0.1-SNAPSHOT
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - { name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/triage" }
+            - { name: SPRING_DATASOURCE_USERNAME, value: "copilot" }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom: { secretKeyRef: { name: triage-secrets, key: POSTGRES_PASSWORD } }
+            - { name: SPRING_KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - name: GITHUB_TOKEN
+              valueFrom: { secretKeyRef: { name: triage-secrets, key: GITHUB_TOKEN } }
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom: { secretKeyRef: { name: triage-secrets, key: GITHUB_WEBHOOK_SECRET } }
+            - name: ANTHROPIC_API_KEY
+              valueFrom: { secretKeyRef: { name: triage-secrets, key: ANTHROPIC_API_KEY } }
+            - name: GITHUB_APP_ID
+              valueFrom: { secretKeyRef: { name: triage-secrets, key: GITHUB_APP_ID } }
+            - { name: GITHUB_APP_PRIVATE_KEY_PATH, value: "/etc/github-app/private-key.pem" }
+            # The eval endpoints write result files; in the container they go to /tmp, not into a docs/ folder.
+            - { name: TRIAGE_EVAL_RESULTS_FILE, value: "/tmp/m3-results.md" }
+            - { name: TRIAGE_EVAL_DUPLICATE_CHECK_FILE, value: "/tmp/m4-duplicate-check.md" }
+          resources:
+            requests: { cpu: 500m, memory: 1536Mi }
+            limits: { memory: 2560Mi }   # JVM + the in-process MiniLM model; the buildpack sizes the heap from this
+          # Startup loads the embedding model and runs Flyway: ~45 s on a small VM. Allow up to 5 minutes before
+          # liveness checks start counting.
+          startupProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            periodSeconds: 20
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            periodSeconds: 10
+          volumeMounts:
+            - name: github-app-key
+              mountPath: /etc/github-app
+              readOnly: true
+      volumes:
+        - name: github-app-key
+          secret:
+            secretName: github-app-key
+            optional: true   # comment mode needs it; without it the app runs in shadow mode only
+---
+# HTTP routing with k3s's built-in Traefik. GitHub sends webhooks to http(s)://<host>/webhooks/github.
+# HTTPS: see docs/m5-report.md (STOP B) for the options; replace the host with the VM's DNS name.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: triage-app
+  namespace: triage
+spec:
+  rules:
+    - host: triage.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: triage-app
+                port:
+                  number: 80

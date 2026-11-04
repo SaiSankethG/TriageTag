@@ -1,0 +1,68 @@
+# Postgres 16 + pgvector, one replica, data on a persistent volume (k3s's local-path storage = a folder on the VM's disk).
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: triage
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: triage
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: pgvector/pgvector:pg16-trixie   # the same image as docker-compose.yml and the tests
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: triage
+            - name: POSTGRES_USER
+              value: copilot
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: triage-secrets
+                  key: POSTGRES_PASSWORD
+            - name: PGDATA                          # a sub-folder: the volume's root may contain lost+found
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            requests: { cpu: 300m, memory: 1Gi }
+            limits: { memory: 2Gi }
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "copilot", "-d", "triage"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "copilot", "-d", "triage"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi   # spring-boot's 43,810 issues + embeddings + docs are ~1-2 GB today

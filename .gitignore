@@ -5,3 +5,7 @@ target/
 .DS_Store
 .claude/settings.local.json
 __pycache__/
+
+# Filled-in Kubernetes secrets never go into git (only secret.example.yaml does)
+deploy/k3s/secret.yaml
+*.pem

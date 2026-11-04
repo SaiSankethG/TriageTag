@@ -2103,3 +2103,42 @@ calculator and layering would have to be written by hand in a Dockerfile.
    which exercises the native ONNX library, the riskiest part on a minimal base image.
 3. **Why is it 1.2 GB?** The JRE plus ONNX Runtime and the embedding model. They live in layers that rarely change, so updates
    only move the small application layer.
+
+## M5 step 2: k3s manifests (4 Nov 2026)
+
+Files: `deploy/k3s/00-namespace.yaml`, `10-postgres.yaml`, `20-kafka.yaml`, `30-app.yaml`, `secret.example.yaml` (template only;
+`secret.yaml` and `*.pem` are git-ignored); test `K3sManifestsTest` (3). kubectl isn't installed on the build Mac, so there was
+no `kubectl apply --dry-run`; the test parses the files and checks them instead.
+
+### What it does
+- **Postgres** (pgvector image) and **Kafka** (KRaft, one broker) as **StatefulSets** with persistent volumes (k3s's local-path
+  storage: a folder on the VM's disk), each behind a Service (`postgres:5432`, `kafka:9092`). Kafka advertises its in-cluster
+  DNS name, so the app can reach it.
+- **The app** as a Deployment: env from the `triage-secrets` Secret, the GitHub App key mounted as a file (optional: without it,
+  shadow mode only), eval output to /tmp, and three probes: **startup** (up to 5 min, because loading the model + Flyway takes
+  ~45 s on a small VM), **liveness**, **readiness** (Spring Boot's `/actuator/health/liveness|readiness`).
+- An **Ingress** for k3s's built-in Traefik (host is a placeholder until STOP B).
+- **Sizing for 2 OCPU / 12 GB** (Oracle Always Free since mid-2026, per several reports; Oracle's own page still showed 4 / 24
+  when checked, so sai should confirm in the console): requests 1.1 CPU / 3.5 GB, memory limits 6 GB in total, leaving room for
+  k3s itself.
+
+### Basics used here
+- **Deployment vs StatefulSet**: a Deployment's pods are interchangeable (the app). A StatefulSet gives each pod a stable name and
+  **its own** volume that survives restarts (databases, Kafka).
+- **requests vs limits**: requests = what the scheduler reserves; a memory limit = the pod is killed if it uses more. No CPU
+  limit on purpose (CPU over the request is just slowed, never killed).
+- **Probes**: startup ("has it finished starting?"), liveness ("is it stuck? restart it"), readiness ("can it take traffic?").
+  Without a startup probe, a slow start would be killed by the liveness probe in a loop.
+- **Secrets**: the repo has only a template with placeholders; the real values are typed on the server. A test fails if
+  `secret.yaml` ever appears in the repo.
+
+### One alternative I rejected
+**Helm charts.** Templating and releases for four objects on one VM is more to learn and explain than plain YAML applied in order.
+
+### Likely interview questions
+1. **Why StatefulSets for Postgres and Kafka?** Stable identity and a volume per pod that survives restarts; a Deployment would
+   get a fresh, empty disk.
+2. **How did you size it for a 2-CPU / 12-GB VM?** Requests add up to 1.1 CPU / 3.5 GB and memory limits to 6 GB, leaving room for
+   k3s and the OS; Kafka's heap is capped at 512 MB; the JVM heap follows the container limit through the buildpack.
+3. **How do secrets get to the pod?** A Kubernetes Secret created on the server from a template (never committed), injected as
+   env vars; the GitHub App key is mounted as a read-only file.
