@@ -56,6 +56,7 @@ public abstract class FullStackTest {
 
     @BeforeEach
     void emptyTheTables() {
+        jdbc.update("delete from issue_embedding");
         jdbc.update("delete from issue_label");
         jdbc.update("delete from issue");
         jdbc.update("delete from webhook_delivery");

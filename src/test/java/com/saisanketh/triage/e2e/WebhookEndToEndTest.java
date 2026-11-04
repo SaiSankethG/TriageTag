@@ -50,6 +50,9 @@ class WebhookEndToEndTest extends FullStackTest {
         assertThat(jdbc.queryForList("select label_name from issue_label", String.class)).containsExactly("bug");
         assertThat(countRows("select count(*) from webhook_delivery where delivery_id = '" + delivery + "'"))
                 .isEqualTo(1);
+        // The worker also embedded it with the real model, so it can be found by similarity search.
+        waitUntil("the issue has an embedding", () -> countRows(
+                "select count(*) from issue_embedding where model = 'all-MiniLM-L6-v2'") == 1);
     }
 
     @Test

@@ -1,6 +1,7 @@
 package com.saisanketh.triage.db;
 
 import com.saisanketh.triage.ClockConfig;
+import com.saisanketh.triage.embedding.IssueEmbeddingRepository;
 import com.saisanketh.triage.kafka.IssueEventPublisher;
 import com.saisanketh.triage.repository.WebhookDeliveryRepository;
 import com.saisanketh.triage.service.IssueService;
@@ -27,7 +28,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({PostgresContainerConfig.class, ClockConfig.class, IssueService.class,
-        WebhookDeliveryRepository.class, WebhookIntakeService.class, KeywordDuplicateSearch.class})
+        WebhookDeliveryRepository.class, WebhookIntakeService.class, KeywordDuplicateSearch.class,
+        IssueEmbeddingRepository.class})
 public abstract class PostgresTest {
 
     @MockitoBean

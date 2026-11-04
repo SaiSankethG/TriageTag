@@ -2,6 +2,7 @@ package com.saisanketh.triage.kafka;
 
 import com.saisanketh.triage.domain.Issue;
 import com.saisanketh.triage.domain.SourceType;
+import com.saisanketh.triage.embedding.IssueEmbeddingService;
 import com.saisanketh.triage.github.GitHubIssueMapper;
 import com.saisanketh.triage.kafka.IssueEventConsumer.BadIssueEventException;
 import com.saisanketh.triage.service.IssueService;
@@ -28,7 +29,9 @@ class IssueEventConsumerTest {
 
     private final JsonMapper json = JsonMapper.builder().build();
     private final IssueService issueService = mock(IssueService.class);
-    private final IssueEventConsumer consumer = new IssueEventConsumer(json, new GitHubIssueMapper(), issueService);
+    private final IssueEmbeddingService embeddingService = mock(IssueEmbeddingService.class);
+    private final IssueEventConsumer consumer =
+            new IssueEventConsumer(json, new GitHubIssueMapper(), issueService, embeddingService);
 
     private static ConsumerRecord<String, String> record(String value) {
         return new ConsumerRecord<>("issue-events", 1, 42L, "Codertocat/Hello-World#1", value);
@@ -55,6 +58,16 @@ class IssueEventConsumerTest {
         assertThat(issue.getValue().getNumber()).isEqualTo(1);
         assertThat(issue.getValue().getTitle()).isEqualTo("Spelling error in the README file");
         assertThat(issue.getValue().getLabels()).containsExactly("bug");
+        verify(embeddingService).embedIssue(SourceType.GITHUB, "444500041");   // new text -> new embedding
+    }
+
+    @Test
+    void aStaleEventIsNotReEmbedded() throws IOException {
+        when(issueService.upsert(any())).thenReturn(UpsertResult.STALE);
+
+        consumer.onIssueEvent(record(messageFromFixture()));
+
+        verifyNoInteractions(embeddingService);
     }
 
     @Test

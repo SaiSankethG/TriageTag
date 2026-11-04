@@ -16,7 +16,21 @@
     <description>Maintainer-side GitHub issue triage assistant</description>
     <properties>
         <java.version>21</java.version>
+        <!-- 1.22.0 (Oct 2026), not the newest 1.23.0 (2 Nov 2026): a release that has been out a few weeks -->
+        <langchain4j.version>1.22.0</langchain4j.version>
     </properties>
+    <dependencyManagement>
+        <dependencies>
+            <!-- The LangChain4j BOM picks matching versions of all LangChain4j modules -->
+            <dependency>
+                <groupId>dev.langchain4j</groupId>
+                <artifactId>langchain4j-bom</artifactId>
+                <version>${langchain4j.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -47,6 +61,16 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <!-- Embeddings (M3): LangChain4j core + the all-MiniLM-L6-v2 model, run in-process (no API key, no network).
+             No LangChain4j Spring Boot starter: beans are wired by hand. -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-embeddings-all-minilm-l6-v2</artifactId>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>

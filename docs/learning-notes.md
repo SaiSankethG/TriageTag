@@ -1317,3 +1317,53 @@ database we already have. (Also rejected: building the query from the title only
 3. **Why only issues created before the query issue?**
    That's what was knowable when the issue was opened. Searching later issues would let the original's *own* duplicates or
    later discussion leak into the result: an evaluation that looks better than reality.
+
+## M3 step 3: embeddings with all-MiniLM-L6-v2, in-process (4 Nov 2026)
+
+Files: `pom.xml` (LangChain4j BOM 1.22.0, `langchain4j-core`, `langchain4j-embeddings-all-minilm-l6-v2`),
+`embedding/EmbeddingService.java` (our interface), `MiniLmEmbeddingService.java`, `EmbeddingText.java`,
+`IssueEmbeddingRepository.java`, `IssueEmbeddingService.java`, `web/EmbeddingController.java`
+(`POST /embeddings/{owner}/{repo}`); the Kafka worker embeds new and changed issues. Tests: `EmbeddingTextTest` (3),
+`MiniLmEmbeddingServiceTest` (3, real model), `IssueEmbeddingServiceTest` (3), `IssueEmbeddingRepositoryDbTest` (4, real
+pgvector), 1 more consumer test, and the end-to-end test now checks the embedding row.
+
+### What it does
+- **Text** per issue: title + first 2,000 characters of the body, HTML comments removed, whitespace collapsed
+  (`EmbeddingText`): the same window as the keyword search.
+- **Model**: all-MiniLM-L6-v2 (384 numbers per text), run **inside the JVM** with ONNX Runtime; the model file is in the
+  LangChain4j jar. No API key, no network, no cost per call.
+- **Batch job** `POST /embeddings/{owner}/{repo}`: finds issues with no embedding from the current model, 256 at a time,
+  embeds them with `embedAll`, saves with one `batchUpdate` (`INSERT ... ?::vector ... ON CONFLICT DO UPDATE`), logs
+  progress, returns `{repo, model, embedded, durationMs}`. Re-running only embeds what's missing. Real runs:
+  spring-petclinic 394 issues in 2.2 s; spring-boot **43,810 issues in 333 s** (5.5 min, ~130 issues/s on a laptop CPU).
+- **Live**: after the Kafka worker inserts or updates an issue (not when STALE), it re-embeds it.
+
+### Basics used here
+- **Sentence-embedding model**: a small neural network trained so that sentences with similar meaning get vectors with
+  high cosine similarity. "port 8080 already in use" and "web server can't bind, port taken" share almost no words but
+  come out close; the test checks they are closer than an unrelated YAML issue.
+- **ONNX Runtime**: runs a trained model (exported to the ONNX format) on the CPU from Java. *Before:* call an embeddings
+  API over HTTP per issue (a key, network, cost, rate limits). *After:* `model.embed(text)` in-process, ~180 texts/second.
+- **Our own interface (`EmbeddingService`)**: callers depend on `embed(text)`, not on LangChain4j. Changing the model
+  (another local one, or an API) is one new class; `model` is stored with each vector, so `countMissing` then shows
+  everything needs re-embedding.
+- **`?::vector`**: the JDBC driver doesn't know pgvector's type, so we send text `"[0.1,-0.2,...]"` and cast it in SQL.
+- **`jdbc.batchUpdate(sql, rows)`**: sends many inserts in one round trip.
+- **Why no LangChain4j Spring Boot starter**: its auto-configuration targets particular Spring Boot versions; creating
+  `new AllMiniLmL6V2EmbeddingModel()` in our own `@Component` works with any Boot version and is one line.
+
+### One alternative I rejected
+**An embeddings API (OpenAI, Voyage, Cohere).** Better models, but every issue costs a network call and money, needs a
+key, and the 44k-issue backfill would hit rate limits. The local model is free, private and fast enough; the interface
+makes a later switch cheap if the evaluation (step 6) shows we need a stronger model.
+
+### Likely interview questions
+1. **How do you compute embeddings, and why locally?**
+   all-MiniLM-L6-v2 via LangChain4j + ONNX Runtime inside the JVM: 384-dim vectors, no key, no per-call cost, no data
+   leaving the machine. Behind our own `EmbeddingService` interface so the model can change.
+2. **How do you keep embeddings up to date?**
+   A batch job embeds whatever is missing for the current model (resumable, idempotent), and the Kafka worker re-embeds an
+   issue whenever its text changes. Deleted issues lose their vector through `ON DELETE CASCADE`.
+3. **What text do you embed and why?**
+   Title + first 2,000 characters of the body without template comments: the title carries most meaning, the start of
+   the body has the symptom; long logs at the end add noise (and the model only reads ~256 tokens well anyway).

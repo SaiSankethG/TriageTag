@@ -2,6 +2,7 @@ package com.saisanketh.triage.kafka;
 
 import com.saisanketh.triage.domain.Issue;
 import com.saisanketh.triage.domain.SourceType;
+import com.saisanketh.triage.embedding.IssueEmbeddingService;
 import com.saisanketh.triage.github.GitHubIssueMapper;
 import com.saisanketh.triage.service.IssueService;
 import com.saisanketh.triage.service.UpsertResult;
@@ -39,6 +40,7 @@ public class IssueEventConsumer {
     private final JsonMapper jsonMapper;
     private final GitHubIssueMapper issueMapper;
     private final IssueService issueService;
+    private final IssueEmbeddingService embeddingService;
 
     @KafkaListener(topics = KafkaTopicsConfig.ISSUE_EVENTS, groupId = GROUP_ID)
     public void onIssueEvent(ConsumerRecord<String, String> record) {
@@ -56,6 +58,11 @@ public class IssueEventConsumer {
 
         Issue issue = toIssue(record, issueJson);
         UpsertResult result = issueService.upsert(issue);   // a database error here is retried (see KafkaErrorHandlingConfig)
+        if (result != UpsertResult.STALE) {
+            // New or changed text -> new embedding, so the issue can be found by (and find) similar issues.
+            // If this fails, the whole message is retried; the upsert above is idempotent.
+            embeddingService.embedIssue(issue.getSource(), issue.getExternalId());
+        }
         log.info("Issue event {} (partition {}, offset {}): {}", record.key(), record.partition(),
                 record.offset(), result);
     }
