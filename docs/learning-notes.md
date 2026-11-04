@@ -2263,3 +2263,29 @@ place is the instructions and the inputs.
    another part of the same report says are already there.
 3. **How do you keep the draft from claiming a weak match?** Below medium similarity the prompt says "None", so the model never
    sees a weak match as a candidate.
+
+## M5 extra B: two draft versions side by side, scored blind (4 Nov 2026)
+
+Files: `scripts/m4-scoring-v3.py`, `docs/m4-scoring-v3.md` (generated). `docs/m4-scoring.md` is unchanged.
+
+### What it does
+Regenerates the reports of the same 30 spring-boot issues as `docs/m4-scoring.md` with the current prompts (91,588 tokens,
+≈ $0.01-0.05), and writes each issue's new draft next to its old one as **Draft A** and **Draft B**. Which is which depends on a
+hash of the issue number (about half each way), and the key is folded away at the end, so sai can score both without knowing
+which prompt wrote them.
+
+### Basics used here
+- **Blind comparison**: if you know which draft is "the new one", you tend to like it more. Hiding the label (and mixing the
+  order) removes that bias; a fixed hash keeps the order the same if the file is regenerated.
+- **Same inputs, one change**: same 30 issues, same model; only the prompt version differs. That's what makes the comparison fair.
+
+### One alternative I rejected
+**An LLM judge** that picks the better draft. Cheap, but it would grade its own family's writing, and the point of STOP A was a
+maintainer's judgement. It could come later, calibrated against sai's scores.
+
+### Likely interview questions
+1. **How did you evaluate prompt changes?** Same 30 real issues, two prompt versions, drafts shown blind (A/B in mixed order),
+   scored by hand as useful / partly / wrong.
+2. **Why not just read the new outputs?** Without the old ones next to them, and without blinding, it's easy to see improvement
+   that isn't there.
+3. **What does it cost to re-run?** About 90k tokens on Haiku 5.5, a few cents.
