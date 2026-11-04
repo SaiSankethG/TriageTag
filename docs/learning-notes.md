@@ -1367,3 +1367,51 @@ makes a later switch cheap if the evaluation (step 6) shows we need a stronger m
 3. **What text do you embed and why?**
    Title + first 2,000 characters of the body without template comments: the title carries most meaning, the start of
    the body has the symptom; long logs at the end add noise (and the model only reads ~256 tokens well anyway).
+
+## M3 step 4: vector top 3 with pgvector (4 Nov 2026)
+
+Files: `triage/VectorDuplicateSearch.java`, `triage/SimilarIssueService.java`, `web/SimilarIssueController.java`
+(`GET /repos/{owner}/{repo}/issues/{number}/similar?method=vector|keyword&limit=3`); tests `VectorDuplicateSearchDbTest`
+(4, real pgvector, hand-made vectors), `SimilarIssueControllerTest` (4).
+
+### What it does
+- Two queries: (1) the issue's own vector, repo and `created_at`; (2) the nearest **earlier** issues of the **same repo** by
+  cosine distance, `ORDER BY embedding <=> ?::vector LIMIT k`, returning number, title and score (= 1 - distance).
+- Real example, spring-boot #52529 (answer key: duplicate of #52519): **vector top-1 = #52519** "Support
+  MockServerConnectionDetails on DockerComposeService", score 0.807. Keyword top 3 = three other Docker issues; #52519
+  isn't among them.
+- `EXPLAIN ANALYZE`: `Index Scan using idx_issue_embedding_hnsw`, **6 ms** on 43,810 vectors.
+
+### The HNSW + filter problem, and how it's handled
+An HNSW index answers "the nearest vectors"; the `WHERE` (same repo, created before) is applied **after**. If the nearest
+40 (the default `ef_search`) are all from another repo or newer, a plain index scan returns *fewer than k rows* and no
+error. pgvector 0.8's **iterative index scan** fixes that: `SET LOCAL hnsw.iterative_scan = strict_order` keeps walking the
+index until enough rows pass the filter, still in exact distance order. `ef_search = 100` widens each step (better recall).
+`SET LOCAL` = only for this transaction, which is why the method is `@Transactional`. A test proves it: 40 nearer vectors
+from another repo, the index forced on (`enable_seqscan = off`), and the 3 results are still the right 3 from our repo.
+
+### Basics used here
+- **Nearest-neighbour query in SQL**: `ORDER BY embedding <=> :query LIMIT 3`: "sort by distance to the query, keep 3".
+  With an HNSW index Postgres walks the graph instead of computing all 43,810 distances.
+- **Pass the vector as a parameter, not a join**: the index can only be used when the thing being compared against is a
+  fixed value for the query, so we read the issue's vector first and send it back as `?::vector`.
+- **`List<DuplicateSearch>` injection**: Spring passes *every* bean that implements the interface; the service turns them
+  into a map by `name()` ("keyword", "vector"), so `?method=` picks one and a third search is just a new `@Component`.
+- **`EXPLAIN ANALYZE`**: shows the plan Postgres really used and how long each step took.
+
+### One alternative I rejected
+**Exact search (no index, compare with every row).** 43k vectors is small enough that a full scan takes tens of ms, and it's
+always exact. But it grows linearly with the data, and the prompt asks for the HNSW index; with iterative scans the index
+gives the same top results for this data at a fraction of the cost. (Also rejected: IVFFlat, pgvector's other index; it
+needs training on existing data and re-tuning as data grows, while HNSW works well from the first row.)
+
+### Likely interview questions
+1. **How do you find similar issues fast?**
+   Embeddings in pgvector with an HNSW index (cosine). Query = the issue's vector as a parameter, `ORDER BY <=> LIMIT 3`,
+   filtered to the same repo and earlier issues. ~6 ms on 44k vectors.
+2. **What goes wrong when you filter an approximate nearest-neighbour search?**
+   The index returns its nearest candidates first and the filter removes some, so you can silently get fewer results.
+   pgvector 0.8 iterative scans keep scanning until the limit is filled; a test forces the index and checks it.
+3. **Cosine similarity vs Euclidean distance?**
+   Cosine compares direction only (meaning), not length; sentence-embedding models are trained for it. `<=>` is cosine
+   distance in pgvector; similarity = 1 - distance.
