@@ -1641,3 +1641,37 @@ the provider swappable without LangChain4j in the core.
    `missing-details-v1` with every result lets me compare versions and explain any old result.
 3. **How do you count tokens?** From the provider's usage numbers on each reply (the fake estimates chars / 4). They feed a
    daily budget (step 7) and the report's cost column.
+
+## M4 step 2: missing-details check with strict JSON (4 Nov 2026)
+
+Files: `prompts/missing-details-v1.txt`, `ai/MissingDetailsChecker.java`, `ai/MissingDetails.java`, `ai/StrictJson.java`,
+a keyword rule in `FakeTriageLlm`; tests `MissingDetailsCheckerTest` (9) with a `ScriptedTriageLlm` test helper.
+
+### What it does
+For a new issue, the LLM says for each of **version, steps to reproduce, expected vs actual, logs/stack trace** whether it is
+`present`, `missing` or `not_applicable` (e.g. steps for a feature request). The answer must be exactly one JSON object with
+exactly those four keys and allowed values. Bad answer → ask once more → still bad (or the call failed) → status `UNKNOWN`
+with the reason, never a guess. Bodies are cut at 6,000 characters. The result keeps the prompt version and tokens used.
+
+### Basics used here
+- **Validate LLM output like user input.** The model can add "Sure! Here's the JSON:", drop a key or invent a value. Before:
+  `mapper.readValue(answer, Map.class)` and hope. After: parse, check the exact key set, check each value against an enum,
+  and only then use it.
+- **One leniency on purpose**: a Markdown code fence (```json ... ```) is removed; models add it often and it doesn't
+  change the meaning. Anything else around the JSON is rejected.
+- **`EnumMap`**: a map whose keys are enum values, kept in the enum's order; fast and readable.
+- **Jackson 3** (`tools.jackson...`): Spring Boot 4's JSON library. `JacksonException` is unchecked now, and
+  `propertyNames()` lists an object's keys.
+
+### One alternative I rejected
+**The provider's "structured output" / tool-calling mode** (the API forces a JSON schema). Worth trying with the real model
+at STOP A, but the parser and the retry must exist anyway (another provider may not support it, and the fake doesn't), and
+they're what's tested here.
+
+### Likely interview questions
+1. **What if the LLM returns invalid JSON?** Strict parse and validation; one retry; then "unknown" with the reason, shown as
+   such in the report. Both calls' tokens are counted.
+2. **Why "not_applicable" as a third value?** Without it the model must call steps-to-reproduce "missing" for a feature
+   request, and the bot would ask reporters for nonsense.
+3. **Why not regexes instead of an LLM?** The fake LLM *is* regexes, and it's easy to fool ("expected" in "unexpected
+   error"). An LLM understands "here's my pom.xml with 3.4.1" as a version. The real comparison comes from the STOP A hand-scoring.

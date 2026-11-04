@@ -3,6 +3,7 @@ package com.saisanketh.triage.ai;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 /**
  * A stand-in for a real LLM: no network, no key, no cost, always the same answer for the same prompt.
@@ -17,6 +18,10 @@ public class FakeTriageLlm implements TriageLlm {
     public static final String MODEL = "fake";
 
     private final Map<String, Function<Prompt, String>> rules = new HashMap<>();
+
+    public FakeTriageLlm() {
+        rule(MissingDetailsChecker.PROMPT_NAME, FakeTriageLlm::missingDetails);
+    }
 
     @Override
     public String model() {
@@ -36,5 +41,23 @@ public class FakeTriageLlm implements TriageLlm {
 
     static int estimateTokens(String text) {
         return (text.length() + 3) / 4;
+    }
+
+    // --- the rules ---
+
+    private static final Pattern VERSION = Pattern.compile("\\b\\d+\\.\\d+(\\.\\d+)?\\b");
+    private static final Pattern STEPS = Pattern.compile("(?i)steps|reproduc|repro\\b|sample (project|app)|minimal");
+    private static final Pattern EXPECTED = Pattern.compile("(?i)expect|instead|should");
+    private static final Pattern LOGS = Pattern.compile("(?i)exception|stack ?trace|caused by|\\berror\\b|\\n\\s+at [\\w.$]+\\(");
+
+    /** Keyword rules: "present" if a typical word or pattern for the detail appears in the title or body. */
+    static String missingDetails(Prompt prompt) {
+        String text = prompt.variables().get("title") + "\n" + prompt.variables().get("body");
+        return "{\"version\": \"%s\", \"steps_to_reproduce\": \"%s\", \"expected_vs_actual\": \"%s\", \"logs_or_stack_trace\": \"%s\"}"
+                .formatted(found(VERSION, text), found(STEPS, text), found(EXPECTED, text), found(LOGS, text));
+    }
+
+    private static String found(Pattern pattern, String text) {
+        return pattern.matcher(text).find() ? "present" : "missing";
     }
 }
