@@ -3,9 +3,13 @@ package com.saisanketh.triage.service;
 import com.saisanketh.triage.domain.Issue;
 import com.saisanketh.triage.repository.IssueRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /** Saves issues. "Upsert" = update if we have it, insert if we don't. */
@@ -36,5 +40,30 @@ public class IssueService {
 
         issueRepository.save(incoming);
         return UpsertResult.INSERTED;
+    }
+
+    /**
+     * One page of a repo's issues, newest (highest number) first, as DTOs.
+     * Two queries in total, whatever the page size: (1) the ids of this page + the total count,
+     * (2) those issues with their labels. readOnly = true: Hibernate can skip dirty checking.
+     */
+    @Transactional(readOnly = true)
+    public IssueList listIssues(String repo, int page, int size) {
+        Page<Long> ids = issueRepository.findIdsByRepo(repo,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "number")));
+
+        List<IssueSummary> issues = ids.isEmpty()
+                ? List.of()
+                : issueRepository.findByIdInOrderByNumberDesc(ids.getContent()).stream()
+                        .map(IssueService::toSummary)
+                        .toList();
+
+        return new IssueList(issues, page, size, ids.getTotalElements());
+    }
+
+    private static IssueSummary toSummary(Issue issue) {
+        return new IssueSummary(issue.getNumber(), issue.getTitle(), issue.getState(), issue.getStateReason(),
+                issue.getLabels().stream().sorted().toList(),   // sorted, so the API output is stable
+                issue.getCreatedAt(), issue.getDuplicateOf());
     }
 }

@@ -634,3 +634,71 @@ right. So vague references count as NOT_FOUND, and the report says how many ther
    It favours recent issues (structured close reason) and duplicates a maintainer bothered to link; old ones
    with no link are missing. Also, maintainers mostly spot duplicates that *look* alike (docs/problem.md),
    so the key leans towards easier cases. We report the not-found share honestly.
+
+## M1 finish, step G: `GET /repos/{owner}/{repo}/issues` (piece 7) (4 Nov 2026)
+
+Files: `web/IssueController.java`, `service/IssueSummary.java`, `service/IssueList.java`,
+`IssueService.listIssues`, two new `IssueRepository` methods, `application.yml` (`open-in-view: false`);
+tests `IssueServiceListTest` (3), `IssueControllerTest` (4).
+
+### What it does
+`curl 'localhost:8080/repos/spring-projects/spring-petclinic/issues?page=0&size=20'` returns
+`{"issues":[{"number":..,"title":..,"state":..,"stateReason":..,"labels":[..],"createdAt":..,"duplicateOf":..}],"page":0,"size":20,"total":N}`,
+newest first. `size` must be 1-100, `page` 0 or more (else 400).
+
+### The N+1 problem, and how this avoids it
+Labels live in another table and are **lazy**: Hibernate loads them only when you first touch `issue.getLabels()`.
+Load 20 issues (1 query), then read each one's labels (20 more queries) = **N+1 = 21 queries** for one page.
+With 100 issues it's 101. It's invisible in the code and only shows as slowness or a wall of SQL in the log.
+The fix: load issues *and* labels in one query, with a join. Two ways:
+- **Fetch join** in JPQL: `select i from Issue i left join fetch i.labels where ...`
+- **`@EntityGraph(attributePaths = "labels")`** on a repository method: "when you run this query, also fetch
+  labels". Same SQL, no hand-written JPQL. Used here.
+
+**But a collection fetch + paging don't mix.** With a join, one issue with 3 labels becomes 3 rows, so the
+database can't do `LIMIT 20` on *issues*. Hibernate then loads **all** matching rows and pages in memory
+(warning `HHH90003004`): for spring-boot that's every issue, for every page. So it takes two queries:
+1. `findIdsByRepo(repo, pageable)`: just the 20 ids for this page, `ORDER BY number DESC LIMIT 20 OFFSET ..`,
+   plus a `count(*)` for the total. (Spring Data runs the `countQuery` automatically for a `Page`.)
+2. `findByIdInOrderByNumberDesc(ids)` with `@EntityGraph("labels")`: those 20 issues and their labels, in one join.
+Total: **3 SQL statements per page (ids, count, issues+labels), whatever the page size.**
+
+### Why a DTO, never the entity
+- The entity's `labels` is lazy. Turning it into JSON *after* the transaction ends throws
+  `LazyInitializationException`, or (with open-in-view on) silently fires N+1 queries while writing the response.
+- The entity has `raw` (the whole GitHub JSON, KBs per issue) and `body`: we'd send far too much.
+- The API would change whenever the table changes. A record (`IssueSummary`) is a fixed contract.
+
+### Basics used here
+- **`Pageable` / `PageRequest.of(page, size, sort)`** (Spring Data): "page 2, 20 per page, newest first". Pass it
+  to a repository method and Spring adds `ORDER BY ... LIMIT ... OFFSET ...`.
+  **`Page<T>`** is the answer: `getContent()` (this page) + `getTotalElements()` (all pages, from the count query).
+- **`@EntityGraph(attributePaths = "labels")`**: tells this one query to fetch the lazy `labels` too (a join).
+  *Before:* `findByIdIn(ids)` then 20 lazy loads. *After:* one query with `left join issue_label`.
+- **Derived query names**: `findByIdInOrderByNumberDesc(ids)`: Spring reads the method name and builds
+  `where id in (...) order by number desc`. No SQL written.
+- **`@Transactional(readOnly = true)`**: a read-only transaction; Hibernate skips dirty checking at the end.
+- **`@GetMapping` + `@RequestParam(defaultValue = "20") int size`**: reads `?size=50` from the URL, or uses 20.
+- **`spring.jpa.open-in-view: false`**: Spring Boot's default (`true`) keeps a DB session open until the HTTP response is
+  written, so lazy loading "just works" in controllers and JSON writing. That hides N+1 queries and holds DB connections
+  longer. Turning it off makes a missed fetch fail loudly in development instead of being slow in production.
+- **`ArgumentCaptor`** (Mockito): catches the argument a mock was called with, so the test can check the
+  `Pageable` (page 3, size 20, sorted by number desc).
+
+### One alternative I rejected
+**`@BatchSize(size = 100)` on `labels`.** One annotation, and Hibernate then loads labels for up to 100
+issues in one `IN (...)` query when the first one is touched: 1 + 1 queries instead of N+1. It's a good tool,
+but it changes *every* place that reads labels and is less obvious to a reader than an explicit
+"load these issues with their labels" method. (Also rejected: a single `@EntityGraph` + `Page` query, because of
+the in-memory paging trap above.)
+
+### Likely interview questions
+1. **What is the N+1 problem and how did you avoid it?**
+   Loading N parents with 1 query and then each lazy child collection with its own query: N+1 round trips.
+   I page the ids first, then load those issues with `@EntityGraph(labels)`, one join. 3 statements per page.
+2. **Why not just add `join fetch` to the paged query?**
+   A collection join multiplies rows, so the database can't `LIMIT` by issue. Hibernate fetches everything and
+   pages in memory (HHH90003004), which is fine for 20 rows and terrible for 30,000. Page the ids, then fetch.
+3. **Why return DTOs instead of entities?**
+   Lazy collections break (or cause hidden queries) during JSON writing, entities carry fields the API shouldn't
+   expose (`raw`, `body`), and the API contract shouldn't change every time the table does.
