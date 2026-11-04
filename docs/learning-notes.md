@@ -1796,3 +1796,44 @@ and has the section anchors right in it; scraping HTML depends on the site's lay
    with 200 overlap, and the heading first so it's always inside the window.
 3. **How would you know if retrieval is good?** The STOP A hand-scoring of 30 real issues (useful / partly / wrong). Next: a
    small labelled set of issue → right docs section to measure recall@5 of the docs search itself.
+
+## M4 step 5: the triage report, created by the Kafka worker (4 Nov 2026)
+
+Files: Flyway `V8__triage_report.sql`; package `report`: `TriageService`, `TriageReport`, `TriageReportRepository`,
+`TriageReportDto`; `web/ReportController` (`GET` and `POST /reports/{owner}/{repo}/{number}`); `IssueEventConsumer` (calls
+`createIfMissing` on `opened`), `IssueService.findId`; tests `TriageServiceDbTest` (3), `ReportControllerTest` (2),
+2 new cases in `IssueEventConsumerTest`, one more check in `WebhookEndToEndTest`.
+
+### What it does
+For one issue, `TriageService` runs every part and stores the result as one row:
+1. **duplicates**: vector top 3, with links;
+2. **duplicate_check**: the LLM "same root problem?" check, only if the top match scores ≥ 0.825 (sai's comment threshold);
+3. **labels** (vote), 4. **missing** details (LLM), 5. **fixed_hint** (only if the top match scores ≥ 0.75), 6. **draft_reply** (RAG);
+7. **llm_model**, the **prompt versions** used and the total **cost_tokens**.
+
+The Kafka worker creates it for `opened` events, after the upsert and the embedding. `createIfMissing` checks first, so
+a redelivered event doesn't pay for the LLM twice. `POST /reports/...` (re)creates a report for any stored issue (demo,
+STOP A); `GET` returns it. Live check: spring-boot #52529 → top match #52519 (its real original, 0.807), label
+`type: enhancement`, 5 docs sections + 2 issues as draft sources.
+
+### Basics used here
+- **Orchestration in one service**: each part is its own tested class; `TriageService` only calls them in order and adds
+  things up. Before: the Kafka listener would call six services itself and become hard to test. After: the listener calls one method.
+- **Idempotency at the expensive step**: Kafka delivers at least once. The upsert was already safe to repeat; the LLM calls
+  cost money, so "does a report exist?" is checked before them, and `issue_id` is UNIQUE as a backstop.
+- **jsonb parts read back as `JsonNode`**: the API returns the stored JSON as it is. If a Java record changes later, old
+  reports still load (no "can't deserialize" errors).
+- **`ResponseEntity.of(Optional)`**: 200 with the body if present, 404 if empty, in one line.
+
+### One alternative I rejected
+**One normalized table per part** (report_label, report_duplicate, ...). Many joins for data that is always read and
+written together, never queried inside. jsonb is simpler here, and the plan's schema asked for it.
+
+### Likely interview questions
+1. **What happens if the LLM is down when an issue is opened?** The LLM parts say UNKNOWN with the reason; duplicates,
+   labels and the fixed hint (no LLM) are still there, and the report is saved. Only a DB error fails the message, and
+   Kafka's retry + DLT handle that.
+2. **How do you avoid paying twice for a redelivered event?** Check for an existing report before any LLM call; UNIQUE
+   (issue_id) as a backstop.
+3. **Why run the LLM duplicate check only above a threshold?** Cost and purpose: it exists to decide a public comment, which
+   needs a high score anyway. Below it, the maintainer still sees the private top 3.

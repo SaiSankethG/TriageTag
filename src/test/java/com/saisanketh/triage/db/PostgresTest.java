@@ -6,7 +6,13 @@ import com.saisanketh.triage.ai.IssueTextRepository;
 import com.saisanketh.triage.ai.LlmConfig;
 import com.saisanketh.triage.ai.PromptTemplates;
 import com.saisanketh.triage.eval.DuplicateCheckEval;
+import com.saisanketh.triage.ai.DraftReplyService;
+import com.saisanketh.triage.ai.MissingDetailsChecker;
 import com.saisanketh.triage.docs.DocChunkRepository;
+import com.saisanketh.triage.docs.DocIngestService;
+import com.saisanketh.triage.docs.DocSource;
+import com.saisanketh.triage.report.TriageReportRepository;
+import com.saisanketh.triage.report.TriageService;
 import com.saisanketh.triage.embedding.IssueEmbeddingRepository;
 import com.saisanketh.triage.eval.EvalService;
 import com.saisanketh.triage.kafka.IssueEventPublisher;
@@ -51,7 +57,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         LabelSuggester.class, EvalService.class, CandidateFilter.class,
         LlmTestConfig.class, LlmConfig.class, PromptTemplates.class, IssueTextRepository.class, DuplicateVerifier.class,
         DuplicateCheckEval.class, IssueFixRepository.class, FixedHintService.class,
-        DocChunkRepository.class})
+        DocChunkRepository.class, DocIngestService.class, DraftReplyService.class, MissingDetailsChecker.class,
+        TriageReportRepository.class, TriageService.class})
 public abstract class PostgresTest {
 
     @MockitoBean
@@ -60,4 +67,7 @@ public abstract class PostgresTest {
     /** GitHub isn't called from DB tests: the "what fixed this issue" lookup is a mock. */
     @MockitoBean
     protected FixSource fixSource;
+
+    @MockitoBean
+    protected DocSource docSource;
 }

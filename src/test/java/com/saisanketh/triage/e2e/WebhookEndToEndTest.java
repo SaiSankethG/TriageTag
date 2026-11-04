@@ -53,6 +53,9 @@ class WebhookEndToEndTest extends FullStackTest {
         // The worker also embedded it with the real model, so it can be found by similarity search.
         waitUntil("the issue has an embedding", () -> countRows(
                 "select count(*) from issue_embedding where model = 'all-MiniLM-L6-v2'") == 1);
+        // ... and created its triage report (fake LLM in tests).
+        waitUntil("the issue has a triage report", () -> countRows(
+                "select count(*) from triage_report where llm_model = 'fake'") == 1);
     }
 
     @Test

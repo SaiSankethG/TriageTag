@@ -1,0 +1,118 @@
+package com.saisanketh.triage.db;
+
+import com.saisanketh.triage.ai.DraftReply;
+import com.saisanketh.triage.ai.DuplicateCheck.Verdict;
+import com.saisanketh.triage.ai.MissingDetails;
+import com.saisanketh.triage.docs.DocChunkRepository;
+import com.saisanketh.triage.docs.DocSection;
+import com.saisanketh.triage.domain.Issue;
+import com.saisanketh.triage.embedding.IssueEmbeddingRepository;
+import com.saisanketh.triage.report.TriageReport;
+import com.saisanketh.triage.report.TriageReportDto;
+import com.saisanketh.triage.report.TriageReportRepository;
+import com.saisanketh.triage.report.TriageService;
+import com.saisanketh.triage.repository.IssueRepository;
+import com.saisanketh.triage.source.FixInfo;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+import java.time.Instant;
+import java.util.List;
+
+import static com.saisanketh.triage.service.TestIssues.issue;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+/** The whole report on real Postgres with the fake LLM; the test embedding model maps every text to the x axis. */
+class TriageServiceDbTest extends PostgresTest {
+
+    private static final String REPO = "octo-org/hello";
+
+    @Autowired
+    private IssueRepository issueRepository;
+    @Autowired
+    private IssueEmbeddingRepository embeddingRepository;
+    @Autowired
+    private DocChunkRepository docChunks;
+    @Autowired
+    private TriageService triageService;
+    @Autowired
+    private TriageReportRepository reports;
+
+    private static float[] direction(double angleDegrees) {
+        float[] v = new float[384];
+        v[0] = (float) Math.cos(Math.toRadians(angleDegrees));
+        v[1] = (float) Math.sin(Math.toRadians(angleDegrees));
+        return v;
+    }
+
+    private long save(int number, String createdAt, double angle, String title, String body, String state,
+                      String milestone, String... labels) {
+        Issue issue = issue(number, title, labels);
+        issue.setBody(body);
+        issue.setCreatedAt(Instant.parse(createdAt));
+        issue.setState(state);
+        issue.setStateReason("closed".equals(state) ? "completed" : null);
+        issue.setMilestone(milestone);
+        long id = issueRepository.saveAndFlush(issue).getId();
+        embeddingRepository.saveAll(List.of(id), List.of(direction(angle)), "test");
+        return id;
+    }
+
+    @Test
+    void buildsAndStoresTheWholeReport() {
+        save(1, "2024-01-01T00:00:00Z", 1, "Datasource url not picked up", "...", "closed", "3.4.2", "type: bug");
+        save(2, "2024-01-02T00:00:00Z", 60, "Banner colours", "...", "open", null, "type: enhancement");
+        long id = save(3, "2024-06-01T00:00:00Z", 0, "Datasource url not picked up from yaml",
+                "Using Spring Boot 3.4.1. Steps: run it. Expected the url to be used.", "open", null);
+        when(fixSource.findFix(REPO, 1)).thenReturn(new FixInfo("Commit", null, "https://c", "3.4.2"));
+        docChunks.replaceAll(REPO, "v1", List.of(new DocSection("https://docs.example/sql#ds", "SQL > DataSource",
+                "Set spring.datasource.url.")), List.of(direction(0)));
+
+        TriageReport report = triageService.create(id);
+
+        assertThat(report.duplicates()).extracting(TriageReport.Duplicate::number).containsExactly(1, 2);
+        assertThat(report.duplicates().get(0).url()).isEqualTo("https://github.com/octo-org/hello/issues/1");
+        assertThat(report.duplicateCheck().verdict()).isEqualTo(Verdict.YES);      // fake: 4 of 6 title words
+        assertThat(report.labels()).extracting(l -> l.label()).contains("type: bug");
+        assertThat(report.missing().status()).isEqualTo(MissingDetails.Status.OK);
+        assertThat(report.missing().missing()).containsExactly(MissingDetails.Detail.LOGS_OR_STACK_TRACE);
+        assertThat(report.fixedHint().text()).contains("fixed in 3.4.2", "try upgrading");
+        assertThat(report.draftReply().status()).isEqualTo(DraftReply.Status.OK);
+        assertThat(report.draftReply().text()).contains("https://docs.example/sql#ds");
+        assertThat(report.llmModel()).isEqualTo("fake");
+        assertThat(report.promptVersions()).isEqualTo("duplicate-check-v1,missing-details-v1,draft-reply-v1");
+        assertThat(report.costTokens()).isPositive();
+
+        TriageReportDto dto = reports.find("Octo-Org/Hello", 3).orElseThrow();
+        assertThat(dto.title()).isEqualTo("Datasource url not picked up from yaml");
+        assertThat(dto.duplicates().get(0).get("number").asInt()).isEqualTo(1);
+        assertThat(dto.missing().get("missing").get(0).asString()).isEqualTo("LOGS_OR_STACK_TRACE");
+        assertThat(dto.draftReply().get("sources")).hasSize(2);
+        assertThat(dto.costTokens()).isEqualTo(report.costTokens());
+    }
+
+    @Test
+    void aWeakTopMatchGetsNoLlmCheckNoHintAndNoDraft() {
+        save(1, "2024-01-01T00:00:00Z", 70, "Banner colours", "...", "closed", "3.4.2");
+        long id = save(2, "2024-06-01T00:00:00Z", 0, "Datasource url", "", "open", null);
+
+        TriageReport report = triageService.create(id);
+
+        assertThat(report.duplicates()).hasSize(1);                 // still shown privately
+        assertThat(report.duplicateCheck()).isNull();
+        assertThat(report.fixedHint()).isNull();
+        assertThat(report.draftReply().status()).isEqualTo(DraftReply.Status.NOTHING_RELEVANT);
+        assertThat(report.promptVersions()).isEqualTo("missing-details-v1");
+    }
+
+    @Test
+    void createIfMissingRunsOnlyOncePerIssue() {
+        long id = save(1, "2024-01-01T00:00:00Z", 0, "First issue", "", "open", null);
+
+        assertThat(triageService.createIfMissing(id)).isTrue();
+        assertThat(triageService.createIfMissing(id)).isFalse();
+        assertThat(triageService.create("octo-org/hello", 999)).isEmpty();
+        assertThat(reports.find("octo-org/hello", 999)).isEmpty();
+    }
+}

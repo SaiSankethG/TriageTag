@@ -5,6 +5,7 @@ import com.saisanketh.triage.domain.SourceType;
 import com.saisanketh.triage.embedding.IssueEmbeddingService;
 import com.saisanketh.triage.github.GitHubIssueMapper;
 import com.saisanketh.triage.kafka.IssueEventConsumer.BadIssueEventException;
+import com.saisanketh.triage.report.TriageService;
 import com.saisanketh.triage.service.IssueService;
 import com.saisanketh.triage.service.UpsertResult;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -30,8 +31,9 @@ class IssueEventConsumerTest {
     private final JsonMapper json = JsonMapper.builder().build();
     private final IssueService issueService = mock(IssueService.class);
     private final IssueEmbeddingService embeddingService = mock(IssueEmbeddingService.class);
+    private final TriageService triageService = mock(TriageService.class);
     private final IssueEventConsumer consumer =
-            new IssueEventConsumer(json, new GitHubIssueMapper(), issueService, embeddingService);
+            new IssueEventConsumer(json, new GitHubIssueMapper(), issueService, embeddingService, triageService);
 
     private static ConsumerRecord<String, String> record(String value) {
         return new ConsumerRecord<>("issue-events", 1, 42L, "Codertocat/Hello-World#1", value);
@@ -124,5 +126,25 @@ class IssueEventConsumerTest {
         assertThatThrownBy(() -> consumer.onIssueEvent(record(message)))
                 .isInstanceOf(IllegalStateException.class)
                 .isNotInstanceOf(BadIssueEventException.class);
+    }
+
+    @Test
+    void anOpenedIssueGetsATriageReport() throws IOException {
+        when(issueService.upsert(any())).thenReturn(UpsertResult.INSERTED);
+        when(issueService.findId(SourceType.GITHUB, "444500041")).thenReturn(java.util.Optional.of(7L));
+
+        consumer.onIssueEvent(record(messageFromFixture()));
+
+        verify(triageService).createIfMissing(7L);
+    }
+
+    @Test
+    void otherActionsDoNotCreateAReport() throws IOException {
+        when(issueService.upsert(any())).thenReturn(UpsertResult.UPDATED);
+        String edited = messageFromFixture().replace("\"action\":\"opened\"", "\"action\":\"edited\"");
+
+        consumer.onIssueEvent(record(edited));
+
+        verifyNoInteractions(triageService);
     }
 }

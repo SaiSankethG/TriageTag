@@ -65,6 +65,12 @@ public class IssueService {
         return existing.isPresent();
     }
 
+    /** Our id of the issue with this tracker id, if we store it. */
+    @Transactional(readOnly = true)
+    public Optional<Long> findId(SourceType source, String externalId) {
+        return issueRepository.findBySourceAndExternalId(source, externalId).map(Issue::getId);
+    }
+
     /** True if the incoming data was last changed before what we already store. */
     private static boolean isOlder(Issue incoming, Issue stored) {
         return incoming.getUpdatedAt() != null && stored.getUpdatedAt() != null

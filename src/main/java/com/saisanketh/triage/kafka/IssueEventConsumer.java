@@ -4,6 +4,7 @@ import com.saisanketh.triage.domain.Issue;
 import com.saisanketh.triage.domain.SourceType;
 import com.saisanketh.triage.embedding.IssueEmbeddingService;
 import com.saisanketh.triage.github.GitHubIssueMapper;
+import com.saisanketh.triage.report.TriageService;
 import com.saisanketh.triage.service.IssueService;
 import com.saisanketh.triage.service.UpsertResult;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +19,8 @@ import tools.jackson.databind.json.JsonMapper;
 import java.util.Set;
 
 /**
- * The triage worker: reads issue events from Kafka and keeps our copy of the issue up to date.
- * For now "triage" is just that; duplicate search etc. come later.
+ * The triage worker: reads issue events from Kafka, keeps our copy of the issue up to date (and its embedding), and
+ * creates the triage report when an issue is opened.
  *
  * <p>Safe to receive a message twice (Kafka delivers "at least once"): the upsert matches on
  * (source, externalId) and ignores older data, and deleting a row that's already gone does nothing.
@@ -41,6 +42,7 @@ public class IssueEventConsumer {
     private final GitHubIssueMapper issueMapper;
     private final IssueService issueService;
     private final IssueEmbeddingService embeddingService;
+    private final TriageService triageService;
 
     @KafkaListener(topics = KafkaTopicsConfig.ISSUE_EVENTS, groupId = GROUP_ID)
     public void onIssueEvent(ConsumerRecord<String, String> record) {
@@ -62,6 +64,10 @@ public class IssueEventConsumer {
             // New or changed text -> new embedding, so the issue can be found by (and find) similar issues.
             // If this fails, the whole message is retried; the upsert above is idempotent.
             embeddingService.embedIssue(issue.getSource(), issue.getExternalId());
+        }
+        if ("opened".equals(action)) {
+            // Only once per issue: a redelivered "opened" finds the report and doesn't pay for the LLM again.
+            issueService.findId(issue.getSource(), issue.getExternalId()).ifPresent(triageService::createIfMissing);
         }
         log.info("Issue event {} (partition {}, offset {}): {}", record.key(), record.partition(),
                 record.offset(), result);

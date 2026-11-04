@@ -57,6 +57,8 @@ triage:
     # 0.55: the top docs score of the median recent external issue is 0.59 (0.42 at p10, 0.71 at p90).
     min-doc-score: 0.55
     min-issue-score: 0.75
+  fixed-hint:
+    min-score: 0.75   # the "already fixed?" hint looks at the top match only if it is at least this similar
   labels:
     threshold: 0.5            # suggest a label if similar issues holding it have >= 50% of the similarity weight
     ignore-prefixes: "status:"  # workflow labels (status: waiting-for-triage, status: duplicate...) are never suggested

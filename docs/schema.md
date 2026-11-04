@@ -79,6 +79,23 @@ CREATE TABLE doc_chunk (
 );
 CREATE INDEX idx_doc_chunk_repo ON doc_chunk (repo);
 CREATE INDEX idx_doc_chunk_hnsw ON doc_chunk USING hnsw (embedding vector_cosine_ops);
+
+-- Added in M4 (Flyway V8): one triage report per issue. Parts are jsonb (read whole by the API, never queried inside).
+CREATE TABLE triage_report (
+  id              bigserial    PRIMARY KEY,
+  issue_id        bigint       NOT NULL UNIQUE REFERENCES issue(id) ON DELETE CASCADE,
+  created_at      timestamptz  NOT NULL,
+  duplicates      jsonb        NOT NULL,   -- top 3: number, title, url, score
+  duplicate_check jsonb,                   -- LLM "same root problem?" on the top match (only above the comment threshold)
+  labels          jsonb        NOT NULL,
+  missing         jsonb        NOT NULL,
+  fixed_hint      jsonb,
+  draft_reply     jsonb        NOT NULL,   -- status, text, sources, unknownLinks
+  llm_model       varchar(100) NOT NULL,
+  prompt_version  text         NOT NULL,   -- e.g. 'missing-details-v1,draft-reply-v1'
+  cost_tokens     integer      NOT NULL,
+  notes           text
+);
 ```
 
 ## Why these choices (interview notes)
