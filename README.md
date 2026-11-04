@@ -85,7 +85,7 @@ Each test issue is searched against the real ~44k spring-boot issues; everything
 | End to end (webhook sent → report stored) p50 / p95 | 23.1 s / 43.3 s: all 500 arrived within 0.4 s, and one worker thread made ~10.4 reports/s, so this is mostly time in the queue |
 | One report with no queue in front of it | 0.23 s |
 
-Real traffic is far lower (spring-boot gets a few dozen issues a day), so a new issue's report is ready in well under a second plus the
+Real traffic is far lower (spring-boot: ~16 new issues a day over the last 30 days, ~2 from outside the team), so a new issue's report is ready in well under a second plus the
 real LLM calls (~2-5 s on Haiku 5.5). For bursts, the topic has 3 partitions, so 3 listener threads (`concurrency: 3`) would
 roughly triple throughput.
 

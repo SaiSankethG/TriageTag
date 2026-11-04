@@ -49,9 +49,9 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 8. Do not upgrade Java/Spring Boot or add dependencies without asking sai.
 
 ## Current step (sai updates this line)
-Phase 0, M0-M5 done (4 Nov 2026; reports: docs/m1-report.md ... m5-report.md). STOP B: sai creates the Oracle VM + k3s,
-the GitHub App, HTTPS choice, demo video (exact steps in docs/m5-report.md). Hand scores still open: docs/m4-scoring.md,
-docs/m4-scoring-v3.md (blind A/B), docs/m4-results.md section 4 (48 false alarms).
-Flyway V1-V11. Outbox (V10) between webhook and Kafka. Comment mode off by default (repo_setting via SQL), threshold 0.90 + LLM yes.
-Replay (833 pairs): vector recall@3 46.2% vs keyword 26.5%. Draft prompt v3 is the default. Image: ./mvnw spring-boot:build-image (arm64).
-Next: M6 (metrics) after STOP B.
+Phase 0, M0-M6 done (4 Nov 2026; reports: docs/m1-report.md ... m6-report.md). STOP C (outreach + first OSS PR: docs/outreach.md)
+and STOP B (Oracle VM + k3s, GitHub App, HTTPS choice, demo video: docs/m5-report.md) are sai's. Hand scores still open:
+docs/m4-scoring.md, docs/m4-scoring-v3.md (blind A/B), docs/m4-results.md section 4 (48 false alarms).
+Flyway V1-V11. Outbox (V10). Comment mode off by default (0.90 + LLM yes). Admin POSTs need X-Admin-Token (TRIAGE_ADMIN_TOKEN).
+Metrics: /actuator/prometheus; dashboard deploy/grafana/. Load test: receiver p50 7 ms / p95 13 ms (500 webhooks).
+Replay (833 pairs): vector recall@3 46.2% vs keyword 26.5%. Draft prompt v3. Image: ./mvnw spring-boot:build-image (arm64).
