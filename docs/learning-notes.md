@@ -2316,3 +2316,28 @@ keyword search couldn't do.
 2. **Why show the weak spot (public comments) in a demo?** Because it's the real result and the reason for the design (shadow mode
    by default); interviewers trust numbers that come with their limits.
 3. **What would you show next?** The replay table (keyword vs vector), and a webhook arriving live from the sandbox repo.
+
+## M5 step 5: the README (4 Nov 2026)
+
+File: `README.md` (rewritten): the problem, a Mermaid architecture diagram, how a report is built, the results (keyword vs
+vector, the comment-mode table, labels, cost), how to run it, the design decisions, and the limits.
+
+### Basics used here
+- **Mermaid**: diagrams written as text (`flowchart LR; A --> B`) that GitHub draws in the README. They live next to the code and
+  change in the same commit.
+- **Decisions with their reasons**: each choice (Postgres + pgvector over Cassandra/Mongo, Kafka, the outbox, shadow mode first)
+  says what problem it solves and what it costs, so a reader can disagree with a reason instead of a guess.
+- **Limits section**: what the numbers don't prove (unmarked duplicates, Spring Boot-specific version parsing, one docs version,
+  no HA).
+
+### One alternative I rejected
+**A short README that links to the reports.** Recruiters and interviewers read the README and rarely click further; the headline
+numbers and the design reasons have to be on the first page.
+
+### Likely interview questions
+1. **Why Postgres + pgvector instead of a vector database or Cassandra?** Relational data, tens of thousands of rows, and one
+   transaction across the issue, its embedding and the outbox; pgvector's HNSW is fast enough (~6 ms) at this size.
+2. **Why Kafka for a small app?** GitHub gives 10 s for a webhook answer and the work takes seconds and can fail: Kafka decouples
+   intake from work, keeps per-issue order, and gives retries and a dead-letter topic.
+3. **What's the weakest part?** Public duplicate comments: at a 4% base rate they're mostly wrong even with an LLM check, so the
+   product defaults to private reports.

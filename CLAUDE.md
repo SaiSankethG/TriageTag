@@ -49,9 +49,9 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 8. Do not upgrade Java/Spring Boot or add dependencies without asking sai.
 
 ## Current step (sai updates this line)
-Phase 0, M0-M4 done (4 Nov 2026; reports: docs/m1-report.md ... m4-report.md). STOP A done: Claude Haiku 5.5 wired
-(langchain4j-anthropic; tests use FakeTriageLlm). Waiting for sai: score docs/m4-scoring.md, decide comment mode (docs/m4-report.md Q1).
-DB: spring-petclinic (394), spring-boot (43,810), triage-sandbox; all embedded; spring-boot docs v4.1.2 in doc_chunk (1,318). Flyway V1-V9.
-Replay (833 pairs): vector recall@3 46.2% vs keyword 26.5%. LLM check at 0.825: false alarms 10.1% -> 4.6%, 48/55 correct kept.
-Live path: webhook -> Kafka -> worker -> issue + embedding + triage_report (on opened). Demo page: http://localhost:8080/.
-Next: M5 (outbox first) after sai's review.
+Phase 0, M0-M5 done (4 Nov 2026; reports: docs/m1-report.md ... m5-report.md). STOP B: sai creates the Oracle VM + k3s,
+the GitHub App, HTTPS choice, demo video (exact steps in docs/m5-report.md). Hand scores still open: docs/m4-scoring.md,
+docs/m4-scoring-v3.md (blind A/B), docs/m4-results.md section 4 (48 false alarms).
+Flyway V1-V11. Outbox (V10) between webhook and Kafka. Comment mode off by default (repo_setting via SQL), threshold 0.90 + LLM yes.
+Replay (833 pairs): vector recall@3 46.2% vs keyword 26.5%. Draft prompt v3 is the default. Image: ./mvnw spring-boot:build-image (arm64).
+Next: M6 (metrics) after STOP B.
