@@ -1,10 +1,10 @@
 package com.saisanketh.triage.github;
 
 import com.saisanketh.triage.kafka.IssueEventMessage;
-import com.saisanketh.triage.kafka.IssueEventPublisher.PublishFailedException;
 import com.saisanketh.triage.service.WebhookIntakeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -93,9 +93,9 @@ public class GitHubWebhookController {
                 log.info("Ignored repeated webhook delivery {}", deliveryId);
                 return ResponseEntity.ok("duplicate delivery");
             }
-        } catch (PublishFailedException e) {
-            // Nothing was saved (the transaction rolled back), so GitHub's "Redeliver" will work later.
-            log.error("Could not queue webhook delivery {}: {}", deliveryId, e.getMessage());
+        } catch (DataAccessException e) {
+            // The database is down or failed: nothing was saved (one transaction), so GitHub's "Redeliver" works later.
+            log.error("Could not store webhook delivery {}: {}", deliveryId, e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("could not queue the event; it can be redelivered");
         }

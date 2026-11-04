@@ -60,6 +60,7 @@ public abstract class FullStackTest {
         jdbc.update("delete from issue_label");
         jdbc.update("delete from issue");
         jdbc.update("delete from webhook_delivery");
+        jdbc.update("delete from outbox_event");
     }
 
     @AfterEach

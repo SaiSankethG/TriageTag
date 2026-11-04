@@ -103,6 +103,19 @@ CREATE TABLE llm_usage (
   tokens bigint  NOT NULL,
   calls  integer NOT NULL
 );
+
+-- Added in M5 (Flyway V10): transactional outbox. Written in the same transaction as webhook_delivery; the relay sends it.
+CREATE TABLE outbox_event (
+  id          bigserial    PRIMARY KEY,           -- also the send order
+  topic       varchar(200) NOT NULL,
+  message_key varchar(300) NOT NULL,              -- Kafka key 'owner/repo#number'
+  payload     text         NOT NULL,              -- JSON text, sent as it is
+  created_at  timestamptz  NOT NULL,
+  sent_at     timestamptz,                        -- null until Kafka confirmed
+  attempts    integer      NOT NULL DEFAULT 0,
+  last_error  text
+);
+CREATE INDEX idx_outbox_event_unsent ON outbox_event (id) WHERE sent_at IS NULL;
 ```
 
 ## Why these choices (interview notes)

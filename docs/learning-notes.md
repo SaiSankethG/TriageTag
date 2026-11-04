@@ -1941,3 +1941,48 @@ keeps that choice cheap to change.
    unit-tested with a stubbed `ChatModel`, and the real model is only used by an explicit script.
 3. **What did it cost?** About 340k tokens for the eval and 30 reports, roughly 5 US cents on Haiku 5.5. Every call is
    counted per day in `llm_usage`, under a budget.
+
+## M5 step 0: transactional outbox (4 Nov 2026)
+
+Files: Flyway `V10__outbox_event.sql`; package `outbox`: `OutboxRepository`, `OutboxEvent`, `OutboxRelay`, `SchedulingConfig`;
+`WebhookIntakeService` (writes the outbox row), `IssueEventPublisher.sendAndWait`, `GitHubWebhookController` (500 on a DB
+error); tests `OutboxRelayTest` (4), `OutboxRepositoryDbTest` (2), `WebhookDeliveryDbTest` (2 new), `WebhookIntakeServiceTest`
+(rewritten), `OutboxKafkaDownEndToEndTest` (1, real Postgres + real Kafka).
+
+### What it does
+- **Webhook path**: in ONE database transaction, insert the `webhook_delivery` row (a repeat → "duplicate", stop) and an
+  `outbox_event` row with the Kafka topic, key and JSON message. Then answer GitHub. **Kafka isn't called here any more.**
+- **Relay**: every 500 ms (Spring `@Scheduled`), take up to 100 unsent rows oldest first (`FOR UPDATE SKIP LOCKED`), send
+  each to Kafka and wait for the ack, then set `sent_at`. On a failure: `attempts + 1`, `last_error`, and **stop the batch**,
+  so a later event of the same issue never overtakes an earlier one. Sent rows are deleted after 7 days.
+- **Crash between "Kafka has it" and "marked sent"**: the row is sent again on the next run, so it's "at least once". The consumer
+  is already idempotent (upsert ignores older data, one report per issue), so a repeat is harmless.
+
+### Why (the problem it fixes)
+M2 published to Kafka *inside* the DB transaction. Two bad cases: Kafka down → the webhook failed with 500 (GitHub only
+redelivers by hand); Kafka acked but the commit failed → the event was out but not recorded. You can't make "write to
+Postgres" and "write to Kafka" one atomic step. The outbox turns it into one Postgres transaction plus a retryable copy job.
+
+### Basics used here
+- **Transactional outbox pattern**: before: `save(); kafka.send();` (two systems, no shared transaction). After: `save();
+  outbox.add();` in one transaction, and a relay copies outbox → Kafka until it succeeds.
+- **`@Scheduled(fixedDelayString = "${triage.outbox.poll-ms:500}")`**: Spring calls the method again 500 ms after the
+  previous call *ended* (fixedDelay: runs never overlap). It needs `@EnableScheduling` once (`SchedulingConfig`), which can be
+  switched off with `triage.outbox.relay-enabled=false` (the Kafka-down test uses that to control the relay by hand).
+- **`SELECT ... FOR UPDATE SKIP LOCKED`**: lock the rows I'm taking; rows another transaction has locked are skipped, not
+  waited for. Two app instances can run the relay without sending a row twice at the same time.
+- **Partial index** (`WHERE sent_at IS NULL`): indexes only the unsent rows, which is all the relay ever asks for.
+
+### One alternative I rejected
+**Debezium / change data capture** (Kafka Connect reads Postgres's write-ahead log and publishes the outbox rows). It's the
+production-grade version, but it needs a Kafka Connect cluster and logical replication: too much to run on a 2-CPU VM for
+one table. The polling relay is ~60 lines and easy to explain.
+
+### Likely interview questions
+1. **What is the transactional outbox and why did you need it?** You can't commit to Postgres and Kafka atomically. So the
+   webhook writes the event to an outbox table in the same transaction as its own data, and a relay publishes it later.
+   No lost events, and webhooks are accepted even when Kafka is down.
+2. **Can a message be sent twice?** Yes, if the app dies after Kafka's ack but before `sent_at` is written. That's at-least-once,
+   so the consumer must be idempotent: ours upserts by GitHub id, ignores older updates, and creates a report only once.
+3. **How do you keep per-issue order?** The relay sends in id order and stops at the first failure, and the Kafka key is the
+   issue, so one issue's events go to one partition in order.

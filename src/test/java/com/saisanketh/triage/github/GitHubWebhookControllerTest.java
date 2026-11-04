@@ -1,7 +1,7 @@
 package com.saisanketh.triage.github;
 
 import com.saisanketh.triage.kafka.IssueEventMessage;
-import com.saisanketh.triage.kafka.IssueEventPublisher.PublishFailedException;
+import org.springframework.dao.DataAccessResourceFailureException;
 import com.saisanketh.triage.service.WebhookIntakeService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -168,9 +168,9 @@ class GitHubWebhookControllerTest {
     }
 
     @Test
-    void kafkaFailureIs500SoGitHubCanRedeliver() throws Exception {
+    void aDatabaseFailureIs500SoGitHubCanRedeliver() throws Exception {
         when(intakeService.accept(any(), any()))
-                .thenThrow(new PublishFailedException("Kafka did not confirm", null));
+                .thenThrow(new DataAccessResourceFailureException("database down"));
 
         send(mockMvc(SECRET), "issues", issuesEvent("opened"), SECRET)
                 .andExpect(status().isInternalServerError());
