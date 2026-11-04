@@ -49,10 +49,9 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 8. Do not upgrade Java/Spring Boot or add dependencies without asking sai.
 
 ## Current step (sai updates this line)
-Phase 0, M0, M1 and M2 done (4 Nov 2026; reports: docs/m1-report.md, docs/m2-report.md).
-DB holds spring-petclinic (394 issues), spring-boot (43,810; 1,036 with duplicate_of = the answer key,
-945 pointing to a stored issue) and SaiSankethG/triage-sandbox (1, from live webhooks).
-Live path works: GitHub repo webhook -> smee -> POST /webhooks/github -> Kafka issue-events -> triage-worker -> DB.
-Schema is Flyway-managed (V1-V3). Webhook secret: ~/.config/triage/webhook-secret (outside the repo).
-Next: M3 replay; it needs a decision on the 109 pairs whose "original" is newer than the duplicate
-(docs/m1-report.md). GitHub App moves to M5. Schema: docs/schema.md. Problem: docs/problem.md.
+Phase 0, M0-M3 done (4 Nov 2026; reports: docs/m1-report.md, m2-report.md, m3-report.md). STOP M3: sai reviews numbers.
+DB holds spring-petclinic (394), spring-boot (43,810; 1,036 with duplicate_of) and SaiSankethG/triage-sandbox (1);
+all petclinic + spring-boot issues embedded (all-MiniLM-L6-v2, pgvector HNSW). Schema: Flyway V1-V5.
+Replay on spring-boot (833 pairs): vector recall@3 46.2% vs keyword 26.5%; MRR 0.403 vs 0.244 (docs/m3-results.md).
+Live path: GitHub repo webhook -> smee -> POST /webhooks/github -> Kafka -> triage-worker -> DB + embedding.
+Next: M4 (LLM layer) after sai's review; prompt: docs/prompts/m3-m6-build.md. Outbox before deploying (M5 step 0).
