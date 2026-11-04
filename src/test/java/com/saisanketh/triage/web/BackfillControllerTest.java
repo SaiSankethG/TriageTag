@@ -2,6 +2,8 @@ package com.saisanketh.triage.web;
 
 import com.saisanketh.triage.service.BackfillService;
 import com.saisanketh.triage.service.BackfillSummary;
+import com.saisanketh.triage.service.DuplicateService;
+import com.saisanketh.triage.service.DuplicateSummary;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,12 +26,28 @@ class BackfillControllerTest {
     @Mock
     private BackfillService backfillService;
 
+    @Mock
+    private DuplicateService duplicateService;
+
     private MockMvc mockMvc;
 
     @BeforeEach
     void setUp() {
         // "Standalone": only this controller plus Spring MVC's normal JSON handling; no app context, no DB.
-        mockMvc = MockMvcBuilders.standaloneSetup(new BackfillController(backfillService)).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(new BackfillController(backfillService, duplicateService)).build();
+    }
+
+    @Test
+    void duplicatesEndpointReturnsTheSummary() throws Exception {
+        when(duplicateService.fillDuplicates("octo-org/hello"))
+                .thenReturn(new DuplicateSummary("octo-org/hello", 10, 6, 2, 1, 3, 2, 1, 1, 500));
+
+        mockMvc.perform(post("/backfill/octo-org/hello/duplicates"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.checked").value(10))
+                .andExpect(jsonPath("$.found").value(6))
+                .andExpect(jsonPath("$.foundByComment").value(3))
+                .andExpect(jsonPath("$.otherRepo").value(1));
     }
 
     @Test

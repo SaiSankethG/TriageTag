@@ -556,3 +556,81 @@ Doing background work properly needs job tracking, which is a bigger piece than 
 3. **How do you test a controller without starting the whole app?**
    `MockMvcBuilders.standaloneSetup(new BackfillController(mockService))`: real MVC routing, JSON and
    exception handling, a Mockito mock for the service, no server and no database.
+
+## M1 finish, step F: the answer key, `duplicate_of` (4 Nov 2026)
+
+Files: `source/DuplicateSource.java`, `source/DuplicateLink.java`, `github/GitHubDuplicateSource.java`,
+`service/DuplicateService.java`, `service/DuplicateSummary.java`, two new `IssueRepository` methods,
+`POST /backfill/{owner}/{repo}/duplicates` in `BackfillController`; tests `GitHubDuplicateSourceTest` (18),
+`DuplicateServiceTest` (2), one more controller test.
+
+### What I found in the real data first (curl, 4 Nov 2026)
+- **#52529** (closed as duplicate): the REST timeline has only `closed` (with `state_reason: duplicate`) and
+  label events. **No comment, no `marked_as_duplicate` event, and nothing in REST says which issue it
+  duplicates.** GitHub's **GraphQL** API does: `ClosedEvent.duplicateOf` = **#52519**. That's set when a
+  maintainer uses "Close as duplicate of #N".
+- **Only 178 spring-boot issues have `state_reason=duplicate`, but 2,011 have the `status: duplicate` label.**
+  Old issues were back-filled by GitHub as `state_reason: completed` (not null, as `docs/problem.md`
+  assumed), and 2023-2024 ones are often `not_planned`. So the label is the main signal, and the step
+  checks both.
+- A sample of 20 labelled duplicates from 2013 to 2026 showed four kinds:
+  1. Recent ones: `ClosedEvent.duplicateOf` (e.g. #47366 -> #46944, #48342 -> #48300). Reliable.
+  2. A maintainer comment: "Duplicate of #16381", "Duplicates https://github.com/spring-projects/spring-boot/issues/49910".
+     (Search finds ~717 labelled duplicates with "Duplicate of" in a comment.)
+  3. A comment pointing to **another repo**: "This is a duplicate of https://github.com/spring-projects/spring-framework/issues/31892".
+     Can't be stored: `duplicate_of` is a number in the same repo.
+  4. Vague or no link: "Yes, see #52367", "we fixed it in #1800", or no comment at all (common before ~2016).
+- **Surprise:** on #16344 the maintainer wrote "Duplicate of #16381", but the GraphQL `MarkedAsDuplicateEvent`
+  lists #16344 as the *canonical* one, the opposite way. So the event's direction isn't trusted;
+  it's only read as "these two are linked".
+
+### The rules ("only fill it when sure")
+1. If the **latest** close was "close as duplicate of #N" -> **FOUND** (evidence `CLOSE_REASON`).
+   Latest, because an issue can be closed, reopened and closed again (#52124).
+2. Otherwise collect candidates from "marked as duplicate" links (the *other* issue of the pair; ignored if
+   someone later un-marked it) and from **maintainer** comments (`OWNER`/`MEMBER`/`COLLABORATOR`) matching
+   `duplicate(s|d) (of) #N | gh-N | https://github.com/<owner>/<repo>/issues/N`.
+   Exactly one candidate -> **FOUND**; more than one -> **AMBIGUOUS**; none -> **NOT_FOUND**.
+3. A FOUND original in another repo becomes **OTHER_REPO** (not stored). Self-references are ignored.
+   "duplicated by #N" (other direction) and "see #N" (vague) deliberately don't match.
+The summary counts every outcome: `checked = found + notFound + otherRepo + ambiguous`, and `found` is split by evidence.
+
+### Basics used here
+- **GraphQL**: one endpoint (`POST /graphql`); the request says exactly which fields it wants, as nested
+  text. `query($number: Int!) { repository(...) { issue(number: $number) { ... } } }`. The `$number` values
+  go in a separate `"variables"` object, so the query text never changes (no string-building, no injection).
+  `... on ClosedEvent { duplicateOf { ... } }` means "if this item is a ClosedEvent, also give me these fields".
+  GraphQL usually answers **HTTP 200 even on errors**, with an `"errors"` list; the code checks it.
+- **`Pattern` / `Matcher`** (Java regex): `Pattern.compile(...)` once (it's slow to build), then
+  `matcher(text)` and `while (m.find())` walks through every match; `m.group(1)` is the first `( )` part.
+  `(?i)` makes it case-insensitive, `\\b` means "word boundary" (so "nonduplicate" doesn't match).
+- **`@Query` + `@Modifying`** (Spring Data JPA): write the JPQL yourself when a method name can't express it.
+  JPQL talks about *entities and fields* (`Issue i`, `i.stateReason`), not tables and columns.
+  `left join i.labels l` joins the `@ElementCollection`, and `l` is then one label string.
+  `@Modifying` marks an `update`/`delete` query (not a select); it needs a transaction, so the method has `@Transactional`.
+  *Before:* load the issue (and maybe its labels), set the field, save. *After:* one `UPDATE issue SET duplicate_of = ? WHERE id = ?`.
+- **`@Param("repo")`**: ties a method parameter to `:repo` in the query.
+- **Lambda as a fake interface:** `DuplicateSource` has one method, so the test writes
+  `DuplicateSource source = (repo, number) -> answers.get(number);`, a complete fake with no mocking library.
+- **Records with a "compact constructor"**: `record Target(String repo, int number) { Target { repo = repo.toLowerCase(...); } }`
+  runs before the fields are set, so every `Target` is stored lower-case and `equals` ignores case.
+
+### One alternative I rejected
+**Using any `#N` in a maintainer's comment** ("see #123", "like #123"). It would fill many more rows, but a
+wrong answer key is worse than a missing one: the replay test (M3) would mark our model wrong when it is
+right. So vague references count as NOT_FOUND, and the report says how many there are.
+(Also rejected: REST timeline only. It's simpler, but it cannot see "close as duplicate of", the best signal.)
+
+### Likely interview questions
+1. **How did you build the ground truth for duplicates, and how do you know it's right?**
+   From GitHub's own records, strongest first: "close as duplicate of #N" (GraphQL `ClosedEvent.duplicateOf`),
+   then "marked as duplicate" links and maintainer comments like "Duplicate of #N", which must agree on one issue.
+   Vague mentions are ignored, other-repo originals are counted but not stored, and the summary reports
+   found / not found / ambiguous / other repo, so the coverage is visible, not hidden.
+2. **Why did you need GraphQL when everything else uses REST?**
+   The REST timeline for #52529 shows "closed, reason duplicate" but not *which* issue. Only GraphQL exposes
+   `duplicateOf` on the close event. It needs a token, and errors come back as HTTP 200 with an `errors` list.
+3. **What biases does this answer key have?**
+   It favours recent issues (structured close reason) and duplicates a maintainer bothered to link; old ones
+   with no link are missing. Also, maintainers mostly spot duplicates that *look* alike (docs/problem.md),
+   so the key leans towards easier cases. We report the not-found share honestly.

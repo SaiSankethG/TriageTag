@@ -2,6 +2,8 @@ package com.saisanketh.triage.web;
 
 import com.saisanketh.triage.service.BackfillService;
 import com.saisanketh.triage.service.BackfillSummary;
+import com.saisanketh.triage.service.DuplicateService;
+import com.saisanketh.triage.service.DuplicateSummary;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -23,11 +25,21 @@ import org.springframework.web.client.HttpClientErrorException;
 public class BackfillController {
 
     private final BackfillService backfillService;
+    private final DuplicateService duplicateService;
 
     /** Example: {@code curl -X POST localhost:8080/backfill/spring-projects/spring-petclinic} */
     @PostMapping("/backfill/{owner}/{repo}")
     public BackfillSummary backfill(@PathVariable String owner, @PathVariable String repo) {
         return backfillService.backfill(owner + "/" + repo);
+    }
+
+    /**
+     * Fills duplicate_of for the repo's stored duplicates. Run it after the backfill.
+     * Example: {@code curl -X POST localhost:8080/backfill/spring-projects/spring-boot/duplicates}
+     */
+    @PostMapping("/backfill/{owner}/{repo}/duplicates")
+    public DuplicateSummary duplicates(@PathVariable String owner, @PathVariable String repo) {
+        return duplicateService.fillDuplicates(owner + "/" + repo);
     }
 
     /** The tracker says the repo doesn't exist (or isn't visible to our token). */
