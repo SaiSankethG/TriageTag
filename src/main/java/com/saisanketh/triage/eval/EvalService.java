@@ -159,19 +159,7 @@ public class EvalService {
 
     private FalseAlarms falseAlarms(String repo, List<Integer> duplicateRanks, List<Double> duplicateTopScores,
                                     boolean externalOnly) {
-        // Random but repeatable: order by a hash of the id. Non-duplicate = no duplicate_of, not closed as
-        // duplicate, no label containing "duplicate".
-        List<Long> sample = jdbc.queryForList("""
-                SELECT i.id FROM issue i
-                WHERE lower(i.repo) = lower(?)
-                  AND i.duplicate_of IS NULL
-                  AND coalesce(i.state_reason, '') <> 'duplicate'
-                  AND NOT EXISTS (SELECT 1 FROM issue_label l
-                                  WHERE l.issue_id = i.id AND lower(l.label_name) LIKE '%%duplicate%%')
-                  AND (? = false OR %s)
-                ORDER BY md5(i.id::text || 'm3-false-alarms')
-                LIMIT ?
-                """.formatted(EXTERNAL_REPORTER), Long.class, repo, externalOnly, FALSE_ALARM_SAMPLE);
+        List<Long> sample = nonDuplicateSample(repo, externalOnly);
 
         List<Double> topScores = new ArrayList<>();
         for (Long id : sample) {
@@ -199,6 +187,24 @@ public class EvalService {
         int n = duplicateRanks.size();
         return new FalseAlarms(topScores.size(), threshold, Metrics.rateAtOrAbove(topScores, threshold),
                 flagged, share(flaggedTop1, n), share(flaggedTop3, n));
+    }
+
+    /**
+     * The same "random" non-duplicate issues every run: ordered by a hash of the id. Non-duplicate = no duplicate_of,
+     * not closed as duplicate, no label containing "duplicate".
+     */
+    List<Long> nonDuplicateSample(String repo, boolean externalOnly) {
+        return jdbc.queryForList("""
+                SELECT i.id FROM issue i
+                WHERE lower(i.repo) = lower(?)
+                  AND i.duplicate_of IS NULL
+                  AND coalesce(i.state_reason, '') <> 'duplicate'
+                  AND NOT EXISTS (SELECT 1 FROM issue_label l
+                                  WHERE l.issue_id = i.id AND lower(l.label_name) LIKE '%%duplicate%%')
+                  AND (? = false OR %s)
+                ORDER BY md5(i.id::text || 'm3-false-alarms')
+                LIMIT ?
+                """.formatted(EXTERNAL_REPORTER), Long.class, repo, externalOnly, FALSE_ALARM_SAMPLE);
     }
 
     // --- labels ---

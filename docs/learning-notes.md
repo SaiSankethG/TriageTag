@@ -1675,3 +1675,34 @@ they're what's tested here.
    request, and the bot would ask reporters for nonsense.
 3. **Why not regexes instead of an LLM?** The fake LLM *is* regexes, and it's easy to fool ("expected" in "unexpected
    error"). An LLM understands "here's my pom.xml with 3.4.1" as a version. The real comparison comes from the STOP A hand-scoring.
+
+## M4 step 2b: LLM check of the top duplicate match + its replay evaluation (4 Nov 2026)
+
+Files: `prompts/duplicate-check-v1.txt`, `ai/DuplicateVerifier.java`, `ai/DuplicateCheck.java`, `ai/IssueText.java`,
+`ai/IssueTextRepository.java`, `eval/DuplicateCheckEval.java`, `eval/DuplicateCheckReport.java`,
+`POST /eval/{owner}/{repo}/duplicate-check` (writes `docs/m4-duplicate-check.md`), config `triage.duplicates.comment-threshold: 0.825`;
+tests `DuplicateVerifierTest` (5), `DuplicateCheckEvalDbTest` (1).
+
+### What it does
+sai's M3 decision 3: comment mode posts only if the top-1 score is >= 0.825 AND the LLM says both issues are the
+**same root problem**. `DuplicateVerifier` sends both issues and expects exactly `{"same_problem": "yes|no|unsure", "reason": "..."}`
+(same strict JSON + one retry + UNKNOWN as step 2). Only "yes" counts. `DuplicateCheckEval` runs the rule on the replay set
+(external reporters): duplicates kept vs non-duplicates still flagged, score-only next to score + LLM. With the fake LLM the
+output is marked "FAKE LLM" and is not committed; the real numbers come after STOP A.
+
+### Basics used here
+- **Two-stage retrieval ("retrieve then verify")**: a cheap, fast search (vectors) finds candidates; an expensive, smarter
+  check (LLM) runs only on the few above a threshold. Before: one score decides. After: the score decides *whether to ask*.
+- **Measure the gate on both sides**: how many right answers survive (duplicates) and how many false alarms are removed
+  (non-duplicates). A check that says "no" to everything has zero false alarms and is useless.
+
+### One alternative I rejected
+**Asking the LLM to re-rank the whole top 10.** Could raise recall, but costs ~10x the tokens per issue and is harder to
+evaluate; the comment decision only needs a yes/no on the top match.
+
+### Likely interview questions
+1. **How do you stop the bot posting wrong duplicate comments?** Shadow mode by default; in comment mode, a high score
+   threshold plus an LLM "same root problem?" check; measured on the replay set for both kept duplicates and false alarms.
+2. **What if the LLM is down?** The verdict is UNKNOWN, which counts as "not confirmed": the bot stays silent, the private
+   report still shows the top 3.
+3. **Why is the fake LLM's number not reported?** It's word overlap, not a model; it only proves the code path works.

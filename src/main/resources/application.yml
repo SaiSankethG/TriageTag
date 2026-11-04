@@ -36,6 +36,10 @@ triage:
     exclude-labels:
       "[spring-projects/spring-boot]":
         - "status: forward-port"   # the team's per-branch clone of an issue: same text as the original
+  duplicates:
+    # Comment mode (M5) posts only if the top match scores >= this AND the LLM confirms "same root problem"
+    # (sai, 4 Nov 2026: the M3 threshold for <= 10% false alarms on external reporters).
+    comment-threshold: 0.825
   labels:
     threshold: 0.5            # suggest a label if similar issues holding it have >= 50% of the similarity weight
     ignore-prefixes: "status:"  # workflow labels (status: waiting-for-triage, status: duplicate...) are never suggested

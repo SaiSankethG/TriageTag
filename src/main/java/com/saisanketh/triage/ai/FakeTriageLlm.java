@@ -1,7 +1,10 @@
 package com.saisanketh.triage.ai;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -21,6 +24,7 @@ public class FakeTriageLlm implements TriageLlm {
 
     public FakeTriageLlm() {
         rule(MissingDetailsChecker.PROMPT_NAME, FakeTriageLlm::missingDetails);
+        rule(DuplicateVerifier.PROMPT_NAME, FakeTriageLlm::duplicateCheck);
     }
 
     @Override
@@ -59,5 +63,32 @@ public class FakeTriageLlm implements TriageLlm {
 
     private static String found(Pattern pattern, String text) {
         return pattern.matcher(text).find() ? "present" : "missing";
+    }
+
+    /**
+     * Title word overlap (Jaccard: shared words / all words, words of 3+ letters): >= 0.5 "yes", >= 0.25 "unsure",
+     * else "no".
+     */
+    static String duplicateCheck(Prompt prompt) {
+        Set<String> a = words(prompt.variables().get("new_title"));
+        Set<String> b = words(prompt.variables().get("candidate_title"));
+        Set<String> union = new HashSet<>(a);
+        union.addAll(b);
+        Set<String> shared = new HashSet<>(a);
+        shared.retainAll(b);
+        double overlap = union.isEmpty() ? 0 : (double) shared.size() / union.size();
+        String verdict = overlap >= 0.5 ? "yes" : overlap >= 0.25 ? "unsure" : "no";
+        return String.format(Locale.ROOT, "{\"same_problem\": \"%s\", \"reason\": \"fake LLM: title word overlap %.2f\"}",
+                verdict, overlap);
+    }
+
+    private static Set<String> words(String text) {
+        Set<String> words = new HashSet<>();
+        for (String w : text.toLowerCase(Locale.ROOT).split("[^a-z0-9]+")) {
+            if (w.length() >= 3) {
+                words.add(w);
+            }
+        }
+        return words;
     }
 }

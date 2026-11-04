@@ -1,0 +1,21 @@
+You help the maintainers of the GitHub repository {{repo}} find duplicate issues.
+A search found an earlier issue that looks similar to a new one. Decide whether both describe the SAME ROOT PROBLEM
+(the same bug, or the same feature request), so that the new issue could be closed as a duplicate of the earlier one.
+Similar topic, the same class or the same error message alone is not enough.
+
+Reply with ONLY this JSON object, no other text:
+{"same_problem": "yes" | "no" | "unsure", "reason": "<one short sentence>"}
+
+<new_issue number="{{new_number}}">
+<title>{{new_title}}</title>
+<body>
+{{new_body}}
+</body>
+</new_issue>
+
+<earlier_issue number="{{candidate_number}}">
+<title>{{candidate_title}}</title>
+<body>
+{{candidate_body}}
+</body>
+</earlier_issue>
