@@ -1415,3 +1415,47 @@ needs training on existing data and re-tuning as data grows, while HNSW works we
 3. **Cosine similarity vs Euclidean distance?**
    Cosine compares direction only (meaning), not length; sentence-embedding models are trained for it. `<=>` is cosine
    distance in pgvector; similarity = 1 - distance.
+
+## M3 step 5: label suggestion by weighted vote (4 Nov 2026)
+
+Files: `triage/LabelSuggester.java`, `SimilarIssueService.suggestLabels`, endpoint
+`GET /repos/{owner}/{repo}/issues/{number}/labels/suggested`, `application.yml` (`triage.labels.*`);
+test `LabelSuggesterDbTest` (3, real pgvector).
+
+### What it does
+1. Take the **10 nearest earlier issues** of the same repo (the vector search's neighbours, with our ids).
+2. Each neighbour votes for each of its labels with its similarity as the weight.
+3. A label's **share** = its votes / the total weight of all 10 neighbours. Suggest it if share >= **0.5**
+   ("issues holding more than half of the similarity agree").
+4. Workflow labels (prefix `status:`, e.g. `status: waiting-for-triage`, `status: duplicate`) are never suggested: they
+   say where an issue is in the process, not what it is about. Both settings are in `application.yml`.
+Real examples: #52591 -> `type: bug` (share 0.63; it really is `type: bug`). #52519 -> nothing (its only label is
+`status: declined`, a workflow label).
+
+### Basics used here
+- **k-nearest-neighbour (kNN) classification**: "label a new thing like its most similar known things". No training step:
+  the "model" is the labelled history plus the embeddings.
+- **Weighted vote**: a neighbour with similarity 0.95 counts more than one with 0.40, so a few very similar issues beat
+  many vaguely related ones. *Before (plain majority):* 6 of 10 neighbours are `type: bug` -> bug. *After:* those 6 must
+  also carry more than half of the total similarity.
+- **Threshold**: only speak when the neighbours mostly agree; otherwise suggest nothing (better silent than noisy).
+- **`= ANY (?)` with a `Long[]`**: one query for the labels of all 10 neighbours instead of 10 queries.
+- **`@Value("${triage.labels.ignore-prefixes:status:}") List<String>`**: Spring splits a comma-separated property into a list;
+  after the first `:` comes the default value.
+
+### One alternative I rejected
+**Training a classifier** (e.g. logistic regression on the embeddings, one per label). Could be more accurate, but needs
+a training pipeline, retraining when labels change, and a model to version and explain. kNN voting works from the data we
+already have, adapts immediately when maintainers relabel issues, and each suggestion can be explained ("7 of the 10 most
+similar issues were `type: bug`").
+
+### Likely interview questions
+1. **How do you suggest labels?**
+   kNN: the 10 most similar earlier issues vote for their labels, weighted by similarity; a label is suggested only if it
+   gets at least half of the total weight. Workflow labels like `status:` are excluded.
+2. **Why a threshold instead of always suggesting the top label?**
+   A wrong suggestion costs a maintainer's attention and trust. When neighbours disagree, staying silent is better; the
+   evaluation (step 6) reports both precision and how often we make a suggestion at all (coverage).
+3. **How would this behave on a brand-new repo?**
+   With few earlier issues there are few neighbours and weak agreement, so mostly no suggestions: it gets useful as
+   labelled history grows. Starting from a related repo's data (or a trained model) would help the cold start.

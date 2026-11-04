@@ -1,5 +1,6 @@
 package com.saisanketh.triage.web;
 
+import com.saisanketh.triage.triage.LabelSuggester.LabelSuggestion;
 import com.saisanketh.triage.triage.SimilarIssue;
 import com.saisanketh.triage.triage.SimilarIssueService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,15 @@ public class SimilarIssueController {
             throw new IllegalArgumentException("limit must be between 1 and " + MAX_LIMIT);
         }
         return similarIssueService.findSimilar(owner + "/" + repo, number, method, limit)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** Example: {@code curl localhost:8080/repos/spring-projects/spring-boot/issues/52529/labels/suggested} */
+    @GetMapping("/repos/{owner}/{repo}/issues/{number}/labels/suggested")
+    public ResponseEntity<List<LabelSuggestion>> suggestedLabels(@PathVariable String owner, @PathVariable String repo,
+                                                                 @PathVariable int number) {
+        return similarIssueService.suggestLabels(owner + "/" + repo, number)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

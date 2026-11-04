@@ -7,6 +7,7 @@ import com.saisanketh.triage.repository.WebhookDeliveryRepository;
 import com.saisanketh.triage.service.IssueService;
 import com.saisanketh.triage.service.WebhookIntakeService;
 import com.saisanketh.triage.triage.KeywordDuplicateSearch;
+import com.saisanketh.triage.triage.LabelSuggester;
 import com.saisanketh.triage.triage.SimilarIssueService;
 import com.saisanketh.triage.triage.VectorDuplicateSearch;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -31,7 +32,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({PostgresContainerConfig.class, ClockConfig.class, IssueService.class,
         WebhookDeliveryRepository.class, WebhookIntakeService.class, KeywordDuplicateSearch.class,
-        IssueEmbeddingRepository.class, VectorDuplicateSearch.class, SimilarIssueService.class})
+        IssueEmbeddingRepository.class, VectorDuplicateSearch.class, SimilarIssueService.class,
+        LabelSuggester.class})
 public abstract class PostgresTest {
 
     @MockitoBean
