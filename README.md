@@ -82,20 +82,31 @@ docker-compose up -d      # Postgres + pgvector on localhost:5433 (database "tri
 
 Postgres is on host port **5433**, so it doesn't clash with a locally installed Postgres. Secrets only ever come from env vars:
 `GITHUB_TOKEN` (backfill), `GITHUB_WEBHOOK_SECRET` (webhooks), `ANTHROPIC_API_KEY` (without it, a rule-based stand-in LLM is
-used and the page says so).
+used and the page says so), and `TRIAGE_ADMIN_TOKEN`.
+
+**Admin calls** (everything that changes data or spends tokens: backfill, embeddings, docs, eval, `POST /reports`) need the
+header `X-Admin-Token` with the value of `TRIAGE_ADMIN_TOKEN`; without the env var they answer 503, with a wrong token 401.
+Reading (the demo page, `GET /reports`, search) and the GitHub webhook (own HMAC check) don't need it. Set it before starting the app:
 
 ```bash
-curl -X POST localhost:8080/backfill/spring-projects/spring-boot              # load issues (~12 min)
-curl -X POST localhost:8080/backfill/spring-projects/spring-boot/duplicates   # answer key (~19 min)
-curl -X POST localhost:8080/embeddings/spring-projects/spring-boot            # embeddings (~6 min)
-curl -X POST localhost:8080/docs/spring-projects/spring-boot                  # reference docs for drafts (~15 s)
-curl -X POST localhost:8080/reports/spring-projects/spring-boot/52529         # one triage report
-curl -X POST localhost:8080/eval/spring-projects/spring-boot                  # the replay (~3 min)
-./mvnw test                                                                   # 245 tests; Testcontainers for Postgres and Kafka
+export TRIAGE_ADMIN_TOKEN=$(openssl rand -hex 32)
+```
+```bash
+curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/backfill/spring-projects/spring-boot              # issues (~12 min)
+curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/backfill/spring-projects/spring-boot/duplicates   # answer key (~19 min)
+curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/embeddings/spring-projects/spring-boot            # embeddings (~6 min)
+curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/docs/spring-projects/spring-boot                  # docs (~15 s)
+curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/reports/spring-projects/spring-boot/52529         # one report
+curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/eval/spring-projects/spring-boot                  # replay (~3 min)
+./mvnw test                                                                   # 251 tests; Testcontainers for Postgres and Kafka
 ```
 
+On the demo page, **Create report** appears only after pasting the admin token into the "Admin" box (kept in that browser tab
+only); without it, only existing reports can be viewed.
+
 Container image and deployment: `./mvnw spring-boot:build-image` (linux/arm64, buildpacks) and `deploy/k3s/`
-(Postgres and Kafka StatefulSets, the app with startup/liveness/readiness probes, an Ingress, and a secret *template*).
+(Postgres and Kafka StatefulSets, the app with startup/liveness/readiness probes, an Ingress that routes only the public paths,
+and a secret *template*).
 
 ## Design decisions
 

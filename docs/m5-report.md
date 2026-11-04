@@ -19,9 +19,10 @@ need sai (a cloud VM, a GitHub App, a video). Nothing was deployed and no server
 | B | **Blind A/B**: the same 30 issues with v2 and v3 drafts in `docs/m4-scoring-v3.md` (91,588 tokens) | `7aafdcf` |
 | C | **Demo script** + three duplicate pairs whose text never mentions the original (`docs/demo-script.md`) | `1ab9280` |
 | 5 | **README**: problem, Mermaid diagram, results, run, design decisions, limits | the commit that adds this report |
+| fix | **Admin endpoints protected** (review finding before deploying): every non-GET endpoint except the webhook needs `X-Admin-Token` = `TRIAGE_ADMIN_TOKEN` (unset → 503, wrong → 401); the Ingress routes only public paths; the demo page sends the token only if pasted | the commit after this report |
 
 ## Tests
-**245 tests, 0 failures** (`./mvnw test`), 30 more than at STOP A. New: outbox (unit, real DB, real Kafka down/up), threshold
+**251 tests, 0 failures** (after the admin-token fix; 245 at the M5 report) (`./mvnw test`), 30 more than at STOP A. New: outbox (unit, real DB, real Kafka down/up), threshold
 maths, settings/search/report-card APIs, demo page checks, k3s manifest checks (no kubectl here, so no `--dry-run`), PEM/JWT/
 token cache, comment mode (every safety check, never twice, failure not retried), draft v3 inputs.
 
@@ -83,7 +84,8 @@ gunzip -c triage-image.tar.gz | sudo k3s ctr images import -
 ```bash
 cp secret.example.yaml secret.yaml && nano secret.yaml
 ```
-(fill in the real values; never copy `secret.yaml` back into the repo)
+(fill in the real values, including `TRIAGE_ADMIN_TOKEN`: generate it with `openssl rand -hex 32` and keep a copy in your
+password manager; never copy `secret.yaml` back into the repo)
 ```bash
 sudo k3s kubectl apply -f 00-namespace.yaml -f secret.yaml -f 10-postgres.yaml -f 20-kafka.yaml
 ```
@@ -95,6 +97,19 @@ sudo k3s kubectl -n triage exec -i postgres-0 -- pg_restore -U copilot -d triage
 sudo k3s kubectl apply -f 30-app.yaml
 ```
 Check: `sudo k3s kubectl -n triage get pods` (triage-app Ready after ~1 min), then `curl -H 'Host: triage.example.com' localhost/actuator/health`.
+
+**Admin calls on the VM** (backfill, embeddings, docs, eval, creating reports) are not routed by the Ingress at all (only
+`/webhooks/github`, `/`, `/index.html`, `/reports`, `/repos`, `/settings` and `/actuator/health` are public). Reach the app
+directly through a port-forward, with the header:
+```bash
+sudo k3s kubectl -n triage port-forward svc/triage-app 8080:80
+```
+then, in a second SSH session:
+```bash
+curl -X POST -H "X-Admin-Token: <your TRIAGE_ADMIN_TOKEN>" localhost:8080/docs/spring-projects/spring-boot
+```
+`POST /reports/...` is reachable through the Ingress (a Kubernetes Ingress can't filter by HTTP method), but the app refuses it
+without the token; on the public demo page, paste the token into the "Admin" box to see **Create report**.
 
 ### 3. HTTPS and a hostname (your choice)
 GitHub can send webhooks to plain http, but it shouldn't. The simplest options: a **Cloudflare Tunnel** (free, HTTPS, no open

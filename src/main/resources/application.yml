@@ -34,6 +34,9 @@ github:
     private-key-path: ${GITHUB_APP_PRIVATE_KEY_PATH:}   # a .pem file outside the repo, never committed
 
 triage:
+  # Shared secret for every non-GET endpoint except the webhook (backfill, embeddings, docs, eval, POST /reports): send it
+  # as header X-Admin-Token. Unset = those endpoints answer 503. From the environment only (openssl rand -hex 32).
+  admin-token: ${TRIAGE_ADMIN_TOKEN:}
   outbox:
     poll-ms: 500          # the relay looks for unsent outbox rows this often (after the previous run ended)
   candidates:

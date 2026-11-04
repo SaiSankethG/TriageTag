@@ -19,5 +19,10 @@ class DemoPageTest {
         assertThat(html).doesNotContain("<script src=");       // no external scripts, no new dependency
         assertThat(html).contains("fetch('/settings')", "/repos/${repo}/issues?", "URLSearchParams(location.search)");
         assertThat(html).contains("@media (max-width: 820px)", "prefers-color-scheme: dark", ":focus-visible");
+        // The admin token is sent only as a header, kept only in sessionStorage, never put in the URL or localStorage.
+        assertThat(html).contains("'X-Admin-Token': adminToken()", "sessionStorage.setItem('triage-admin-token'",
+                "Only existing reports can be viewed on the public demo.");
+        assertThat(html).doesNotContain("localStorage");
+        assertThat(html).doesNotContainPattern("URLSearchParams\\([^)]*[Tt]oken");
     }
 }

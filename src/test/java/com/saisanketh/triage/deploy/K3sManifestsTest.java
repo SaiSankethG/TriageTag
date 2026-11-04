@@ -97,4 +97,19 @@ class K3sManifestsTest {
         }
         assertThat(Files.exists(DIR.resolve("secret.yaml"))).as("a filled-in secret must never be in the repo").isFalse();
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void theIngressRoutesOnlyPublicPaths() throws IOException {
+        Map<String, Object> ingress = objects("30-app.yaml").stream()
+                .filter(o -> "Ingress".equals(o.get("kind"))).findFirst().orElseThrow();
+        List<Object> rules = (List<Object>) map(ingress.get("spec")).get("rules");
+        List<Object> paths = (List<Object>) map(map(rules.get(0)).get("http")).get("paths");
+        List<String> routed = paths.stream().map(p -> (String) map(p).get("path")).toList();
+
+        assertThat(routed).containsExactlyInAnyOrder("/webhooks/github", "/", "/index.html", "/reports", "/repos",
+                "/settings", "/actuator/health");
+        assertThat(routed).noneMatch(p -> p.startsWith("/backfill") || p.startsWith("/eval") || p.startsWith("/embeddings")
+                || p.startsWith("/docs"));
+    }
 }

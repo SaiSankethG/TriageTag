@@ -6,6 +6,7 @@ Usage: python3 -I scripts/m4-scoring.py spring-projects/spring-boot 30
 Needs: the app running on localhost:8080 (with the real LLM), the Docker Postgres on 5433 (read via docker-compose).
 """
 import json
+import os
 import subprocess
 import sys
 import urllib.request
@@ -21,7 +22,8 @@ numbers = [int(n) for n in out.split()]
 
 reports = []
 for n in numbers:
-    req = urllib.request.Request(f"{base}/reports/{repo}/{n}", method="POST")
+    req = urllib.request.Request(f"{base}/reports/{repo}/{n}", method="POST",
+                                 headers={"X-Admin-Token": os.environ.get("TRIAGE_ADMIN_TOKEN", "")})
     with urllib.request.urlopen(req, timeout=300) as resp:
         reports.append(json.load(resp))
     print(f"report for #{n}: {reports[-1]['costTokens']} tokens", file=sys.stderr)

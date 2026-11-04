@@ -129,6 +129,19 @@ class WebhookEndToEndTest extends FullStackTest {
     }
 
     /** POSTs the bytes the way GitHub does, with X-Hub-Signature-256 computed with the given secret. */
+    /** The real app registers the admin filter: with no TRIAGE_ADMIN_TOKEN in tests, admin POSTs are refused, reads work. */
+    @Test
+    void adminEndpointsAreRefusedWithoutTheTokenButTheDemoReadsWork() throws Exception {
+        for (String path : List.of("/backfill/o/r", "/embeddings/o/r", "/docs/o/r", "/eval/o/r", "/reports/o/r/1")) {
+            HttpResponse<String> refused = http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+                    .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.ofString());
+            assertThat(refused.statusCode()).as(path).isEqualTo(503);
+        }
+        HttpResponse<String> settings = http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/settings"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(settings.statusCode()).isEqualTo(200);
+    }
+
     private HttpResponse<String> postWebhook(byte[] body, String deliveryId, String signWith) throws Exception {
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/webhooks/github"))
                 .header("Content-Type", "application/json")

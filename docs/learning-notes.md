@@ -2341,3 +2341,43 @@ numbers and the design reasons have to be on the first page.
    intake from work, keeps per-issue order, and gives retries and a dead-letter topic.
 3. **What's the weakest part?** Public duplicate comments: at a 4% base rate they're mostly wrong even with an LLM check, so the
    product defaults to private reports.
+
+## M5 fix: admin endpoints must not be public (4 Nov 2026)
+
+Found in review before deploying: the Ingress routed `/` to the app, so on the public VM **anyone** could call
+`POST /backfill/{any}/{repo}` (uses up the GitHub token's quota, fills the disk), `POST /embeddings`, `POST /docs`, `POST /eval`
+(minutes of CPU, LLM calls) and `POST /reports/...` (LLM spend).
+
+Files: `web/AdminTokenFilter.java`, config `triage.admin-token` (`TRIAGE_ADMIN_TOKEN`), `static/index.html` (optional "Admin" box),
+`deploy/k3s/30-app.yaml` (env + an Ingress with only the public paths), `secret.example.yaml`, the scoring scripts (send the
+header from the env var), README and `docs/m5-report.md`; tests `AdminTokenFilterTest` (4), one in `WebhookEndToEndTest` (the real
+app refuses all five admin POSTs without the token), one in `K3sManifestsTest`, more checks in `DemoPageTest`.
+
+### What it does
+- **Two locks.** (1) The app: every request that isn't GET/HEAD/OPTIONS, except `POST /webhooks/github` (which has its own HMAC
+  check), needs header `X-Admin-Token` equal to `TRIAGE_ADMIN_TOKEN`. Not configured → **503** ("fail closed", like the webhook
+  secret); missing/wrong → **401**. (2) The Ingress routes only what the public needs: the webhook, the page, `/reports`, `/repos`,
+  `/settings`, `/actuator/health`. Admin paths aren't reachable from outside at all; operators use `kubectl port-forward`.
+- **Constant-time compare** (`MessageDigest.isEqual`): a normal `equals` stops at the first wrong character, so response times
+  could leak how much of a guess was right.
+- **Demo page**: "Create report" only appears after pasting the token into the Admin box; it's sent as a header, kept in
+  `sessionStorage` (this tab only), never in the URL. Without it: "Only existing reports can be viewed on the public demo."
+- Checked in the browser on a local run: no token → that message; right token → report created; wrong token → "not accepted".
+
+### Basics used here
+- **Defense in depth**: the Ingress can't filter by HTTP method (POST /reports shares a path with GET /reports), so the app
+  check is the real lock and the Ingress narrows what's exposed.
+- **`OncePerRequestFilter`**: a Spring servlet filter that runs once per request before any controller. `shouldNotFilter` skips
+  reads and the webhook, so the rule is in one place instead of in every controller.
+- **Fail closed**: if the secret is missing, refuse, rather than silently allowing everything.
+
+### One alternative I rejected
+**Spring Security** with users and roles. Correct for a product with logins, but a new dependency and a lot of configuration for
+one shared operator secret on five endpoints.
+
+### Likely interview questions
+1. **How did you secure the admin endpoints?** A filter requiring a shared token header, compared in constant time, failing
+   closed when not configured; plus an Ingress that doesn't expose admin paths, and port-forwarding for operators.
+2. **Why not just hide the URLs?** Obscurity isn't protection; anyone can guess `/backfill/...` from the open-source code.
+3. **Why is the webhook exempt?** GitHub can't send our admin token; it signs the body with HMAC-SHA256, which the receiver already
+   verifies.

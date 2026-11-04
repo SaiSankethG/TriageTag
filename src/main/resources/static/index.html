@@ -110,6 +110,11 @@
       <input id="search" type="search" placeholder="e.g. datasource, actuator" autocomplete="off">
       <div id="list-status" class="small muted" aria-live="polite"></div>
       <ul id="issue-list" class="issue-list" aria-label="Issues"></ul>
+      <details class="small" style="margin-top:12px">
+        <summary>Admin (create new reports)</summary>
+        <label for="admin-token" style="margin-top:6px">Admin token (kept only in this browser tab)</label>
+        <input id="admin-token" type="password" autocomplete="off">
+      </details>
     </section>
 
     <!-- Right: the report -->
@@ -165,6 +170,12 @@
   function loading(text) { setStatus(el('div', { class: 'note' }, el('span', { class: 'spinner', 'aria-hidden': 'true' }), text)); }
   function errorBox(text) { setStatus(el('div', { class: 'error', role: 'alert' }, text)); }
 
+  // The admin token lives only in sessionStorage (this tab, gone when it closes); never in the URL or long-term storage.
+  function adminToken() { return $('admin-token').value.trim(); }
+  function rememberToken() {
+    try { sessionStorage.setItem('triage-admin-token', adminToken()); } catch { /* storage blocked: keep it in the field only */ }
+  }
+
   function repoValue() { return $('repo').value.trim(); }
   function validRepo(repo) { return /^[\w.-]+\/[\w.-]+$/.test(repo); }
 
@@ -213,14 +224,24 @@
     $('report').replaceChildren();
     loading(create ? 'Creating the report (runs the AI checks, a few seconds)...' : 'Loading the report...');
     try {
-      const response = await fetch(`/reports/${repo}/${number}`, { method: create ? 'POST' : 'GET' });
+      // Creating a report spends LLM tokens, so the server only allows it with the admin token (header, never in the URL).
+      const headers = create && adminToken() ? { 'X-Admin-Token': adminToken() } : {};
+      const response = await fetch(`/reports/${repo}/${number}`, { method: create ? 'POST' : 'GET', headers });
       if (response.status === 404) {
         if (create) {
           setStatus(el('div', { class: 'note' }, `Issue #${number} isn't stored for ${repo}. Only issues the assistant has seen (backfill or webhook) can be triaged.`));
+        } else if (!adminToken()) {
+          setStatus(el('div', { class: 'note' }, `There's no report for #${number} yet. Only existing reports can be viewed on the public demo.`));
         } else {
           setStatus(el('div', { class: 'note' }, `There's no report for #${number} yet. `,
             el('button', { type: 'button', class: 'secondary', onclick: () => showReport(repo, number, true) }, 'Create report')));
         }
+        return;
+      }
+      if (create && (response.status === 401 || response.status === 503)) {
+        setStatus(el('div', { class: 'note' }, response.status === 401
+          ? 'That admin token was not accepted. Only existing reports can be viewed on the public demo.'
+          : 'Creating reports is switched off on this server (no admin token configured).'));
         return;
       }
       if (!response.ok) throw new Error(`the server answered ${response.status}`);
@@ -367,8 +388,10 @@
   $('number-form').addEventListener('submit', (e) => { e.preventDefault(); showReport(repoValue(), $('number').value.trim()); });
   $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadList, 300); });
   $('repo').addEventListener('change', loadList);
+  $('admin-token').addEventListener('input', rememberToken);
 
   (async function start() {
+    try { $('admin-token').value = sessionStorage.getItem('triage-admin-token') || ''; } catch { /* storage blocked */ }
     try { settings = await (await fetch('/settings')).json(); } catch { settings = null; }
     const params = new URLSearchParams(location.search);
     if (params.get('repo')) $('repo').value = params.get('repo');

@@ -8,6 +8,7 @@ Needs: the app running with the real LLM. docs/m4-scoring.md is only read, never
 """
 import hashlib
 import json
+import os
 import re
 import sys
 import urllib.request
@@ -27,7 +28,8 @@ for section in v2_doc.split("\n## ")[1:]:
 
 reports = []
 for n in numbers:
-    req = urllib.request.Request(f"{base}/reports/{repo}/{n}", method="POST")
+    req = urllib.request.Request(f"{base}/reports/{repo}/{n}", method="POST",
+                                 headers={"X-Admin-Token": os.environ.get("TRIAGE_ADMIN_TOKEN", "")})
     with urllib.request.urlopen(req, timeout=300) as resp:
         reports.append(json.load(resp))
     print(f"#{n}: {reports[-1]['costTokens']} tokens, prompts {reports[-1]['promptVersions']}", file=sys.stderr)

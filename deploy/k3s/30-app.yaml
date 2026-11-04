@@ -49,6 +49,8 @@ spec:
               valueFrom: { secretKeyRef: { name: triage-secrets, key: ANTHROPIC_API_KEY } }
             - name: GITHUB_APP_ID
               valueFrom: { secretKeyRef: { name: triage-secrets, key: GITHUB_APP_ID } }
+            - name: TRIAGE_ADMIN_TOKEN    # required header X-Admin-Token for every POST except the webhook
+              valueFrom: { secretKeyRef: { name: triage-secrets, key: TRIAGE_ADMIN_TOKEN } }
             - { name: GITHUB_APP_PRIVATE_KEY_PATH, value: "/etc/github-app/private-key.pem" }
             # The eval endpoints write result files; in the container they go to /tmp, not into a docs/ folder.
             - { name: TRIAGE_EVAL_RESULTS_FILE, value: "/tmp/m3-results.md" }
@@ -79,8 +81,10 @@ spec:
             secretName: github-app-key
             optional: true   # comment mode needs it; without it the app runs in shadow mode only
 ---
-# HTTP routing with k3s's built-in Traefik. GitHub sends webhooks to http(s)://<host>/webhooks/github.
-# HTTPS: see docs/m5-report.md (STOP B) for the options; replace the host with the VM's DNS name.
+# HTTP routing with k3s's built-in Traefik: only the paths the public needs. Admin paths (/backfill, /embeddings, /docs,
+# /eval) aren't routed at all; reach them with kubectl port-forward (docs/m5-report.md). A Kubernetes Ingress can't restrict
+# HTTP methods, so POST /reports/... is routed but refused by the app without the X-Admin-Token header (AdminTokenFilter).
+# HTTPS: see docs/m5-report.md (STOP B); replace the host with the VM's DNS name.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -91,10 +95,10 @@ spec:
     - host: triage.example.com
       http:
         paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: triage-app
-                port:
-                  number: 80
+          - { path: /webhooks/github, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
+          - { path: /, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
+          - { path: /index.html, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
+          - { path: /reports, pathType: Prefix, backend: { service: { name: triage-app, port: { number: 80 } } } }
+          - { path: /repos, pathType: Prefix, backend: { service: { name: triage-app, port: { number: 80 } } } }
+          - { path: /settings, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
+          - { path: /actuator/health, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
