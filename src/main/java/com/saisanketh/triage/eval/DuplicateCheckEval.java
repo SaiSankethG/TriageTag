@@ -142,7 +142,7 @@ public class DuplicateCheckEval {
                 Duration: %.1f s, %d LLM calls, %d tokens, %d without a valid answer (counted as "no").
 
                 Rule: comment only if the vector top-1 score is >= **%.3f** AND the LLM says the two issues are the same
-                root problem. External reporters only (what comment mode would see); candidate filter on.
+                root problem. External reporters only (what comment mode would see); the repo's candidate filter, if any.
 
                 | | Score only | Score + LLM "yes" |
                 |---|---|---|

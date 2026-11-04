@@ -49,9 +49,9 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 8. Do not upgrade Java/Spring Boot or add dependencies without asking sai.
 
 ## Current step (sai updates this line)
-Phase 0, M0-M3 done (4 Nov 2026; reports: docs/m1-report.md, m2-report.md, m3-report.md). STOP M3: sai reviews numbers.
-DB holds spring-petclinic (394), spring-boot (43,810; 1,036 with duplicate_of) and SaiSankethG/triage-sandbox (1);
-all petclinic + spring-boot issues embedded (all-MiniLM-L6-v2, pgvector HNSW). Schema: Flyway V1-V5.
-Replay on spring-boot (833 pairs): vector recall@3 46.2% vs keyword 26.5%; MRR 0.403 vs 0.244 (docs/m3-results.md).
-Live path: GitHub repo webhook -> smee -> POST /webhooks/github -> Kafka -> triage-worker -> DB + embedding.
-Next: M4 (LLM layer) after sai's review; prompt: docs/prompts/m3-m6-build.md. Outbox before deploying (M5 step 0).
+Phase 0, M0-M4 done (4 Nov 2026; reports: docs/m1-report.md ... m4-report.md). STOP A done: Claude Haiku 5.5 wired
+(langchain4j-anthropic; tests use FakeTriageLlm). Waiting for sai: score docs/m4-scoring.md, decide comment mode (docs/m4-report.md Q1).
+DB: spring-petclinic (394), spring-boot (43,810), triage-sandbox; all embedded; spring-boot docs v4.1.2 in doc_chunk (1,318). Flyway V1-V9.
+Replay (833 pairs): vector recall@3 46.2% vs keyword 26.5%. LLM check at 0.825: false alarms 10.1% -> 4.6%, 48/55 correct kept.
+Live path: webhook -> Kafka -> worker -> issue + embedding + triage_report (on opened). Demo page: http://localhost:8080/.
+Next: M5 (outbox first) after sai's review.

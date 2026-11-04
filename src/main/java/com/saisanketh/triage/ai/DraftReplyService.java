@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 public class DraftReplyService {
 
     static final String PROMPT_NAME = "draft-reply";
-    static final String PROMPT_VERSION = "v1";
+    static final String PROMPT_VERSION = "v2";   // v2: v1 drafts cited sources as "[5]" instead of their URLs
     static final int DOCS = 5;
     /** How much of each docs section goes into the prompt. */
     static final int SOURCE_CHARS = 1_200;

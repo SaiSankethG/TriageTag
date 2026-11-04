@@ -40,6 +40,13 @@ triage:
     # because maintainers sometimes name a clone as the original (M4 step 0, docs/learning-notes.md).
     exclude-labels: {}
   llm:
+    # fake | anthropic | auto (= anthropic if ANTHROPIC_API_KEY is set, else the fake). Tests force "fake".
+    provider: auto
+    anthropic:
+      api-key: ${ANTHROPIC_API_KEY:}   # from the environment only; never put a real key here
+      model: claude-haiku-5-5          # sai's choice at STOP A ($0.10 / $0.50 per million input / output tokens)
+      max-tokens: 1024
+      thinking: disabled               # short classification/draft tasks; thinking tokens would be billed
     # Cost guard: above this many tokens (input + output) per UTC day, LLM calls are refused and reports say so.
     daily-token-budget: 200000
   duplicates:

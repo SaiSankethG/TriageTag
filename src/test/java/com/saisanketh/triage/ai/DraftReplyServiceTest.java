@@ -52,7 +52,7 @@ class DraftReplyServiceTest {
         assertThat(reply.sources()).extracting(Source::url)
                 .containsExactly("https://docs.example/sql.html#embedded", "https://github.com/o/r/issues/7");
         assertThat(reply.unknownLinks()).isEmpty();
-        assertThat(reply.promptVersion()).isEqualTo("draft-reply-v1");
+        assertThat(reply.promptVersion()).isEqualTo("draft-reply-v2");
         assertThat(llm.prompts.get(0).variables().get("sources"))
                 .contains("[1] (docs) SQL Databases > Embedded Database Support (https://docs.example/sql.html#embedded)",
                         "Use DB_CLOSE_ON_EXIT=FALSE.", "[2] (issue) #7 H2 closed early (https://github.com/o/r/issues/7)")

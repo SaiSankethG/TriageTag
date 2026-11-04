@@ -72,6 +72,12 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-embeddings-all-minilm-l6-v2</artifactId>
         </dependency>
+        <!-- The LLM provider (M4, STOP A: sai chose Anthropic Claude Haiku 5.5). Only the provider module, version from
+             the BOM; wired by hand in LlmConfig, no Spring Boot starter. -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-anthropic</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

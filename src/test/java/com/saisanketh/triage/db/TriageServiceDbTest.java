@@ -83,7 +83,7 @@ class TriageServiceDbTest extends PostgresTest {
         assertThat(report.draftReply().status()).isEqualTo(DraftReply.Status.OK);
         assertThat(report.draftReply().text()).contains("https://docs.example/sql#ds");
         assertThat(report.llmModel()).isEqualTo("fake");
-        assertThat(report.promptVersions()).isEqualTo("duplicate-check-v1,missing-details-v1,draft-reply-v1");
+        assertThat(report.promptVersions()).isEqualTo("duplicate-check-v1,missing-details-v1,draft-reply-v2");
         assertThat(report.costTokens()).isPositive();
 
         TriageReportDto dto = reports.find("Octo-Org/Hello", 3).orElseThrow();

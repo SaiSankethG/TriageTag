@@ -1898,3 +1898,46 @@ off), but it stops everything at once, at the end. A daily budget in the app fai
    a cost brake; an exact meter would need reserving tokens up front.
 3. **What does a maintainer see when the budget is hit?** The report still has duplicates, labels and the fixed hint; the LLM
    parts say "skipped: daily token budget reached", and so does the note at the top.
+
+## M4 STOP A: the real model (Claude Haiku 5.5) and what it measured (4 Nov 2026)
+
+Files: `pom.xml` (`langchain4j-anthropic`), `ai/LangChain4jTriageLlm.java`, `ai/LlmConfig.java` (provider choice),
+`application.yml` (`triage.llm.*`), `src/test/resources/application.properties` (tests force the fake),
+`prompts/draft-reply-v2.txt`, `scripts/run-with-llm.sh`, `scripts/m4-scoring.py`; docs `m4-results.md`,
+`m4-duplicate-check.md`, `m4-scoring.md`, `m4-report.md`; test `LangChain4jTriageLlmTest` (3).
+
+### What it does
+- `LlmConfig` picks the LLM: `triage.llm.provider` = `fake`, `anthropic` (refuses to start without the key) or `auto` (real if
+  `ANTHROPIC_API_KEY` is set). The real one is LangChain4j's `AnthropicChatModel` (model `claude-haiku-5-5`, thinking off,
+  1,024 max output tokens, 60 s timeout, 2 retries) behind our `LangChain4jTriageLlm` adapter, inside the token-budget guard.
+- `LangChain4jTriageLlm` sends the prompt as one user message and returns the text with the **provider-reported** input and
+  output tokens; any provider error becomes our `LlmException`, so every part degrades to UNKNOWN the same way.
+- **Prompt v2 for drafts**: the first real draft cited sources as "[5]". v2 says to write the URL, never the number. v1
+  stays in the repo, so old reports remain explainable.
+
+### What it measured
+- LLM check at 0.825: false alarms **10.1% → 4.6%**, correct flags kept **48 of 55**. But duplicates are only ~4% of external
+  issues, so public comments would still mostly be wrong (estimated ~6% correct). Shadow mode stays the default.
+- 30 recent issues: 22 drafts, 8 "nothing relevant", ~340k tokens for the whole day (≈ $0.05).
+
+### Basics used here
+- **Adapter**: a class that makes a library's interface (LangChain4j `ChatModel`) look like ours (`TriageLlm`). Before: services
+  import `AnthropicChatModel`. After: only `LlmConfig` knows the provider; switching is one `@Bean` method.
+- **Fail fast on config, degrade on calls**: a wrong provider setting stops startup (an obvious mistake); a failed call at
+  runtime only turns one part of one report into UNKNOWN.
+- **Base rates**: a 4.6% false-alarm rate sounds good, but if only 4% of issues are duplicates, false alarms still
+  outnumber correct flags ~16 to 1. Always turn rates into counts per 1,000 real cases.
+
+### One alternative I rejected
+**The official Anthropic Java SDK** instead of `langchain4j-anthropic`. It's the most direct client, but the project had
+already chosen LangChain4j (embeddings, BOM) and sai approved only the LangChain4j provider module. Our `TriageLlm` adapter
+keeps that choice cheap to change.
+
+### Likely interview questions
+1. **Did the LLM check help?** It halved false alarms (10.1% → 4.6%) and kept 87% of correct flags, measured on 720 real
+   duplicates and 1,000 non-duplicates. But at a 4% duplicate base rate that's still not precise enough to post publicly.
+   So I kept shadow mode and wrote down what to try next.
+2. **How do you keep tests from calling the paid API?** Tests force `provider=fake` in test properties, the adapter is
+   unit-tested with a stubbed `ChatModel`, and the real model is only used by an explicit script.
+3. **What did it cost?** About 340k tokens for the eval and 30 reports, roughly 5 US cents on Haiku 5.5. Every call is
+   counted per day in `llm_usage`, under a budget.
