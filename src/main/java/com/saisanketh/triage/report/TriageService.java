@@ -62,7 +62,7 @@ public class TriageService {
                          MissingDetailsChecker missingDetailsChecker, FixedHintService fixedHintService,
                          DraftReplyService draftReplyService, TriageReportRepository reports, TriageLlm llm,
                          TokenBudget budget, Clock clock,
-                         @Value("${triage.duplicates.comment-threshold:0.825}") double commentThreshold,
+                         @Value("${triage.duplicates.comment-threshold:0.90}") double commentThreshold,
                          @Value("${triage.fixed-hint.min-score:0.75}") double fixedHintMinScore) {
         this.jdbc = jdbc;
         this.issueTexts = issueTexts;

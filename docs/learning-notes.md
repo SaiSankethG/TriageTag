@@ -1986,3 +1986,43 @@ one table. The polling relay is ~60 lines and easy to explain.
    so the consumer must be idempotent: ours upserts by GitHub id, ignores older updates, and creates a report only once.
 3. **How do you keep per-issue order?** The relay sends in id order and stops at the first failure, and the Kafka key is the
    issue, so one issue's events go to one partition in order.
+
+## M5 step 1: checking stricter comment thresholds before building comment mode (4 Nov 2026)
+
+Files: `eval/DuplicateCheckEval.java` and `eval/DuplicateCheckReport.java` (several thresholds from one run, per-issue lists),
+`application.yml` (`comment-threshold: 0.90`), `docs/m5-threshold-check.md` (generated), `docs/m4-results.md` section 4;
+tests `DuplicateCheckEvalTest` (1, the threshold maths), `DuplicateCheckEvalDbTest` (updated).
+
+### What it does
+The eval now asks the LLM once per issue above the **lowest** threshold (0.825) and computes the stricter thresholds (0.85,
+0.90) from the same answers. An issue that scores ≥ 0.90 also scores ≥ 0.825, so no extra calls are needed. It also lists every
+confirmed false alarm (issue, matched issue, titles, links, the LLM's reason) for reading by hand.
+
+### What it found
+- 0.825 → 0.90: correct flags 50 → 19, false alarms 48 → 25. The share of comments that would be right **doesn't improve**
+  (~6% → ~4%).
+- Why: 21 of the 48 false alarms are the team's **forward-port / back-port clones** (same title, next number). The LLM is right
+  that they're the same problem; they just aren't marked as duplicates. Not commenting on clone issues brings false alarms
+  at 0.90 down to 10 of 1,000 and the right-comment share up to ~10%.
+- So the default comment threshold is now **0.90** (the plan said: the strictest tested value), comment mode stays off by
+  default, and step 4 will skip issues with bookkeeping labels.
+
+### Basics used here
+- **Reuse one expensive measurement for several settings**: thresholds are nested (≥ 0.90 implies ≥ 0.825), so one LLM pass at the
+  lowest threshold answers all of them. Before: 3 runs ≈ 3× the cost. After: 1 run.
+- **Look at the errors, not just the rate**: the rate said "stricter is worse"; reading the list showed *why* (clones), and that
+  points to a different fix (skip clones) than turning the threshold knob.
+- **LLM answers vary between runs** (48 vs 46 confirmed false alarms at 0.825 on two runs): report the run you used, and don't
+  over-read differences of one or two.
+
+### One alternative I rejected
+**Picking the threshold that maximises some F-score automatically.** With a 4% base rate, every threshold here gives mostly-wrong
+public comments; an "optimal" number would hide that. A table plus the error list lets sai decide with the real picture.
+
+### Likely interview questions
+1. **How did you choose the comment threshold?** Measured 0.825 / 0.85 / 0.90 on 720 real duplicates and 1,000 non-duplicates with
+   the LLM check, read the false alarms, found most were bookkeeping clones, and chose 0.90 + LLM "yes" + skip clones, with comment
+   mode off by default.
+2. **Why doesn't a higher threshold fix false alarms?** The remaining false alarms are near-identical texts (clones), which score
+   highest of all; you need a different signal (labels/authorship) to remove them.
+3. **How much did this cost?** About 248k tokens, ~3 US cents on Haiku 5.5, because one pass serves all thresholds.

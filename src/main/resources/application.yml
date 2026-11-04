@@ -52,9 +52,12 @@ triage:
     # Cost guard: above this many tokens (input + output) per UTC day, LLM calls are refused and reports say so.
     daily-token-budget: 200000
   duplicates:
-    # Comment mode (M5) posts only if the top match scores >= this AND the LLM confirms "same root problem"
-    # (sai, 4 Nov 2026: the M3 threshold for <= 10% false alarms on external reporters).
-    comment-threshold: 0.825
+    # Comment mode (M5) posts only if the top match scores >= this AND the LLM confirms "same root problem".
+    # 0.90 = the strictest value tested in M5 step 1 (docs/m4-results.md section 4); was 0.825 (M3's 10% false alarms).
+    # The LLM check in reports also runs only above it.
+    comment-threshold: 0.90
+    # Below this the demo page calls a match "low" similarity (between the two: "medium", above comment-threshold: "high").
+    possible-threshold: 0.75
   docs:
     sources:
       # Reference docs for draft replies (M4 step 4): Antora pages at a fixed release tag.

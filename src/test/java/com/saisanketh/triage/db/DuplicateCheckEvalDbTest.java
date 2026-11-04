@@ -54,14 +54,21 @@ class DuplicateCheckEvalDbTest extends PostgresTest {
         DuplicateCheckReport r = eval.evaluate("octo-org/hello");
 
         assertThat(r.duplicates()).isEqualTo(1);
-        assertThat(r.duplicatesFlagged()).isEqualTo(1);
-        assertThat(r.duplicatesFlaggedCorrect()).isEqualTo(1);
-        assertThat(r.duplicatesConfirmedCorrect()).isEqualTo(1);
         assertThat(r.nonDuplicates()).isEqualTo(3);           // #1, #3, #4 (#1 has nothing earlier: not flagged)
-        assertThat(r.nonDuplicatesFlagged()).isEqualTo(1);
-        assertThat(r.nonDuplicatesConfirmed()).isZero();
-        assertThat(r.llmCalls()).isEqualTo(2);
+        assertThat(r.externalIssues()).isEqualTo(4);
+        assertThat(r.rows()).extracting(DuplicateCheckReport.Row::threshold).containsExactly(0.825, 0.85, 0.90);
+        DuplicateCheckReport.Row lowest = r.rows().get(0);
+        assertThat(lowest.duplicatesFlagged()).isEqualTo(1);
+        assertThat(lowest.duplicatesFlaggedCorrect()).isEqualTo(1);
+        assertThat(lowest.duplicatesConfirmedCorrect()).isEqualTo(1);
+        assertThat(lowest.nonDuplicatesFlagged()).isEqualTo(1);
+        assertThat(lowest.nonDuplicatesConfirmed()).isZero();
+        // Scores are ~0.999, so 0.90 counts the same issues as 0.825.
+        assertThat(r.rows().get(2)).usingRecursiveComparison().ignoringFields("threshold").isEqualTo(lowest);
+        assertThat(r.llmCalls()).isEqualTo(2);                // one call per flagged issue, reused for stricter thresholds
+        assertThat(r.confirmedFalseAlarms()).isEmpty();
         assertThat(r.llmModel()).isEqualTo("fake");
-        assertThat(Files.readString(Path.of("target/test-m4-duplicate-check.md"))).contains("FAKE LLM", "Score + LLM");
+        assertThat(Files.readString(Path.of("target/test-m4-duplicate-check.md")))
+                .contains("FAKE LLM", "| 0.900 |", "Per 1,000 new external issues");
     }
 }
