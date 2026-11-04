@@ -1092,3 +1092,47 @@ work. Blocking retries of a few seconds keep events in order and are simpler; a 
 3. **Events for an issue arrive out of order. How do you avoid old data overwriting new?**
    Same key -> same partition keeps them ordered in normal operation. For the rest (redeliveries, backfill racing a
    webhook), the upsert compares `updated_at` and ignores anything older than what's stored.
+
+## M2 step 5: end-to-end test without GitHub (4 Nov 2026)
+
+Files: `e2e/WebhookEndToEndTest.java` (3 tests), `e2e/FullStackTest.java` (shared base), fixture
+`src/test/resources/github/webhook-issues-opened.json` (GitHub's documented Codertocat/Hello-World example, public).
+
+### What it does
+With real Postgres and Kafka containers and the whole app running on a random port:
+1. **Signed `issues/opened`** -> `POST /webhooks/github` answers **200 in 76 ms** -> the triage-worker consumes it ->
+   within the 10 s poll the `issue` row exists (title and the `bug` label right) and there is 1 `webhook_delivery` row.
+2. **The same delivery id again** (like pressing "Redeliver") -> 200 "duplicate delivery"; still **1 issue row, 1
+   delivery row, and exactly 1 message** for that delivery on Kafka.
+3. **Bad signature** -> **401**; no message on Kafka for that delivery, no delivery row, no issue row.
+
+### Basics used here
+- **End-to-end (E2E) test:** tests the whole path the way a real user (here GitHub) uses it: HTTP in, database out.
+  It catches wiring mistakes unit tests can't (wrong topic name, a bean that isn't picked up, JSON shape mismatches).
+  *Before:* each part tested alone (signature, publisher, consumer). *After:* one test proves they work together.
+- **`@SpringBootTest(webEnvironment = RANDOM_PORT)` + `@LocalServerPort`:** starts the real web server on a free port
+  and tells the test which one, so tests never clash with an app already running on 8080.
+- **`java.net.http.HttpClient`** (JDK): sends real HTTP requests. Unlike Spring's `RestClient`, it doesn't throw on 401,
+  so the test can simply check `statusCode()`.
+- **Polling instead of sleeping:** the consumer is asynchronous, so the test checks the DB every 100 ms up to 10 s
+  (`waitUntil`). A fixed `Thread.sleep(5000)` would be both slower and flaky.
+- **Proving "nothing happened":** you can't wait for an absence, so the test reads the topic for a fixed 3 s and
+  checks no message carries that delivery id.
+
+### One alternative I rejected
+**Spring Kafka's embedded broker (`@EmbeddedKafka`)**. It's lighter, but it needs `spring-kafka-test` (not on the
+approved list) and runs a Kafka inside the JVM that isn't the image we run in docker-compose. Testcontainers runs the
+same `apache/kafka:4.1.0` image, and Postgres 16, as development does. Also rejected: Awaitility for the polling
+(a new dependency for a 10-line loop).
+
+### Likely interview questions
+1. **How do you test an asynchronous flow (HTTP -> Kafka -> consumer -> DB) reliably?**
+   Real containers for Kafka and Postgres, post a real signed request, then poll the database with a timeout instead of
+   sleeping a fixed time. Absence ("nothing was published") is checked by reading the topic for a fixed short window.
+2. **What does your E2E test prove that unit tests don't?**
+   That the pieces are wired together: the right topic and key, the consumer group really receives the message, the JSON
+   the receiver writes is what the consumer reads, Flyway's schema matches the entities, and idempotency holds across HTTP,
+   the delivery table and Kafka.
+3. **How fast does the webhook receiver answer, and why does it matter?**
+   About 76 ms in the test (verify, insert delivery row, publish and wait for the Kafka ack). GitHub stops waiting after
+   10 s and marks the delivery as failed, so the slow work (mapping, DB upsert, later triage) happens in the consumer.

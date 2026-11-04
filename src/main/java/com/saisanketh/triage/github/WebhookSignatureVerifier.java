@@ -47,8 +47,8 @@ public class WebhookSignatureVerifier {
         return MessageDigest.isEqual(expected, actual);
     }
 
-    /** "sha256=" + lowercase hex of HMAC-SHA256(body, secret), the same format GitHub sends. */
-    static String sign(String secret, byte[] body) {
+    /** "sha256=" + lowercase hex of HMAC-SHA256(body, secret), the same format GitHub sends. Public for tests. */
+    public static String sign(String secret, byte[] body) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));

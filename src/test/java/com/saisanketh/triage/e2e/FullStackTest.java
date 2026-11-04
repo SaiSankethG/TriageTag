@@ -84,10 +84,15 @@ public abstract class FullStackTest {
 
     /** Reads every message on a topic (from the start) for up to 10 s, with a fresh consumer group. */
     protected List<ConsumerRecord<String, String>> readTopic(String topic, int expectedAtLeast) {
+        return readTopic(topic, expectedAtLeast, MAX_WAIT);
+    }
+
+    /** Same, but gives up after maxWait. Use expectedAtLeast = Integer.MAX_VALUE to read for exactly maxWait. */
+    protected List<ConsumerRecord<String, String>> readTopic(String topic, int expectedAtLeast, Duration maxWait) {
         List<ConsumerRecord<String, String>> records = new ArrayList<>();
         try (Consumer<String, String> consumer = consumerFactory.createConsumer("test-reader-" + UUID.randomUUID(), null)) {
             consumer.subscribe(List.of(topic));
-            long deadline = System.nanoTime() + MAX_WAIT.toNanos();
+            long deadline = System.nanoTime() + maxWait.toNanos();
             while (records.size() < expectedAtLeast && System.nanoTime() < deadline) {
                 consumer.poll(Duration.ofMillis(200)).forEach(records::add);
             }
