@@ -2466,3 +2466,42 @@ the fake is still refused when real usage is over the budget, so the budget beha
 2. **Why still refuse the fake when over budget?** So "budget reached" behaves the same with or without a key, and tests can check it.
 3. **How did you find it?** A local app without a key showed "AI checks paused" after a load of fake reports: reading the counter
    showed fake tokens in it.
+
+## M6 step 3: load test (4 Nov 2026)
+
+Files: `scripts/load-test.py` (standard library only), `KafkaErrorHandlingConfig` (now logs every dead letter), README "Load test";
+test: one more in `KafkaTopicsConfigTest` (the dead-letter log shows the real cause).
+
+### What it does
+Sends N signed `issues opened` webhooks (HMAC-SHA256, exactly like GitHub) for synthetic issues numbered 900000+ in spring-boot,
+with P parallel senders; records each HTTP response time; then reads `triage_report.created_at` per issue from Postgres to get
+the end-to-end time; prints p50/p95; and deletes everything it created (issues cascade to embeddings and reports; deliveries;
+outbox rows). The app runs with the fake LLM, so it costs nothing.
+
+**Result (500 webhooks, 10 senders):** receiver p50 7 ms / p95 13 ms; all 500 reports; end to end p50 23.1 s / p95 43.3 s, because
+500 arrived in 0.4 s and one worker thread makes ~10.4 reports/s (a single report alone: 0.23 s).
+
+### What the test found
+The first smoke run's synthetic issues lacked `repository_url`, so the mapper failed and all 5 went to the dead-letter topic,
+**with nothing in the log**. Only the new `triage_kafka_dead_letters_total` metric showed it. Now every dead letter writes an error
+line with the key, partition, offset and the real cause. The script also gives up after 60 s without progress instead of waiting 15
+minutes.
+
+### Basics used here
+- **Receiver latency vs end-to-end latency**: the receiver only writes two rows and answers (7 ms); the work happens later from
+  Kafka. With a burst, end-to-end time is mostly **queueing**: Little's law, wait ≈ backlog / throughput (500 / 10.4 ≈ 48 s for the
+  last one).
+- **Percentiles**: p50 = the typical case; p95 = the slowest 1 in 20. Averages hide the tail.
+- **Test data hygiene**: unique, recognisable ids (900000+, `loadtest-*` delivery ids) so cleanup can't touch real rows.
+
+### One alternative I rejected
+**A load-testing tool (k6, Gatling, JMeter).** Better for big tests, but a new tool to install; 70 lines of Python with threads
+send 1,200 webhooks/s here, which is plenty for one VM.
+
+### Likely interview questions
+1. **How fast is it?** The webhook receiver answers in 7 ms (p50), 13 ms (p95) under a burst of 500, well within GitHub's 10 s;
+   a single report takes ~0.2 s plus the LLM calls; a burst queues in Kafka and drains at ~10 reports/s per worker thread.
+2. **How would you scale it?** More listener threads (one per partition, 3 today), more partitions and app instances; the
+   database and the LLM (rate limits, cost) become the next limits.
+3. **What did the load test teach you?** That dead letters were silent: only the metric caught them. Now they're logged with the
+   cause, and the dashboard turns red at the first one.

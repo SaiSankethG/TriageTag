@@ -25,4 +25,13 @@ class KafkaTopicsConfigTest {
         assertThat(dlt.name()).isEqualTo("issue-events.DLT");
         assertThat(dlt.numPartitions()).isEqualTo(config.issueEventsTopic().numPartitions());
     }
+
+    @Test
+    void deadLetterLogLinesShowTheRealCause() {
+        RuntimeException wrapped = new RuntimeException("listener failed",
+                new IllegalStateException("could not map", new NullPointerException("repository_url is null")));
+
+        org.assertj.core.api.Assertions.assertThat(KafkaErrorHandlingConfig.rootMessage(wrapped))
+                .isEqualTo("NullPointerException: repository_url is null");
+    }
 }

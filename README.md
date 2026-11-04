@@ -72,6 +72,23 @@ why the default is **shadow mode**: a private top 3 for the maintainer.
 - **Hand-scoring:** 30 recent issues with full reports in [docs/m4-scoring.md](docs/m4-scoring.md) (and two draft versions
   side by side, blind, in [docs/m4-scoring-v3.md](docs/m4-scoring-v3.md)).
 
+### Load test (local, M6)
+500 signed `issues opened` webhooks sent by `scripts/load-test.py` (10 parallel senders) to the app on a MacBook (Apple Silicon),
+with Postgres and Kafka in Docker (Colima, 2 GB VM) and the **fake LLM** (so it measures the pipeline, not Claude's latency).
+Each test issue is searched against the real ~44k spring-boot issues; everything the test created is deleted afterwards.
+
+| | Result |
+|---|---|
+| Webhooks accepted | 500 of 500 |
+| **Receiver response time** p50 / p95 | **7 ms / 13 ms** (GitHub allows 10 s) |
+| Reports stored | 500 of 500, no dead letters |
+| End to end (webhook sent → report stored) p50 / p95 | 23.1 s / 43.3 s: all 500 arrived within 0.4 s, and one worker thread made ~10.4 reports/s, so this is mostly time in the queue |
+| One report with no queue in front of it | 0.23 s |
+
+Real traffic is far lower (spring-boot gets a few dozen issues a day), so a new issue's report is ready in well under a second plus the
+real LLM calls (~2-5 s on Haiku 5.5). For bursts, the topic has 3 partitions, so 3 listener threads (`concurrency: 3`) would
+roughly triple throughput.
+
 ## Run locally
 
 ```bash

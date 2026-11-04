@@ -2,6 +2,7 @@ package com.saisanketh.triage.kafka;
 
 import com.saisanketh.triage.kafka.IssueEventConsumer.BadIssueEventException;
 import com.saisanketh.triage.metrics.TriageMetrics;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -22,6 +23,7 @@ import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
  *       the partition behind it.</li>
  * </ul>
  */
+@Slf4j
 @Configuration
 public class KafkaErrorHandlingConfig {
 
@@ -38,11 +40,23 @@ public class KafkaErrorHandlingConfig {
 
         // Count every dead letter (metric triage.kafka.dead.letters), then send it.
         ConsumerRecordRecoverer countAndSend = (record, exception) -> {
+            // Without this line a dead letter is silent in the log: found by the M6 load test, where only the metric showed it.
+            log.error("Sending {} (partition {}, offset {}) to {}: {}", record.key(), record.partition(), record.offset(),
+                    KafkaTopicsConfig.ISSUE_EVENTS_DLT, rootMessage(exception));
             metrics.deadLetter(exception);
             sendToDeadLetterTopic.accept(record, exception);
         };
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(countAndSend, backOff);
         errorHandler.addNotRetryableExceptions(BadIssueEventException.class);
         return errorHandler;
+    }
+
+    /** The innermost cause's type and message (the listener wraps the real exception). */
+    static String rootMessage(Throwable exception) {
+        Throwable cause = exception;
+        while (cause.getCause() != null && cause.getCause() != cause) {
+            cause = cause.getCause();
+        }
+        return cause.getClass().getSimpleName() + ": " + cause.getMessage();
     }
 }
