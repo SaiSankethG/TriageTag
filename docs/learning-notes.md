@@ -499,3 +499,60 @@ page 400 would roll back all 400 pages. One transaction per issue is slower, but
    Hibernate keeps a snapshot of every entity it loaded in the current transaction. At commit it compares
    each entity with its snapshot and writes an `UPDATE` for whatever changed. So changing a field on a
    managed entity is enough to save it.
+
+## M1 finish, step E: `POST /backfill/{owner}/{repo}` (piece 6) (4 Nov 2026)
+
+Files: `web/BackfillController.java`, test `web/BackfillControllerTest.java` (3 tests).
+
+### What it does
+`curl -X POST localhost:8080/backfill/spring-projects/spring-petclinic` runs the backfill and, when it's
+done, answers with the summary as JSON:
+`{"repo":"spring-projects/spring-petclinic","pages":12,"inserted":...,"updated":0,"skipped":...,"durationMs":...}`.
+Errors come back as standard "problem details" JSON: unknown repo -> 404, bad repo name -> 400.
+
+### Synchronous vs background: the trade-off
+*Synchronous* (what we do): the HTTP request stays open until the backfill finishes.
+- Good: dead simple; the caller gets the real result or the real error; easy to test; nothing to poll.
+- Bad: spring-boot takes minutes, so the request is long. If the client (curl, a proxy, a load balancer)
+  gives up, the caller loses the summary (the backfill itself keeps running on the server). It also ties
+  up one web thread for the whole time, and nothing stops two people starting the same backfill at once.
+*Background* (later): `POST` answers `202 Accepted` with a job id at once; the work runs on another
+thread (`@Async`, or better a Kafka message, which this project already plans to use); `GET /jobs/{id}`
+shows progress. More robust, but needs job state, a status endpoint and more tests. Fine to wait until
+the backfill is triggered by something other than a developer with curl.
+
+### Basics used here
+- **`@RestController`** (Spring MVC): marks a class whose methods answer HTTP requests, and whose return
+  values are written as JSON (it's `@Controller` + `@ResponseBody`).
+  *Before (plain servlet):* read the URL, parse it, call the service, turn the result into JSON, write it to the response.
+  *After:* `@PostMapping("/backfill/{owner}/{repo}") public BackfillSummary backfill(...)`; Spring does the rest.
+- **`@PostMapping("/backfill/{owner}/{repo}")`**: this method handles `POST` to that path; `{owner}` and
+  `{repo}` are placeholders. **`@PathVariable String owner`** puts the placeholder's value into the parameter.
+  POST (not GET) because it *changes* data; a browser or crawler following a GET link must never start a
+  backfill. A test checks that GET gives 405 Method Not Allowed.
+- **Records as JSON:** Jackson writes a record's components as fields: `BackfillSummary(repo, pages, ...)`
+  -> `{"repo": ..., "pages": ...}`. No annotations needed.
+- **`@ExceptionHandler`**: "if this controller throws X, answer like this instead of a 500".
+  **`ProblemDetail`** is Spring's built-in RFC 9457 error body: `{"status":404,"title":"Not Found","detail":"..."}`.
+- **`MockMvc` standalone setup** (spring-test): sends fake HTTP requests to the controller in memory, through
+  real Spring MVC (URL matching, JSON, exception handlers), without starting a server, the app or a DB.
+  We use this instead of `@WebMvcTest` because in Spring Boot 4 that lives in an extra module
+  (`spring-boot-webmvc-test`) we would have to add.
+- **`jsonPath("$.inserted")`**: picks a value out of the JSON response; `$` is the root object.
+
+### One alternative I rejected
+**`@Async` with a fire-and-forget `202 Accepted`.** It looks like a one-line improvement, but then the caller
+can't see the result or errors, there's no progress or job id, and failures only show up in the logs.
+Doing background work properly needs job tracking, which is a bigger piece than this step.
+
+### Likely interview questions
+1. **Why is the backfill a POST and not a GET?**
+   GET must be safe (no side effects): browsers prefetch links, crawlers follow them, proxies may repeat
+   them. A backfill writes thousands of rows and uses rate limit, so it's a POST.
+2. **What are the downsides of running the backfill inside the HTTP request?**
+   Long request (clients/proxies may time out and lose the summary), a web thread is busy for minutes, no
+   progress, and no protection against two runs at once. The fix is a background job (Kafka or `@Async`)
+   that returns a job id immediately, plus a status endpoint.
+3. **How do you test a controller without starting the whole app?**
+   `MockMvcBuilders.standaloneSetup(new BackfillController(mockService))`: real MVC routing, JSON and
+   exception handling, a Mockito mock for the service, no server and no database.
