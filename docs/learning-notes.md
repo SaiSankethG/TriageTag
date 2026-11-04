@@ -1546,3 +1546,62 @@ picture and the exclusions it would mislead a maintainer deciding whether to tru
 3. **How would you improve recall?**
    Merge forward-port clones in the candidate pool, use a stronger embedding model (the `EmbeddingService` interface makes
    that a one-class change), add the issue's comments to the text, or re-rank the top 10 with an LLM (M4).
+
+## M4 step 0: per-repo candidate filter (4 Nov 2026)
+
+Files: `triage/CandidateFilter.java`, `triage/CandidateFilterProperties.java`, both searches (`KeywordDuplicateSearch`,
+`VectorDuplicateSearch`), `DuplicateSearch` (new 3-argument `findSimilar`), `EvalService`/`EvalReport`/`MarkdownReport`
+(recall with and without the filter), `application.yml` (`triage.candidates.exclude-labels`); tests `CandidateFilterTest` (3),
+`VectorDuplicateSearchTest` (1), one new case each in `KeywordDuplicateSearchDbTest` and `VectorDuplicateSearchDbTest`.
+
+### What it does
+sai's M3 decision 2: a per-repo list of labels whose issues are never returned as duplicate candidates, in config, with
+nothing spring-boot-specific in the code. For spring-boot it lists `status: forward-port` (the team's per-branch clone of an
+issue). Both searches add `AND NOT EXISTS (... label_name = ANY (?))`; the eval runs every search with and without it.
+
+### The result (honest: the idea didn't work)
+| | recall@1 | recall@3 | recall@10 | MRR |
+|---|---|---|---|---|
+| vector, no filter (M3) | 31.0% | **46.2%** | 60.9% | 0.403 |
+| vector, with filter | 30.1% | 45.6% | 59.9% | 0.396 |
+
+Why: in 13 scored pairs the maintainer's "original" **is** a forward-port clone, and 8 of them were in the top 3 without the
+filter (rank 1 for 7). The filter makes those impossible to find. The gain it was meant to bring (a clone pushing the real
+original down) happened only 0/3/1 times at top 1/3/10. So the clones weren't the problem. Recommendation: keep the
+mechanism, remove the spring-boot entry from config. Labels don't use the filter: a clone has the same labels as its
+original, so it is fair evidence.
+
+### A bug the re-run found: @Transactional and self-invocation
+The first re-run gave 35 of 1,000 false-alarm samples **no result at all**. Cause: `DuplicateSearch.findSimilar(id, limit)`
+became an interface default method without `@Transactional`. Spring adds transactions with a **proxy**: a wrapper object
+that starts a transaction and then calls the real object. A call from *inside* the real object (`this.findSimilar(...)`)
+never passes the proxy, so it gets no transaction of its own.
+- Before (broken): proxy.findSimilar(id, 3) → no annotation → no transaction → real.findSimilar(id, 3, true) (`this` call)
+  → `SET LOCAL hnsw.iterative_scan` outside a transaction does nothing → HNSW stops after ~40 candidates, the filters
+  remove them all → `[]`.
+- After: `VectorDuplicateSearch` overrides the 2-argument method just to put `@Transactional(readOnly = true)` on it. A unit
+  test asks Spring's `AnnotationTransactionAttributeSource` whether each public search method is transactional.
+Recall was never affected (the eval called the annotated 3-argument method); the false-alarm and threshold numbers were.
+
+### Basics used here
+- **`@ConfigurationProperties(prefix = "triage.candidates")`** on a record: Spring copies matching YAML keys into the record's
+  fields (`exclude-labels` → `excludeLabels`). Before: many `@Value("${...}")` strings; after: one typed object. It is
+  registered with `@EnableConfigurationProperties(CandidateFilterProperties.class)` on the bean that uses it.
+- **Map keys with "/"** in YAML need brackets: `"[spring-projects/spring-boot]"`, otherwise Spring drops the slash.
+- **`= ANY (?)`** with a Java `String[]` parameter: the Postgres driver sends it as `text[]`; an empty array matches nothing,
+  so "no labels configured" needs no special SQL.
+
+### One alternative I rejected
+**Merging clones into their original** (one group per problem, any member counts as a hit). It would fix both directions,
+but needs a reliable clone→original link (the clone's body links it only by text); too much for a filter that turned out to
+matter in under 1% of pairs.
+
+### Likely interview questions
+1. **You added a filter and recall went down. Why keep it?** The mechanism is generic and cheap (a config list); the data
+   showed this particular label is the wrong one to exclude for spring-boot, so I recommended removing that entry. Measuring
+   before trusting an idea is the point.
+2. **Why did your vector search return nothing for some issues?** `@Transactional` works through a proxy; a self-call skipped
+   it, so `SET LOCAL` (pgvector's iterative scan) had no effect and HNSW's ~40 candidates were all filtered out. Fixed by
+   annotating the entry method and testing that every public search method is transactional.
+3. **How do you configure per-tenant behaviour in Spring Boot?** A `@ConfigurationProperties` record with a map keyed by
+   tenant (repo), normalised to lower case, with an empty default so unknown tenants get the normal behaviour.

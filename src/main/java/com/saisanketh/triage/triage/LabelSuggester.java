@@ -45,7 +45,9 @@ public class LabelSuggester {
     /** Labels whose share is at least the threshold, highest share first. */
     @Transactional(readOnly = true)
     public List<LabelSuggestion> suggest(long issueId) {
-        List<Neighbour> neighbours = vectorSearch.findNeighbours(issueId, NEIGHBOURS);
+        // No candidate filter here: a forward-port clone carries the same labels as its original, so it is fair
+        // evidence for "what is this issue about" (with the filter, external-issue coverage fell from 31% to 20%).
+        List<Neighbour> neighbours = vectorSearch.findNeighbours(issueId, NEIGHBOURS, false);
         double totalWeight = neighbours.stream().mapToDouble(n -> Math.max(n.score(), 0)).sum();
         if (totalWeight == 0) {
             return List.of();

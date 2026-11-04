@@ -4,6 +4,7 @@ import com.saisanketh.triage.eval.EvalReport.AnswerKey;
 import com.saisanketh.triage.eval.EvalReport.FalseAlarms;
 import com.saisanketh.triage.eval.EvalReport.LabelScore;
 import com.saisanketh.triage.eval.EvalReport.SearchScore;
+import com.saisanketh.triage.triage.CandidateFilter;
 import com.saisanketh.triage.triage.DuplicateSearch;
 import com.saisanketh.triage.triage.KeywordDuplicateSearch;
 import com.saisanketh.triage.triage.LabelSuggester;
@@ -51,15 +52,17 @@ public class EvalService {
     private final KeywordDuplicateSearch keywordSearch;
     private final VectorDuplicateSearch vectorSearch;
     private final LabelSuggester labelSuggester;
+    private final CandidateFilter candidateFilter;
     private final Path resultsFile;
 
     public EvalService(JdbcTemplate jdbc, KeywordDuplicateSearch keywordSearch, VectorDuplicateSearch vectorSearch,
-                       LabelSuggester labelSuggester,
+                       LabelSuggester labelSuggester, CandidateFilter candidateFilter,
                        @Value("${triage.eval.results-file:docs/m3-results.md}") String resultsFile) {
         this.jdbc = jdbc;
         this.keywordSearch = keywordSearch;
         this.vectorSearch = vectorSearch;
         this.labelSuggester = labelSuggester;
+        this.candidateFilter = candidateFilter;
         this.resultsFile = Path.of(resultsFile);
     }
 
@@ -74,22 +77,29 @@ public class EvalService {
         List<Pair> pairs = scoredPairs(repo);
         log.info("Eval {}: {} scored pairs", repo, pairs.size());
 
-        // Run both searches once per duplicate; keep the vector results for the threshold step.
+        // Run both searches, with and without the candidate filter, once per duplicate; keep the (filtered) vector
+        // results for the threshold step.
         List<Integer> keywordRanks = new ArrayList<>();
         List<Integer> vectorRanks = new ArrayList<>();
+        List<Integer> keywordRanksUnfiltered = new ArrayList<>();
+        List<Integer> vectorRanksUnfiltered = new ArrayList<>();
         List<Double> vectorTopScores = new ArrayList<>();
         for (int i = 0; i < pairs.size(); i++) {
             Pair pair = pairs.get(i);
-            keywordRanks.add(Metrics.rankOf(keywordSearch.findSimilar(pair.duplicateId(), TOP_K), pair.originalNumber()));
-            List<SimilarIssue> vectorResults = vectorSearch.findSimilar(pair.duplicateId(), TOP_K);
+            keywordRanks.add(rank(keywordSearch, pair, true));
+            keywordRanksUnfiltered.add(rank(keywordSearch, pair, false));
+            List<SimilarIssue> vectorResults = vectorSearch.findSimilar(pair.duplicateId(), TOP_K, true);
             vectorRanks.add(Metrics.rankOf(vectorResults, pair.originalNumber()));
             vectorTopScores.add(vectorResults.isEmpty() ? Double.NEGATIVE_INFINITY : vectorResults.get(0).score());
+            vectorRanksUnfiltered.add(rank(vectorSearch, pair, false));
             if ((i + 1) % 100 == 0) {
                 log.info("Eval {}: {}/{} duplicates searched", repo, i + 1, pairs.size());
             }
         }
         SearchScore keyword = score(keywordSearch, keywordRanks);
         SearchScore vector = score(vectorSearch, vectorRanks);
+        SearchScore keywordUnfiltered = score(keywordSearch, keywordRanksUnfiltered);
+        SearchScore vectorUnfiltered = score(vectorSearch, vectorRanksUnfiltered);
 
         FalseAlarms falseAlarms = falseAlarms(repo, vectorRanks, vectorTopScores, true);
         FalseAlarms falseAlarmsAll = falseAlarms(repo, vectorRanks, vectorTopScores, false);
@@ -97,7 +107,8 @@ public class EvalService {
         LabelScore labelsAll = labelScore(repo, false);
 
         long durationMs = (System.nanoTime() - start) / 1_000_000;
-        EvalReport report = new EvalReport(repo, answerKey, keyword, vector, falseAlarms, falseAlarmsAll,
+        EvalReport report = new EvalReport(repo, answerKey, candidateFilter.excludedLabels(repo),
+                keyword, vector, keywordUnfiltered, vectorUnfiltered, falseAlarms, falseAlarmsAll,
                 labels, labelsAll, durationMs);
         writeMarkdown(report);
         log.info("Eval finished: {}", report);
@@ -126,6 +137,10 @@ public class EvalService {
                 WHERE lower(d.repo) = lower(?) AND o.created_at < d.created_at
                 ORDER BY d.number
                 """, (rs, row) -> new Pair(rs.getLong("id"), rs.getInt("number"), rs.getInt("original")), repo);
+    }
+
+    private static int rank(DuplicateSearch search, Pair pair, boolean applyCandidateFilter) {
+        return Metrics.rankOf(search.findSimilar(pair.duplicateId(), TOP_K, applyCandidateFilter), pair.originalNumber());
     }
 
     private static SearchScore score(DuplicateSearch search, List<Integer> ranks) {

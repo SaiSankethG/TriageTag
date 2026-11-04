@@ -1,22 +1,30 @@
 package com.saisanketh.triage.eval;
 
+import java.util.List;
+
 /**
  * Everything the replay evaluation measured for one repo.
  *
  * <p>False alarms and labels are measured on issues opened by people OUTSIDE the team (author_association not
  * OWNER/MEMBER/COLLABORATOR): those are what a triage assistant sees. Large repos also contain many team bookkeeping
  * issues (spring-boot: forward-port clones, "Upgrade to X" dependency issues) that have a near-identical earlier twin;
- * the "...AllIssues" numbers include them, for transparency.
+ * the "...AllIssues" numbers include them, for transparency. False alarms and labels use the candidate filter (what
+ * the app does); recall is reported with and without it.
  *
  * @param answerKey             how the scored set was built from the answer key
- * @param keyword               recall@k and MRR of the keyword baseline
- * @param vector                recall@k and MRR of the vector search
+ * @param excludedLabels        the repo's candidate filter (labels whose issues are never candidates); may be empty
+ * @param keyword               recall@k and MRR of the keyword baseline, candidate filter on
+ * @param vector                recall@k and MRR of the vector search, candidate filter on
+ * @param keywordUnfiltered     the keyword baseline with every earlier issue as a candidate
+ * @param vectorUnfiltered      the vector search with every earlier issue as a candidate
  * @param falseAlarms           external reporters: how often non-duplicates would be flagged; threshold for <= 10%
  * @param falseAlarmsAllIssues  the same on all issues, team bookkeeping included
  * @param labels                external reporters: precision of the top suggested label
  * @param labelsAllIssues       the same on all issues
  */
-public record EvalReport(String repo, AnswerKey answerKey, SearchScore keyword, SearchScore vector,
+public record EvalReport(String repo, AnswerKey answerKey, List<String> excludedLabels,
+                         SearchScore keyword, SearchScore vector,
+                         SearchScore keywordUnfiltered, SearchScore vectorUnfiltered,
                          FalseAlarms falseAlarms, FalseAlarms falseAlarmsAllIssues,
                          LabelScore labels, LabelScore labelsAllIssues, long durationMs) {
 

@@ -7,6 +7,7 @@ import com.saisanketh.triage.kafka.IssueEventPublisher;
 import com.saisanketh.triage.repository.WebhookDeliveryRepository;
 import com.saisanketh.triage.service.IssueService;
 import com.saisanketh.triage.service.WebhookIntakeService;
+import com.saisanketh.triage.triage.CandidateFilter;
 import com.saisanketh.triage.triage.KeywordDuplicateSearch;
 import com.saisanketh.triage.triage.LabelSuggester;
 import com.saisanketh.triage.triage.SimilarIssueService;
@@ -31,12 +32,13 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  */
 @DataJpaTest(properties = {
         "spring.jpa.properties.hibernate.generate_statistics=true",
-        "triage.eval.results-file=target/test-m3-results.md"})
+        "triage.eval.results-file=target/test-m3-results.md",
+        "triage.candidates.exclude-labels[octo-org/hello]=status: forward-port"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({PostgresContainerConfig.class, ClockConfig.class, IssueService.class,
         WebhookDeliveryRepository.class, WebhookIntakeService.class, KeywordDuplicateSearch.class,
         IssueEmbeddingRepository.class, VectorDuplicateSearch.class, SimilarIssueService.class,
-        LabelSuggester.class, EvalService.class})
+        LabelSuggester.class, EvalService.class, CandidateFilter.class})
 public abstract class PostgresTest {
 
     @MockitoBean

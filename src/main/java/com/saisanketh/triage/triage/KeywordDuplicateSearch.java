@@ -21,7 +21,8 @@ public class KeywordDuplicateSearch implements DuplicateSearch {
      * 1. q: the query issue (repo, creation time, its tsvector).
      * 2. terms: every lexeme of its tsvector, each quoted (backslashes and quotes escaped), joined with " | " (OR).
      *    Cast with ::tsquery (not to_tsquery) because the lexemes are already stemmed.
-     * 3. Earlier issues of the same repo that match any term, best ts_rank first.
+     * 3. Earlier issues of the same repo that match any term and have none of the excluded labels, best ts_rank first.
+     *    The excluded labels are a text[] parameter; an empty array excludes nothing.
      */
     static final String SQL = """
             WITH q AS (
@@ -35,11 +36,13 @@ public class KeywordDuplicateSearch implements DuplicateSearch {
             WHERE i.repo = q.repo
               AND i.created_at < q.created_at
               AND i.search_tsv @@ terms.query
+              AND NOT EXISTS (SELECT 1 FROM issue_label l WHERE l.issue_id = i.id AND l.label_name = ANY (?))
             ORDER BY score DESC, i.number DESC
             LIMIT ?
             """;
 
     private final JdbcTemplate jdbc;
+    private final CandidateFilter candidateFilter;
 
     @Override
     public String name() {
@@ -47,9 +50,14 @@ public class KeywordDuplicateSearch implements DuplicateSearch {
     }
 
     @Override
-    public List<SimilarIssue> findSimilar(long issueId, int limit) {
+    public List<SimilarIssue> findSimilar(long issueId, int limit, boolean applyCandidateFilter) {
+        List<String> repo = jdbc.queryForList("SELECT repo FROM issue WHERE id = ?", String.class, issueId);
+        if (repo.isEmpty()) {
+            return List.of();
+        }
+        List<String> excluded = applyCandidateFilter ? candidateFilter.excludedLabels(repo.get(0)) : List.of();
         return jdbc.query(SQL,
                 (rs, row) -> new SimilarIssue(rs.getInt("number"), rs.getString("title"), rs.getDouble("score")),
-                issueId, limit);
+                issueId, excluded.toArray(new String[0]), limit);
     }
 }

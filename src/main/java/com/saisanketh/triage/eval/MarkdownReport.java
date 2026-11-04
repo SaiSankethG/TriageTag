@@ -5,6 +5,7 @@ import com.saisanketh.triage.eval.EvalReport.LabelScore;
 import com.saisanketh.triage.eval.EvalReport.SearchScore;
 
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 /** Turns an EvalReport into the markdown of docs/m3-results.md. */
 final class MarkdownReport {
@@ -30,10 +31,18 @@ final class MarkdownReport {
                 Each duplicate is searched as if it had just been opened: only earlier issues of the same repo.
 
                 ## Duplicate search: keyword vs vector
+                Candidate filter: %s
+
                 | Method | recall@1 | recall@3 | recall@10 | MRR (top 10) |
                 |---|---|---|---|---|
                 %s
                 %s
+                %s
+                %s
+
+                "with filter" is what the app does: earlier issues with an excluded label (bookkeeping copies) are never
+                candidates. "no filter" searches every earlier issue (the M3 numbers). False alarms and labels below use
+                the filter.
 
                 ## False alarms (vector, top-1 score)
                 Random non-duplicate issues (no `duplicate_of`, not closed as duplicate, no duplicate label). The threshold is
@@ -58,15 +67,24 @@ final class MarkdownReport {
                 """.formatted(
                 r.repo(), r.repo(), r.durationMs() / 1000.0,
                 a.withDuplicateOf(), a.originalNotStored(), a.originalNewer(), a.scored(),
-                row(r.keyword()), row(r.vector()),
+                filterText(r),
+                row(r.keyword(), "with filter"), row(r.vector(), "with filter"),
+                row(r.keywordUnfiltered(), "no filter"), row(r.vectorUnfiltered(), "no filter"),
                 row("External reporters", r.falseAlarms(), a.scored()),
                 row("All issues", r.falseAlarmsAllIssues(), a.scored()),
                 row("External reporters", r.labels()),
                 row("All issues", r.labelsAllIssues()));
     }
 
-    private static String row(SearchScore s) {
-        return String.format(Locale.ROOT, "| %s | %s (%d) | %s (%d) | %s (%d) | %.3f |", s.method(),
+    private static String filterText(EvalReport r) {
+        return r.excludedLabels().isEmpty()
+                ? "none configured for this repo."
+                : "issues labelled " + r.excludedLabels().stream().map(l -> "`" + l + "`").collect(Collectors.joining(", "))
+                        + " are not candidates (`triage.candidates.exclude-labels`).";
+    }
+
+    private static String row(SearchScore s, String filter) {
+        return String.format(Locale.ROOT, "| %s, %s | %s (%d) | %s (%d) | %s (%d) | %.3f |", s.method(), filter,
                 pct(s.recallAt1()), s.hitsAt1(), pct(s.recallAt3()), s.hitsAt3(), pct(s.recallAt10()), s.hitsAt10(),
                 s.mrr());
     }

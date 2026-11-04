@@ -30,6 +30,12 @@ github:
   webhook-secret: ${GITHUB_WEBHOOK_SECRET:}   # shared secret for webhook signatures; empty = refuse all webhooks
 
 triage:
+  candidates:
+    # Per repo: issues with any of these labels are never returned as duplicate candidates (bookkeeping copies).
+    # The [brackets] keep the "/" in the map key.
+    exclude-labels:
+      "[spring-projects/spring-boot]":
+        - "status: forward-port"   # the team's per-branch clone of an issue: same text as the original
   labels:
     threshold: 0.5            # suggest a label if similar issues holding it have >= 50% of the similarity weight
     ignore-prefixes: "status:"  # workflow labels (status: waiting-for-triage, status: duplicate...) are never suggested

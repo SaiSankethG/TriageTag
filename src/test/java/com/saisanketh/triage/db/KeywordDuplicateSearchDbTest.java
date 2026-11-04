@@ -71,4 +71,23 @@ class KeywordDuplicateSearchDbTest extends PostgresTest {
 
         assertThat(search.findSimilar(query.getId(), 3)).extracting(SimilarIssue::number).containsExactly(30);
     }
+
+    @Test
+    void issuesWithAnExcludedLabelAreNotCandidatesUnlessTheFilterIsOff() {
+        // PostgresTest configures "status: forward-port" as excluded for octo-org/hello.
+        save(40, "Actuator health endpoint returns 404", "The /actuator/health endpoint is not found.", "2024-01-01T00:00:00Z");
+        Issue clone = issue(41, "Actuator health endpoint returns 404", "status: forward-port");
+        clone.setBody("The /actuator/health endpoint is not found.");
+        clone.setCreatedAt(Instant.parse("2024-01-02T00:00:00Z"));
+        issueRepository.saveAndFlush(clone);
+        Issue query = save(42, "Actuator health endpoint returns 404", "/actuator/health is not found.", "2024-02-01T00:00:00Z");
+
+        assertThat(search.findSimilar(query.getId(), 3)).extracting(SimilarIssue::number).containsExactly(40);
+        assertThat(search.findSimilar(query.getId(), 3, false)).extracting(SimilarIssue::number).contains(40, 41);
+    }
+
+    @Test
+    void anUnknownIssueIdHasNoResults() {
+        assertThat(search.findSimilar(-1, 3)).isEmpty();
+    }
 }

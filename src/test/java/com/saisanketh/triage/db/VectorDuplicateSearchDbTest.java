@@ -99,4 +99,16 @@ class VectorDuplicateSearchDbTest extends PostgresTest {
                 .hasValueSatisfying(r -> assertThat(r).extracting(SimilarIssue::number).containsExactly(1));
         assertThat(similarIssueService.findSimilar("octo-org/hello", 999, "vector", 3)).isEmpty();
     }
+
+    @Test
+    void issuesWithAnExcludedLabelAreNotCandidatesUnlessTheFilterIsOff() {
+        // PostgresTest configures "status: forward-port" as excluded for octo-org/hello.
+        save("octo-org/hello", 1, "2024-01-01T00:00:00Z", 20);
+        long clone = save("octo-org/hello", 2, "2024-01-02T00:00:00Z", 1);    // nearest, but a forward-port clone
+        jdbc.update("INSERT INTO issue_label (issue_id, label_name) VALUES (?, 'status: forward-port')", clone);
+        long query = save("octo-org/hello", 3, "2024-06-01T00:00:00Z", 0);
+
+        assertThat(search.findSimilar(query, 3)).extracting(SimilarIssue::number).containsExactly(1);
+        assertThat(search.findSimilar(query, 3, false)).extracting(SimilarIssue::number).containsExactly(2, 1);
+    }
 }
