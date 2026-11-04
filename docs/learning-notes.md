@@ -702,3 +702,54 @@ the in-memory paging trap above.)
 3. **Why return DTOs instead of entities?**
    Lazy collections break (or cause hidden queries) during JSON writing, entities carry fields the API shouldn't
    expose (`raw`, `body`), and the API contract shouldn't change every time the table does.
+
+## M1 finish, step H: running it for real (piece 8) (4 Nov 2026)
+
+No new code; this step runs everything against real GitHub data and checks the numbers. Full numbers: `docs/m1-report.md`.
+
+### What happened
+| Run | Pages | Inserted | Updated | Skipped (PRs) | Time | GitHub says |
+|---|---|---|---|---|---|---|
+| spring-petclinic | 27 | 394 | 0 | 2,284 | 30 s | 394 issues, 2,284 PRs |
+| spring-petclinic, 2nd run | 27 | 0 | 394 | 2,284 | 32 s | (label rows: 74 before and after) |
+| spring-boot | 519 | 43,810 | 0 | 8,035 | 11.9 min | 43,810 issues, 8,034 PRs |
+| spring-boot duplicates | - | 1,036 found of 2,041 | - | - | 18.7 min | 178 have state_reason=duplicate |
+
+- **Counts match GitHub exactly** for issues in both repos. PRs: 8,035 skipped vs 8,034 in GitHub search. Search
+  counts are an index and can lag, so one difference out of 8,000 isn't worth chasing; the issue count is what we store.
+- **No rate-limit waits were needed**: 570 REST pages used ~570 of 5,000 calls/hour (with a token).
+- **The second run inserted 0**: the upsert works against the real database, not just against mocks.
+- **The read API runs 3 SQL statements per page** (checked with `logging.level.org.hibernate.SQL=debug`):
+  page of ids, count, issues+labels. No N+1.
+
+### What the answer key looks like
+2,041 issues closed or labelled as duplicates -> 1,036 with `duplicate_of` (51%): 117 from "close as duplicate of",
+137 from "marked as duplicate" links, 782 from maintainer comments; 909 with no reliable link, 88 whose original is in
+another repo (mostly spring-framework), 8 ambiguous. Hand-checked: #52529 -> #52519, #52124 -> #49279, #16344 -> #16381,
+#47366 -> #46944, #50073 -> #49910; #39044 (other repo) and #52567 ("see #...") correctly left empty.
+Two facts that matter for M3 (the replay):
+- **91 of the 1,036 originals aren't stored issues** (most likely pull requests). Only 945 pairs can be scored.
+- **In 109 pairs the "original" is newer than the duplicate**: maintainers sometimes close the older issue in favour
+  of a newer, better-written one. A time-ordered replay (only search *earlier* issues) can never find those, so M3
+  must either skip them or count them separately.
+
+### Basics: checking a data pipeline
+- **Reconcile with an independent count**: our row count vs GitHub's search `total_count` for `is:issue` (and `is:pr` for skipped).
+- **Run it twice**: an idempotent load gives 0 inserts and the same child-table row count the second time.
+- **Spot-check by hand**: pick cases you already understand (here, the ones studied in step F) and look at the stored values.
+- **Look at the SQL**: `logging.level.org.hibernate.SQL=debug` prints every statement; count them for one request.
+
+### One alternative I rejected
+**Starting with spring-boot straight away.** 30 seconds on petclinic proved the counts, the PR skip and the idempotency
+before spending 12 minutes and ~520 API calls on spring-boot. Small first, then big.
+
+### Likely interview questions
+1. **How do you know your backfill loaded everything?**
+   I compared with GitHub's own numbers: 43,810 issues stored = 43,810 in GitHub search; the skipped PRs match too (±1,
+   search lag). Then I ran it again: 0 inserts, same label rows.
+2. **How good is your answer key?**
+   51% of the 2,041 labelled duplicates have a reliable link (1,036). The rest have no link (909), point to another repo
+   (88) or are ambiguous (8). I report this coverage rather than guess.
+3. **What surprised you in the data?**
+   Only 178 of 2,041 duplicates have `state_reason=duplicate`. Old ones show `completed`. The duplicate-event direction
+   can be reversed. 109 "originals" are newer than their duplicates, which matters for a time-ordered replay.

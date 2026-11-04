@@ -49,9 +49,7 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 8. Do not upgrade Java/Spring Boot or add dependencies without asking sai.
 
 ## Current step (sai updates this line)
-Phase 0 and M0 done. Schema decided: docs/schema.md. Problem: docs/problem.md.
-M1 next, piece by piece: 1) Issue entity + SourceType enum + IssueRepository,
-2) IssueSource interface + GitHubIssueSource (RestClient, token from GITHUB_TOKEN),
-3) Link-header paging, 4) skip pull requests + map JSON to Issue,
-5) IssueService.upsert by (source, external_id), 6) POST /backfill/{owner}/{repo},
-7) GET /repos/{owner}/{repo}/issues, 8) tests. Test on a small repo before spring-boot.
+Phase 0, M0 and M1 done (4 Nov 2026, report: docs/m1-report.md). DB holds spring-petclinic (394 issues)
+and spring-boot (43,810 issues; 1,036 with duplicate_of = the answer key; 945 of them point to a stored issue).
+Next: M3 replay needs a decision on the 109 pairs whose "original" is newer than the duplicate
+(see docs/m1-report.md, open questions). Schema: docs/schema.md. Problem: docs/problem.md.
