@@ -18,6 +18,7 @@ spring:
 github:
   api-url: https://api.github.com
   token: ${GITHUB_TOKEN:}   # from the environment; empty if not set. Never put a real token here.
+  webhook-secret: ${GITHUB_WEBHOOK_SECRET:}   # shared secret for webhook signatures; empty = refuse all webhooks
 
 management:
   endpoints:

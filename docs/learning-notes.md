@@ -890,3 +890,62 @@ volume needs ownership fixes, and in development Postgres, not Kafka, is the sou
 3. **What is KRaft?**
    Kafka's built-in consensus (Raft) for cluster metadata, replacing ZooKeeper. A node can be broker, controller
    or both; here one node is both. Since Kafka 4.0 it's the only mode.
+
+## M2 step 2: webhook receiver `POST /webhooks/github` (4 Nov 2026)
+
+Files: `github/WebhookSignatureVerifier.java`, `github/GitHubWebhookController.java`, `application.yml`
+(`github.webhook-secret: ${GITHUB_WEBHOOK_SECRET:}`); tests `WebhookSignatureVerifierTest` (5),
+`GitHubWebhookControllerTest` (9).
+
+### What it does
+GitHub sends an HTTP POST to us whenever something happens to an issue (a **webhook**). The receiver, in this order:
+1. No secret configured -> **503** and an error log line `GITHUB_WEBHOOK_SECRET is not set: refusing ...`.
+2. `X-Hub-Signature-256` missing or wrong -> **401**. The body is never logged.
+3. `X-GitHub-Event: ping` (sent once when the webhook is created) -> **200** `pong`.
+4. `issues` with action opened / edited / closed / reopened / labeled / unlabeled -> **200** (step 3 hands it to Kafka).
+5. Any other event or action -> **202** "ignored". (A signed body that isn't JSON -> 400.)
+It does no GitHub calls and no triage work: GitHub gives up after 10 seconds and marks the delivery as failed.
+
+### How the signature works (HMAC)
+GitHub and we share a secret. For each delivery GitHub computes `HMAC-SHA256(secret, body)` and sends it as
+`sha256=<64 hex chars>`. We compute the same over the body we received; if both match, the sender knew the
+secret (so it's GitHub) and the body wasn't changed on the way. Checked against GitHub's documented example:
+secret `It's a Secret to Everybody`, body `Hello, World!` -> `sha256=757107ea...b043e17`.
+
+### Why raw bytes, why constant time
+- **Raw bytes:** the signature is over the *exact bytes* sent. If we parsed the JSON into an object and wrote it
+  back out, spacing, key order or number formats could change and a genuine request would fail the check.
+  So the controller takes `@RequestBody byte[]`, verifies, and only then parses.
+- **Constant-time compare (`MessageDigest.isEqual`):** a normal `equals` stops at the first different character.
+  An attacker can measure that tiny time difference and find the right signature one character at a time.
+  `isEqual` always compares everything, so the time doesn't leak anything.
+
+### Basics used here
+- **`@RequestHeader(value = "X-GitHub-Event", required = false) String event`**: puts an HTTP header into a
+  parameter (null if missing, instead of Spring answering 400 itself, so *we* decide: 401).
+- **`@RequestBody byte[] body`**: the body untouched. *Before:* `@RequestBody IssueEvent event` (Spring parses
+  JSON first; the original bytes are gone). *After:* `byte[]`, verify, then `jsonMapper.readTree(body)`.
+- **`ResponseEntity`**: lets a controller choose the status code: `ResponseEntity.status(401).body("...")`,
+  `ResponseEntity.accepted()` (202), `ResponseEntity.ok(...)` (200).
+- **`javax.crypto.Mac`**: the JDK's HMAC. `Mac.getInstance("HmacSHA256")`, `init(new SecretKeySpec(secretBytes, ...))`,
+  `doFinal(body)`; `HexFormat.of().formatHex(...)` turns the 32 bytes into 64 lowercase hex characters.
+- **`JsonMapper`** (Jackson 3): Spring Boot creates one; we inject it and call `readTree(bytes)` to get a `JsonNode`.
+- **Status codes:** 200 = done; 202 = received, nothing to do; 401 = we don't believe you're GitHub; 503 = we're not
+  configured, try later (GitHub shows it as a failed delivery, which can be redelivered once the secret is set).
+
+### One alternative I rejected
+**A servlet filter or Spring Security for the signature check.** Cleaner if many endpoints needed it, but there's one
+webhook endpoint, and a filter would have to cache the body so the controller can read it again (a body stream can
+only be read once). Doing it in the controller with `byte[]` is short and visible. Also rejected: answering 401 when
+the secret is missing. 401 means "you aren't GitHub", but the real problem is *our* configuration, so 503 plus a log line.
+
+### Likely interview questions
+1. **How do you know a webhook really came from GitHub?**
+   HMAC-SHA256 of the raw body with a shared secret, compared with `X-Hub-Signature-256` in constant time. Wrong or
+   missing -> 401, and the body is never logged. The secret comes only from an environment variable.
+2. **Why must you verify the raw body before parsing JSON?**
+   The signature covers the exact bytes. Parsing and re-serializing can change whitespace, key order or number
+   format, so even a genuine request would fail, or you'd end up checking something other than what was sent.
+3. **GitHub waits 10 seconds. How do you stay under that?**
+   The receiver only verifies, reads the event type and hands the payload on (Kafka, step 3). No GitHub API calls,
+   no triage. The slow work happens in a consumer that GitHub doesn't wait for.
