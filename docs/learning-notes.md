@@ -1271,3 +1271,49 @@ before X" filters and joins are plain SQL, in one transaction, with one backup.
 3. **You changed the Postgres image under existing data. What could go wrong?**
    A different major version can't read the files (we kept 16). A different OS can change text collation, which can
    corrupt text indexes: Postgres warned about it, and the fix was an image on the same Debian release (or REINDEX).
+
+## M3 step 2: keyword baseline with Postgres full-text search (4 Nov 2026)
+
+Files: `V5__issue_full_text_search.sql`, `triage/DuplicateSearch.java` (interface), `triage/SimilarIssue.java`,
+`triage/KeywordDuplicateSearch.java`; test `KeywordDuplicateSearchDbTest` (4, real Postgres).
+
+### What it does
+- V5 adds `issue.search_tsv`, a **generated** `tsvector` column: title (weight A) + first 2,000 characters of the body
+  (weight B) with HTML comments removed, English stemming. A GIN index makes matching fast. Applied to 44k rows in 3.1 s.
+- `KeywordDuplicateSearch.findSimilar(issueId, 3)`: take the query issue's own lexemes, join them with OR into a
+  `tsquery`, match earlier issues of the same repo, rank with `ts_rank`, return the top k (number, title, score).
+  About 115 ms per query on spring-boot.
+- Both searches (this and the vector one in step 4) implement `DuplicateSearch` with the same rule: **same repo,
+  created before the query issue**, never the issue itself. That is what a maintainer could have found at the time.
+
+### Basics used here
+- **`tsvector`**: a text turned into a sorted list of normalised words ("lexemes") with positions: `to_tsvector('english',
+  'Health endpoints returning 404')` -> `'404':4 'endpoint':2 'health':1 'return':3`. Stop words ("the", "is") are dropped and
+  words are stemmed ("returning" -> "return"), so different forms of a word match.
+- **`tsquery` and `@@`**: a search expression (`'health' | 'endpoint'` = OR, `&` = AND); `doc @@ query` is true if it matches.
+  *Before:* `WHERE title ILIKE '%health%'` (one word, no stemming, no ranking, no index). *After:* `search_tsv @@ query`, ranked.
+- **`ts_rank`**: a relevance score: higher when more query words appear, more often, and in heavier-weighted parts
+  (`setweight(..., 'A')` = the title counts most).
+- **Generated column (`GENERATED ALWAYS AS (...) STORED`)**: Postgres computes and stores it on every insert/update.
+  Our Java code never writes it, and Hibernate's `validate` ignores columns the entity doesn't map.
+- **GIN index**: an inverted index: word -> rows containing it. The right index for `@@`.
+- **Why OR, not AND:** `plainto_tsquery` ANDs every word, so a 150-word issue would only match itself. OR + ranking
+  rewards the issues sharing the most (and the most important) words.
+- **Quoting lexemes:** each lexeme is wrapped in quotes with `'` and `\` escaped before the `::tsquery` cast; a test uses
+  `C:\temp\app isn't` to prove odd characters don't break the query.
+
+### One alternative I rejected
+**Elasticsearch/OpenSearch (BM25)** as the keyword baseline. A better-tuned text ranker, but a whole new service. The
+point of the baseline is "what plain keyword search already gets you", and Postgres full-text search is that, in the
+database we already have. (Also rejected: building the query from the title only. Fairer to give both methods the same text.)
+
+### Likely interview questions
+1. **How does your keyword baseline work?**
+   Postgres full-text search: a generated, GIN-indexed `tsvector` over title + body; the query issue's lexemes ORed into a
+   `tsquery`; earlier issues of the same repo ranked by `ts_rank`. Same text window and same "earlier, same repo" rule as the vector search.
+2. **Why do you need a baseline at all?**
+   "Vector search finds 60% of duplicates" means nothing alone. Against keyword search on the same data and rule, it says
+   how much the embeddings actually add. Maintainers already have keyword search (GitHub's search box).
+3. **Why only issues created before the query issue?**
+   That's what was knowable when the issue was opened. Searching later issues would let the original's *own* duplicates or
+   later discussion leak into the result: an evaluation that looks better than reality.
