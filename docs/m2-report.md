@@ -63,6 +63,12 @@ Database afterwards: **1 issue row** (`App crashes on startup when port 8080 is 
 - **Kafka down:** 500 in **2.05 s** (`max.block.ms=2000`). The longest possible answer is about 7 s, under GitHub's 10 s.
 - GitHub's own delivery durations (0.02 to 0.03 s) measure smee's answer, not ours.
 
+## Decisions (sai, 4 Nov 2026)
+- Q1: keep **503** when the webhook secret isn't set.
+- Q2: build the **transactional outbox in M5, before deploying** (added to `docs/prompts/m3-m6-build.md`).
+- Q5: keep `GITHUB_TOKEN` **read-only**; use the `gh` keyring login only for one-off setup.
+- Q8: handle **deleted** (remove the row; labels cascade) and **transferred** (remove from the old repo) before M3 step 1.
+
 ## Open questions (for sai)
 1. **No secret → 503, not 401.** The prompt said "refuse every webhook". I chose 503 because 401 means "you aren't
    GitHub", while the real problem is our own configuration. OK?
