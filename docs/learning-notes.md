@@ -949,3 +949,79 @@ the secret is missing. 401 means "you aren't GitHub", but the real problem is *o
 3. **GitHub waits 10 seconds. How do you stay under that?**
    The receiver only verifies, reads the event type and hands the payload on (Kafka, step 3). No GitHub API calls,
    no triage. The slow work happens in a consumer that GitHub doesn't wait for.
+
+## M2 step 3: idempotency on `X-GitHub-Delivery`, publish to Kafka (4 Nov 2026)
+
+Files: `V3__webhook_delivery.sql`, `repository/WebhookDeliveryRepository.java`, `kafka/IssueEventMessage.java`,
+`kafka/IssueEventPublisher.java`, `service/WebhookIntakeService.java`, `ClockConfig.java`, controller wired up,
+producer timeouts in `application.yml`, `scripts/send-test-webhook.sh`, docs/schema.md. Tests:
+`WebhookIntakeServiceTest` (3), `WebhookDeliveryDbTest` (2, real DB), 5 more controller tests.
+
+### What it does
+GitHub can send the same delivery more than once (its retries, or a person pressing "Redeliver"). Each delivery has
+a unique `X-GitHub-Delivery` id. In **one transaction**:
+1. `INSERT INTO webhook_delivery ... ON CONFLICT (delivery_id) DO NOTHING`. 0 rows inserted = we've seen it ->
+   answer **200 "duplicate delivery"** and stop.
+2. Publish to Kafka and **wait for the broker's ack** (`acks=all`, at most ~5 s).
+3. Kafka failed -> exception -> the transaction **rolls back** (the delivery row disappears) -> **500**. Later,
+   GitHub's Redeliver is treated as new and works.
+The message: key `owner/repo#number` (same issue -> same partition -> in order), value
+`{"deliveryId","action","repo","issue": {...GitHub's full issue object...}}`.
+
+Checked by hand against the real app: first send 200 (0.26 s, mostly warm-up), same id again 200 "duplicate delivery"
+(6 ms), wrong signature 401 (1 ms); Kafka had exactly 1 message, key `Codertocat/Hello-World#1`, partition 1.
+With **Kafka stopped**: 500 in **2.05 s** and no delivery row; after starting Kafka, the same id was accepted.
+
+### The trade-off, and the transactional outbox
+The database and Kafka are two different systems, so one transaction can't cover both. Our order is
+"insert row -> publish -> commit". What can go wrong:
+- **Publish fails** -> rollback -> 500 -> nothing saved, nothing sent. GitHub can redeliver. Good.
+- **Publish succeeds, then the commit fails** (DB dies in that millisecond) -> the message is in Kafka but the row
+  isn't. A redelivery would publish it again: a **duplicate message**. Harmless here, because the consumer's upsert
+  is idempotent (step 4), but in general it's a real gap.
+- **We wait for Kafka inside a DB transaction**, so a slow Kafka holds a DB connection for up to ~5 s.
+The proper fix is the **transactional outbox pattern**: in the *same DB transaction* write the delivery row **and**
+an `outbox` row with the message; commit; answer 200. A separate relay (a poller, or Debezium reading the DB log)
+then sends outbox rows to Kafka and marks them sent. Now the DB is the only thing that has to commit, nothing is
+lost and nothing is sent unless it was saved. We're not building it yet: it needs another table, a relay process
+and its own retries, and duplicate messages are already safe for us.
+
+### Basics used here
+- **Idempotency:** doing something twice has the same effect as doing it once. Here: the same delivery id twice ->
+  one row, one Kafka message.
+- **`INSERT ... ON CONFLICT DO NOTHING`** (Postgres): insert, or if the primary key already exists do nothing and
+  report 0 rows, with no error and no race. *Before:* `SELECT` first, then `INSERT` (two requests at once can both
+  see "not there" and both insert). *After:* one statement; the primary key decides.
+- **`JdbcTemplate`** (Spring): run plain SQL. `jdbc.update(sql, args...)` returns the number of rows changed.
+  It uses the same connection as JPA inside a `@Transactional` method, so it's in the same transaction.
+- **`KafkaTemplate.send(topic, key, value)`** returns a `CompletableFuture`; `.get(5, SECONDS)` blocks until the broker
+  answers or the timeout passes. *Before (fire-and-forget):* `send(...)` and hope. *After:* `send(...).get(...)`,
+  so we only answer 200 when Kafka really has it.
+- **`acks=all`**: the broker only confirms after the message is written to all in-sync replicas (here: 1).
+- **Producer timeouts:** by default `send()` can block **60 s** waiting for metadata when Kafka is down. We set
+  `max.block.ms=2000`, `request.timeout.ms=4000`, `delivery.timeout.ms=5000`, so the answer comes fast: 2 s when the
+  broker is down.
+- **Rollback rule:** Spring rolls a `@Transactional` method back when a *RuntimeException* escapes it, which is why
+  `PublishFailedException` extends `RuntimeException`.
+- **`@Transactional(propagation = NOT_SUPPORTED)` in a test:** `@DataJpaTest` normally wraps each test in a transaction
+  that's rolled back. This turns that off for one test, so the service's own transaction really commits or rolls
+  back and the test can check the table afterwards.
+- **`@MockitoBean`** (Spring test): replaces one bean in the test context with a Mockito mock (here the Kafka
+  publisher, so the real-DB tests don't need Kafka).
+
+### One alternative I rejected
+**Answer 200 first and publish in the background** (`@Async`). Fast, but if the publish then fails, GitHub already
+thinks the delivery succeeded and will never resend it: the event is lost silently. Waiting for the ack keeps
+"200" meaning "it's safely in Kafka". (The outbox, above, is the real upgrade; deferred for now.)
+
+### Likely interview questions
+1. **GitHub sends the same webhook twice. What happens?**
+   The second `INSERT ... ON CONFLICT DO NOTHING` on the delivery id inserts 0 rows, so we answer 200 "duplicate
+   delivery" and don't publish again. Even if a duplicate did get through, the consumer's upsert is idempotent.
+2. **Kafka is down when a webhook arrives. What happens?**
+   The publish times out after ~2 s, the exception rolls back the delivery row, and we answer 500. GitHub marks the
+   delivery failed; when Kafka is back, "Redeliver" (or GitHub's retry) works because the id isn't stored.
+3. **What is the transactional outbox pattern and why would you use it?**
+   Write the business change and the outgoing message into the same database transaction (an outbox table); a
+   separate relay publishes outbox rows to the broker. It removes the "DB committed but message not sent" (or the
+   reverse) gap of writing to two systems, without distributed transactions.

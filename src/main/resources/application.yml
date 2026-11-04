@@ -14,6 +14,13 @@ spring:
     baseline-version: 1
   kafka:
     bootstrap-servers: localhost:9092
+    producer:
+      acks: all   # "stored" only when the broker has written it (the default since Kafka 3, written out for clarity)
+      properties:
+        # Defaults would let a send hang for 60 s when Kafka is down; GitHub waits only 10 s for our answer.
+        max.block.ms: 2000          # max wait for topic metadata before send() gives up
+        request.timeout.ms: 4000    # max wait for one broker response
+        delivery.timeout.ms: 5000   # max total time for a send, retries included (must be >= linger + request timeout)
 
 github:
   api-url: https://api.github.com

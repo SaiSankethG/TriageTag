@@ -1,6 +1,8 @@
-# Database schema v1 (M1)
+# Database schema v1 (M1), plus webhook_delivery (M2)
 
 Decided 3 Nov 2026. Source-neutral, so Jira can be added later without changes.
+Since M2 the schema is managed by Flyway (`src/main/resources/db/migration`): V1 = this schema,
+V2 drops Hibernate's `CHECK (source = 'GITHUB')`, V3 adds `webhook_delivery`.
 
 ```sql
 CREATE TABLE issue (
@@ -34,6 +36,15 @@ CREATE TABLE issue_label (
 );
 
 CREATE INDEX idx_issue_label_name ON issue_label (label_name);     -- "all issues labelled X"
+
+-- Added in M2 (Flyway V3): one row per accepted GitHub webhook delivery.
+CREATE TABLE webhook_delivery (
+  delivery_id varchar(64)  PRIMARY KEY,     -- X-GitHub-Delivery (a UUID); the PK makes a redelivery a no-op
+  event       varchar(50)  NOT NULL,        -- X-GitHub-Event, e.g. 'issues'
+  action      varchar(50),                  -- e.g. 'opened'
+  repo        varchar(200),                 -- 'owner/name'
+  received_at timestamptz  NOT NULL
+);
 ```
 
 ## Why these choices (interview notes)

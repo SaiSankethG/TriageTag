@@ -1,9 +1,14 @@
 package com.saisanketh.triage.db;
 
+import com.saisanketh.triage.ClockConfig;
+import com.saisanketh.triage.kafka.IssueEventPublisher;
+import com.saisanketh.triage.repository.WebhookDeliveryRepository;
 import com.saisanketh.triage.service.IssueService;
+import com.saisanketh.triage.service.WebhookIntakeService;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
  * Base class for tests against a real Postgres (Testcontainers).
@@ -15,10 +20,15 @@ import org.springframework.context.annotation.Import;
  *   <li>Flyway runs V1, V2... on the empty container, and Hibernate {@code validate} then checks the entities
  *       against that schema, so every real-DB test also tests the migrations.</li>
  *   <li>All subclasses have the same configuration, so Spring reuses one context and one container for all of them.</li>
+ *   <li>Kafka isn't part of these tests: the publisher is a Mockito mock ({@code @MockitoBean}).</li>
  * </ul>
  */
 @DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
-@Import({PostgresContainerConfig.class, IssueService.class})
+@Import({PostgresContainerConfig.class, ClockConfig.class, IssueService.class,
+        WebhookDeliveryRepository.class, WebhookIntakeService.class})
 public abstract class PostgresTest {
+
+    @MockitoBean
+    protected IssueEventPublisher publisher;
 }

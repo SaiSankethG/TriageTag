@@ -1,5 +1,8 @@
 package com.saisanketh.triage.github;
 
+import com.saisanketh.triage.kafka.IssueEventMessage;
+import com.saisanketh.triage.kafka.IssueEventPublisher.PublishFailedException;
+import com.saisanketh.triage.service.WebhookIntakeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -29,6 +32,7 @@ public class GitHubWebhookController {
 
     private final WebhookSignatureVerifier signatureVerifier;
     private final JsonMapper jsonMapper;
+    private final WebhookIntakeService intakeService;
 
     /**
      * @param body the raw bytes: the signature is over these exact bytes, so we must not parse and re-write
@@ -73,7 +77,29 @@ public class GitHubWebhookController {
             return ResponseEntity.accepted().body("ignored action issues/" + action);
         }
 
-        log.info("Accepted webhook delivery {}: issues/{}", deliveryId, action);
+        if (deliveryId == null || deliveryId.isBlank()) {
+            return ResponseEntity.badRequest().body("missing X-GitHub-Delivery header");
+        }
+        JsonNode issue = json.get("issue");
+        JsonNode repoName = json.path("repository").get("full_name");
+        if (issue == null || !issue.isObject() || repoName == null || !repoName.isString()) {
+            return ResponseEntity.badRequest().body("issues event without issue or repository.full_name");
+        }
+
+        IssueEventMessage message = new IssueEventMessage(deliveryId, action, repoName.asString(), issue);
+        try {
+            if (intakeService.accept(event, message) == WebhookIntakeService.Result.DUPLICATE) {
+                log.info("Ignored repeated webhook delivery {}", deliveryId);
+                return ResponseEntity.ok("duplicate delivery");
+            }
+        } catch (PublishFailedException e) {
+            // Nothing was saved (the transaction rolled back), so GitHub's "Redeliver" will work later.
+            log.error("Could not queue webhook delivery {}: {}", deliveryId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("could not queue the event; it can be redelivered");
+        }
+
+        log.info("Accepted webhook delivery {}: issues/{} for {}", deliveryId, action, message.key());
         return ResponseEntity.ok("accepted issues/" + action);
     }
 }
