@@ -1185,3 +1185,40 @@ needs only `npx` and is what GitHub's own docs suggest for testing webhooks.
    Generated with `openssl rand -hex 32` into `~/.config/triage/webhook-secret` (mode 600, outside the repo), given to
    GitHub once via the API, and read into the `GITHUB_WEBHOOK_SECRET` env var only when starting the app. Never printed,
    logged or committed.
+
+## M3 step 0: deleted and transferred issues (4 Nov 2026)
+
+Files: `GitHubWebhookController.HANDLED_ACTIONS` (+ deleted, transferred), `IssueService.delete`,
+`IssueEventConsumer` (REMOVING_ACTIONS). Tests: 2 consumer unit tests, 1 real-DB test, 2 end-to-end tests.
+
+### What it does
+- `issues/deleted`: the issue is gone on GitHub, so the worker removes our row, matched by `(source, external_id)` =
+  `issue.id`. Its labels go with it.
+- `issues/transferred`: the issue moved to another repo. GitHub sends the **old** issue as `issue` and the new one
+  (new id, new number, new repo) under `changes.new_issue` / `changes.new_repository`. We remove the old repo's row.
+  (If we also watch the new repo, its own webhook brings the new issue in.)
+- Removing a row that's already gone returns false and does nothing, so a repeated message is harmless.
+
+### Basics used here
+- **`repository.delete(entity)`** (JPA): Hibernate first deletes the `@ElementCollection` rows (`issue_label`),
+  then the `issue` row. The database's `ON DELETE CASCADE` on `issue_label.issue_id` would also remove them if
+  something deleted the row with plain SQL. Two safety nets.
+  *Before:* `DELETE FROM issue_label WHERE issue_id = ?; DELETE FROM issue WHERE id = ?` by hand.
+  *After:* find by key, `issueRepository.delete(row)`.
+- **Same pipeline, different action:** the receiver doesn't care what the action means; the consumer branches on it.
+  That keeps the 10-second path the same for every event.
+
+### One alternative I rejected
+**A "deleted" flag (soft delete) instead of removing the row.** It keeps history and protects against a late `edited`
+event re-creating the row, but every query would need `WHERE NOT deleted`, and sai asked for removal. Known gap: an
+`edited` event delivered *after* `deleted` (very unlikely: same partition, so in order) would re-insert the issue.
+
+### Likely interview questions
+1. **How do you handle an issue being deleted or moved?**
+   The webhook's `deleted` / `transferred` action removes our row by the tracker's issue id; labels cascade. Transfers
+   carry the old issue in `issue` and the new one in `changes.new_issue`.
+2. **What if the delete event is processed twice?**
+   The second delete finds nothing and returns false: idempotent like the upsert.
+3. **Hard delete or soft delete?**
+   Hard delete here: simpler queries, and we don't need history of deleted issues. Soft delete would keep an audit
+   trail and block late events from resurrecting the row, at the cost of a filter on every query.

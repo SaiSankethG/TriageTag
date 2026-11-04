@@ -81,12 +81,45 @@ class WebhookEndToEndTest extends FullStackTest {
         assertThat(countRows("select count(*) from issue")).isZero();
     }
 
+    @Test
+    void aDeletedIssueDisappearsWithItsLabels() throws Exception {
+        postWebhook(fixtureBytes(), UUID.randomUUID().toString(), WEBHOOK_SECRET);
+        waitUntil("the issue row exists", () -> countRows("select count(*) from issue") == 1);
+
+        HttpResponse<String> response = postWebhook(fixtureWithAction("deleted"), UUID.randomUUID().toString(),
+                WEBHOOK_SECRET);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        waitUntil("the issue row is gone", () -> countRows("select count(*) from issue") == 0);
+        assertThat(countRows("select count(*) from issue_label")).isZero();
+    }
+
+    @Test
+    void aTransferredIssueDisappearsFromTheOldRepo() throws Exception {
+        postWebhook(fixtureBytes(), UUID.randomUUID().toString(), WEBHOOK_SECRET);
+        waitUntil("the issue row exists", () -> countRows("select count(*) from issue") == 1);
+
+        HttpResponse<String> response = postWebhook(fixtureWithAction("transferred"), UUID.randomUUID().toString(),
+                WEBHOOK_SECRET);
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        waitUntil("the issue row is gone", () -> countRows(
+                "select count(*) from issue where repo = 'Codertocat/Hello-World'") == 0);
+    }
+
     // --- helpers ---
 
     private byte[] fixtureBytes() throws IOException {
         try (InputStream in = getClass().getResourceAsStream("/github/webhook-issues-opened.json")) {
             return in.readAllBytes();
         }
+    }
+
+    /** The same documented payload with another action (the issue object is what deleted/transferred also carry). */
+    private byte[] fixtureWithAction(String action) throws IOException {
+        String json = new String(fixtureBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        return json.replace("\"action\": \"opened\"", "\"action\": \"" + action + "\"")
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
     /** POSTs the bytes the way GitHub does, with X-Hub-Signature-256 computed with the given secret. */

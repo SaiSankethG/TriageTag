@@ -1,6 +1,7 @@
 package com.saisanketh.triage.service;
 
 import com.saisanketh.triage.domain.Issue;
+import com.saisanketh.triage.domain.SourceType;
 import com.saisanketh.triage.repository.IssueRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -48,6 +49,20 @@ public class IssueService {
 
         issueRepository.save(incoming);
         return UpsertResult.INSERTED;
+    }
+
+    /**
+     * Removes our copy of an issue (it was deleted on the tracker, or moved to another repo).
+     * Its labels go with it: JPA deletes the element-collection rows, and the database's
+     * ON DELETE CASCADE on issue_label would do the same.
+     *
+     * @return true if there was a row to remove
+     */
+    @Transactional
+    public boolean delete(SourceType source, String externalId) {
+        Optional<Issue> existing = issueRepository.findBySourceAndExternalId(source, externalId);
+        existing.ifPresent(issueRepository::delete);
+        return existing.isPresent();
     }
 
     /** True if the incoming data was last changed before what we already store. */

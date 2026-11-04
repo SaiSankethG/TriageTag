@@ -1,6 +1,7 @@
 package com.saisanketh.triage.db;
 
 import com.saisanketh.triage.domain.Issue;
+import com.saisanketh.triage.domain.SourceType;
 import com.saisanketh.triage.repository.IssueRepository;
 import com.saisanketh.triage.service.IssueList;
 import com.saisanketh.triage.service.IssueService;
@@ -82,6 +83,26 @@ class IssueServiceDbTest extends PostgresTest {
         assertThat(jdbc.queryForObject("select state from issue", String.class)).isEqualTo("closed");
         assertThat(jdbc.queryForList("select label_name from issue_label", String.class))
                 .containsExactly("status: duplicate");
+    }
+
+    @Test
+    void deleteRemovesTheIssueAndItsLabels() {
+        issueService.upsert(issue(1, "To be deleted", "type: bug", "status: duplicate"));
+        issueService.upsert(issue(2, "Stays"));
+        flushAndForget();
+
+        boolean removed = issueService.delete(SourceType.GITHUB, "1001");
+        flushAndForget();
+        boolean removedAgain = issueService.delete(SourceType.GITHUB, "1001");   // e.g. Kafka delivered it twice
+
+        assertThat(removed).isTrue();
+        assertThat(removedAgain).isFalse();
+        assertThat(jdbc.queryForList("select number from issue", Integer.class)).containsExactly(2);
+        assertThat(countLabelRows()).isZero();
+    }
+
+    private int countLabelRows() {
+        return jdbc.queryForObject("select count(*) from issue_label", Integer.class);
     }
 
     /** Write pending changes to the DB, then forget all loaded entities (like starting a new request). */

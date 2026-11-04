@@ -1,6 +1,7 @@
 package com.saisanketh.triage.kafka;
 
 import com.saisanketh.triage.domain.Issue;
+import com.saisanketh.triage.domain.SourceType;
 import com.saisanketh.triage.github.GitHubIssueMapper;
 import com.saisanketh.triage.kafka.IssueEventConsumer.BadIssueEventException;
 import com.saisanketh.triage.service.IssueService;
@@ -18,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -53,6 +55,31 @@ class IssueEventConsumerTest {
         assertThat(issue.getValue().getNumber()).isEqualTo(1);
         assertThat(issue.getValue().getTitle()).isEqualTo("Spelling error in the README file");
         assertThat(issue.getValue().getLabels()).containsExactly("bug");
+    }
+
+    @Test
+    void aDeletedIssueIsRemoved() {
+        consumer.onIssueEvent(record("""
+                {"deliveryId": "d-2", "action": "deleted", "repo": "Codertocat/Hello-World",
+                 "issue": {"id": 444500041, "number": 1, "title": "Spelling error in the README file"}}
+                """));
+
+        verify(issueService).delete(SourceType.GITHUB, "444500041");
+        verify(issueService, never()).upsert(any());
+    }
+
+    @Test
+    void aTransferredIssueIsRemovedFromTheOldRepo() {
+        // GitHub sends the OLD issue as "issue" and the new one (new id, new repo) under "changes".
+        consumer.onIssueEvent(record("""
+                {"deliveryId": "d-3", "action": "transferred", "repo": "Codertocat/Hello-World",
+                 "issue": {"id": 444500041, "number": 1},
+                 "changes": {"new_issue": {"id": 999000111, "number": 5},
+                             "new_repository": {"full_name": "Codertocat/Other-Repo"}}}
+                """));
+
+        verify(issueService).delete(SourceType.GITHUB, "444500041");
+        verify(issueService, never()).upsert(any());
     }
 
     @Test

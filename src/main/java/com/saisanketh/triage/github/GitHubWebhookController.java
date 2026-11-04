@@ -28,7 +28,8 @@ import java.util.Set;
 public class GitHubWebhookController {
 
     /** The "issues" actions that change what we store. Others (assigned, milestoned, ...) are ignored for now. */
-    static final Set<String> HANDLED_ACTIONS = Set.of("opened", "edited", "closed", "reopened", "labeled", "unlabeled");
+    static final Set<String> HANDLED_ACTIONS = Set.of("opened", "edited", "closed", "reopened", "labeled", "unlabeled",
+            "deleted", "transferred");
 
     private final WebhookSignatureVerifier signatureVerifier;
     private final JsonMapper jsonMapper;
