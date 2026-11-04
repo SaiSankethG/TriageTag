@@ -2,7 +2,9 @@ package com.saisanketh.triage.outbox;
 
 import com.saisanketh.triage.kafka.IssueEventPublisher;
 import com.saisanketh.triage.kafka.IssueEventPublisher.PublishFailedException;
+import com.saisanketh.triage.metrics.TriageMetrics;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -39,6 +41,13 @@ public class OutboxRelay {
         this.outbox = outbox;
         this.publisher = publisher;
         this.clock = clock;
+    }
+
+    /** Used by Spring: also registers the metric triage.outbox.unsent (counted by SQL each time it is scraped). */
+    @Autowired
+    public OutboxRelay(OutboxRepository outbox, IssueEventPublisher publisher, Clock clock, TriageMetrics metrics) {
+        this(outbox, publisher, clock);
+        metrics.gauge("triage.outbox.unsent", "Outbox rows not yet sent to Kafka", outbox::countUnsent);
     }
 
     /**

@@ -1,6 +1,8 @@
 package com.saisanketh.triage.db;
 
 import com.saisanketh.triage.embedding.EmbeddingService;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import tools.jackson.databind.json.JsonMapper;
@@ -14,6 +16,11 @@ import java.util.List;
  */
 @TestConfiguration(proxyBeanMethods = false)
 public class LlmTestConfig {
+
+    @Bean
+    MeterRegistry meterRegistry() {
+        return new SimpleMeterRegistry();
+    }
 
     @Bean
     JsonMapper jsonMapper() {

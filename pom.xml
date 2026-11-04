@@ -78,6 +78,11 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-anthropic</artifactId>
         </dependency>
+        <!-- Metrics in Prometheus format at /actuator/prometheus (M6, approved in the plan). Version from Spring Boot. -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

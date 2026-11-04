@@ -3,6 +3,7 @@ package com.saisanketh.triage.comment;
 import com.saisanketh.triage.comment.CommentRepository.Mode;
 import com.saisanketh.triage.comment.GitHubCommentClient.PostedComment;
 import com.saisanketh.triage.github.GitHubAppAuth;
+import com.saisanketh.triage.metrics.TriageMetrics;
 import com.saisanketh.triage.report.TriageReport;
 import com.saisanketh.triage.report.TriageReport.Duplicate;
 import lombok.extern.slf4j.Slf4j;
@@ -50,18 +51,20 @@ public class CommentService {
     private final GitHubAppAuth appAuth;
     private final GitHubCommentClient client;
     private final Clock clock;
+    private final TriageMetrics metrics;
     private final double threshold;
     /** lower-case repo -> labels whose issues never get a comment */
     private final Map<String, List<String>> skipLabels;
 
     public CommentService(JdbcTemplate jdbc, CommentRepository comments, GitHubAppAuth appAuth,
-                          GitHubCommentClient client, Clock clock, CommentProperties properties,
+                          GitHubCommentClient client, Clock clock, TriageMetrics metrics, CommentProperties properties,
                           @Value("${triage.duplicates.comment-threshold:0.90}") double threshold) {
         this.jdbc = jdbc;
         this.comments = comments;
         this.appAuth = appAuth;
         this.client = client;
         this.clock = clock;
+        this.metrics = metrics;
         this.threshold = threshold;
         this.skipLabels = properties.skipLabels().entrySet().stream()
                 .collect(Collectors.toMap(e -> e.getKey().toLowerCase(Locale.ROOT), Map.Entry::getValue));
@@ -72,6 +75,12 @@ public class CommentService {
     }
 
     public Decision maybeComment(TriageReport report) {
+        Decision decision = decide(report);
+        metrics.commentDecision(decision.name());
+        return decision;
+    }
+
+    private Decision decide(TriageReport report) {
         IssueFacts issue = jdbc.queryForObject("""
                 SELECT i.repo, i.number, i.state, i.author_association,
                        ARRAY(SELECT l.label_name FROM issue_label l WHERE l.issue_id = i.id) AS labels

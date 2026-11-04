@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Optional;
 
 /**
  * Remembers which webhook deliveries we already accepted. Plain SQL (JdbcTemplate) instead of JPA because the
@@ -21,6 +22,12 @@ public class WebhookDeliveryRepository {
     /**
      * @return true if this delivery id is new (a row was inserted), false if we have seen it before
      */
+    /** When we accepted this delivery; empty if it isn't stored (e.g. a message published by hand). */
+    public Optional<Instant> receivedAt(String deliveryId) {
+        return jdbc.query("SELECT received_at FROM webhook_delivery WHERE delivery_id = ?",
+                (rs, row) -> rs.getTimestamp("received_at").toInstant(), deliveryId).stream().findFirst();
+    }
+
     public boolean insertIfNew(String deliveryId, String event, String action, String repo, Instant receivedAt) {
         int rows = jdbc.update("""
                 INSERT INTO webhook_delivery (delivery_id, event, action, repo, received_at)

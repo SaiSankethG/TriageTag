@@ -1,17 +1,31 @@
 package com.saisanketh.triage.ai;
 
+import com.saisanketh.triage.metrics.TriageMetrics;
+
 /**
- * Wraps the real (or fake) TriageLlm: refuses calls once today's token budget is used up, and counts every call's tokens.
+ * Wraps the real (or fake) TriageLlm: refuses calls once today's token budget is used up, and counts every call's tokens
+ * (in the budget table and as metrics: tokens and estimated cost).
  * A "decorator": same interface, added behaviour, so no caller has to remember the budget.
  */
 public class GuardedTriageLlm implements TriageLlm {
 
     private final TriageLlm delegate;
     private final TokenBudget budget;
+    private final TriageMetrics metrics;
+    private final double inputUsdPerMillion;
+    private final double outputUsdPerMillion;
 
-    public GuardedTriageLlm(TriageLlm delegate, TokenBudget budget) {
+    /**
+     * @param inputUsdPerMillion  list price per million input tokens, for the cost metric (0 for the fake)
+     * @param outputUsdPerMillion list price per million output tokens
+     */
+    public GuardedTriageLlm(TriageLlm delegate, TokenBudget budget, TriageMetrics metrics,
+                            double inputUsdPerMillion, double outputUsdPerMillion) {
         this.delegate = delegate;
         this.budget = budget;
+        this.metrics = metrics;
+        this.inputUsdPerMillion = inputUsdPerMillion;
+        this.outputUsdPerMillion = outputUsdPerMillion;
     }
 
     @Override
@@ -26,6 +40,8 @@ public class GuardedTriageLlm implements TriageLlm {
         }
         LlmReply reply = delegate.complete(prompt);
         budget.record(reply.totalTokens());
+        metrics.llmCall(delegate.model(), reply.inputTokens(), reply.outputTokens(),
+                (reply.inputTokens() * inputUsdPerMillion + reply.outputTokens() * outputUsdPerMillion) / 1_000_000);
         return reply;
     }
 }

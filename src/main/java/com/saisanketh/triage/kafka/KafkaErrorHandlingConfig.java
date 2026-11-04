@@ -1,10 +1,12 @@
 package com.saisanketh.triage.kafka;
 
 import com.saisanketh.triage.kafka.IssueEventConsumer.BadIssueEventException;
+import com.saisanketh.triage.metrics.TriageMetrics;
 import org.apache.kafka.common.TopicPartition;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.ConsumerRecordRecoverer;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.ExponentialBackOffWithMaxRetries;
@@ -26,7 +28,7 @@ public class KafkaErrorHandlingConfig {
     static final int MAX_RETRIES = 3;
 
     @Bean
-    DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, String> kafkaTemplate) {
+    DefaultErrorHandler kafkaErrorHandler(KafkaTemplate<String, String> kafkaTemplate, TriageMetrics metrics) {
         DeadLetterPublishingRecoverer sendToDeadLetterTopic = new DeadLetterPublishingRecoverer(kafkaTemplate,
                 (record, exception) -> new TopicPartition(KafkaTopicsConfig.ISSUE_EVENTS_DLT, record.partition()));
 
@@ -34,7 +36,12 @@ public class KafkaErrorHandlingConfig {
         backOff.setInitialInterval(500);
         backOff.setMultiplier(2.0);
 
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(sendToDeadLetterTopic, backOff);
+        // Count every dead letter (metric triage.kafka.dead.letters), then send it.
+        ConsumerRecordRecoverer countAndSend = (record, exception) -> {
+            metrics.deadLetter(exception);
+            sendToDeadLetterTopic.accept(record, exception);
+        };
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(countAndSend, backOff);
         errorHandler.addNotRetryableExceptions(BadIssueEventException.class);
         return errorHandler;
     }

@@ -1,5 +1,6 @@
 package com.saisanketh.triage.ai;
 
+import com.saisanketh.triage.metrics.TriageMetrics;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,7 +22,9 @@ import java.time.Duration;
 public class LlmConfig {
 
     @Bean
-    TriageLlm triageLlm(TokenBudget budget,
+    TriageLlm triageLlm(TokenBudget budget, TriageMetrics metrics,
+                        @Value("${triage.llm.anthropic.price-input-per-million:0.10}") double inputPrice,
+                        @Value("${triage.llm.anthropic.price-output-per-million:0.50}") double outputPrice,
                         @Value("${triage.llm.provider:auto}") String provider,
                         @Value("${triage.llm.anthropic.api-key:}") String apiKey,
                         @Value("${triage.llm.anthropic.model:claude-haiku-5-5}") String model,
@@ -41,7 +44,7 @@ public class LlmConfig {
         };
         if (!useAnthropic) {
             log.info("LLM: FakeTriageLlm (rule-based answers, no cost); provider setting '{}'", provider);
-            return new GuardedTriageLlm(new FakeTriageLlm(), budget);
+            return new GuardedTriageLlm(new FakeTriageLlm(), budget, metrics, 0, 0);
         }
         log.info("LLM: Anthropic {} (max {} output tokens, thinking {}), daily budget {} tokens", model, maxTokens,
                 thinking, budget.dailyLimit());
@@ -54,6 +57,6 @@ public class LlmConfig {
                 .timeout(Duration.ofSeconds(60))
                 .maxRetries(2)
                 .build();
-        return new GuardedTriageLlm(new LangChain4jTriageLlm(chatModel, model), budget);
+        return new GuardedTriageLlm(new LangChain4jTriageLlm(chatModel, model), budget, metrics, inputPrice, outputPrice);
     }
 }

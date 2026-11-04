@@ -45,6 +45,8 @@ class CommentServiceDbTest extends PostgresTest {
     private CommentService commentService;
     @Autowired
     private JdbcTemplate jdbc;
+    @Autowired
+    private io.micrometer.core.instrument.MeterRegistry registry;
 
     private static float[] direction(double angleDegrees) {
         float[] v = new float[384];
@@ -82,6 +84,9 @@ class CommentServiceDbTest extends PostgresTest {
         triageService.createIfMissing(id);
 
         verify(commentClient, never()).post(anyString(), anyInt(), anyString(), anyString());
+        // Metrics: the new report's top match (#1, ~1.0) is "high", and comment mode decided SHADOW_MODE.
+        assertThat(registry.get("triage.duplicates.suggested").tag("level", "high").counter().count()).isGreaterThanOrEqualTo(1);
+        assertThat(registry.get("triage.comments").tag("decision", "SHADOW_MODE").counter().count()).isGreaterThanOrEqualTo(1);
     }
 
     @Test

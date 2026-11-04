@@ -56,6 +56,9 @@ triage:
       model: claude-haiku-5-5          # sai's choice at STOP A ($0.10 / $0.50 per million input / output tokens)
       max-tokens: 1024
       thinking: disabled               # short classification/draft tasks; thinking tokens would be billed
+      # For the cost metric only (triage_llm_cost_usd): Haiku 5.5 list prices, USD per million tokens.
+      price-input-per-million: 0.10
+      price-output-per-million: 0.50
     # Cost guard: above this many tokens (input + output) per UTC day, LLM calls are refused and reports say so.
     daily-token-budget: 200000
   duplicates:
@@ -97,4 +100,4 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus   # /actuator/prometheus: NOT in the public Ingress paths (deploy/k3s/30-app.yaml)

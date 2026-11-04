@@ -2381,3 +2381,47 @@ one shared operator secret on five endpoints.
 2. **Why not just hide the URLs?** Obscurity isn't protection; anyone can guess `/backfill/...` from the open-source code.
 3. **Why is the webhook exempt?** GitHub can't send our admin token; it signs the body with HMAC-SHA256, which the receiver already
    verifies.
+
+## M6 step 1: Prometheus metrics with Micrometer (4 Nov 2026)
+
+Files: `pom.xml` (`micrometer-registry-prometheus`, approved in the plan, version from Spring Boot), `metrics/TriageMetrics.java`,
+hooks in `GuardedTriageLlm` (tokens + cost), `KafkaErrorHandlingConfig` (dead letters), `IssueEventConsumer` (webhook→report
+time), `TriageService` (duplicate level), `CommentService` (decision), `OutboxRelay` (unsent gauge); `application.yml` exposes
+`/actuator/prometheus` (on the app port only: it's not in the public Ingress paths). Tests: `TriageMetricsTest` (3), plus checks
+in `GuardedTriageLlmTest`, `IssueEventConsumerTest`, `CommentServiceDbTest` and `WebhookEndToEndTest` (the real endpoint).
+
+### The metrics
+| Prometheus name | Type | What |
+|---|---|---|
+| `triage_webhook_to_report_seconds` | histogram | accepted webhook (`webhook_delivery.received_at`) → stored report |
+| `triage_llm_tokens_total{model,direction}` | counter | input / output tokens |
+| `triage_llm_cost_usd_total{model}` | counter | tokens × list price (Haiku 5.5: $0.10 / $0.50 per million) |
+| `triage_kafka_dead_letters_total{exception}` | counter | messages sent to issue-events.DLT, by real cause |
+| `triage_duplicates_suggested_total{level}` | counter | each new report's top match: high / medium / low / none |
+| `triage_comments_total{decision}` | counter | comment mode: SHADOW_MODE, BELOW_THRESHOLD, POSTED... |
+| `triage_outbox_unsent` | gauge | outbox rows not yet sent (grows while Kafka is down) |
+| `kafka_consumer_fetch_manager_records_lag_max` | gauge | consumer lag, from Spring Boot's Kafka client metrics |
+
+"Tokens per day" is a query, not a metric: `increase(triage_llm_tokens_total[1d])`.
+
+### Basics used here
+- **Micrometer** is to metrics what SLF4J is to logging: you record to a neutral API (`Counter`, `Timer`, `Gauge`), and a
+  registry (here Prometheus) decides the format. Before: `log.info("took {} ms")` and grep. After: a time series you can graph and alert on.
+- **Counter vs gauge vs timer**: a counter only goes up (tokens used); a gauge is "the value right now" (unsent rows); a timer
+  records durations. With `publishPercentileHistogram()` it exports buckets, so Prometheus can compute p50/p95 over any window
+  with `histogram_quantile`.
+- **Tags (labels)**: one metric, split by model or decision. Keep their values few (never an issue number), or Prometheus stores
+  one series per value.
+- **Pull model**: Prometheus scrapes `/actuator/prometheus` every N seconds; the app just keeps the numbers.
+
+### One alternative I rejected
+**Computing p95 in the app** (Micrometer's client-side percentiles). They can't be combined across instances or time windows;
+histogram buckets can, in Prometheus.
+
+### Likely interview questions
+1. **What do you monitor?** The user-facing latency (webhook to report, p50/p95), LLM tokens and cost, Kafka lag and dead letters,
+   the outbox backlog, and what the assistant decided (duplicate levels, comment decisions).
+2. **How do you get p95 latency?** A Micrometer timer with a percentile histogram; Prometheus computes
+   `histogram_quantile(0.95, sum(rate(triage_webhook_to_report_seconds_bucket[5m])) by (le))`.
+3. **Why not put the issue number in a tag?** High cardinality: every value is a new time series, which blows up Prometheus'
+   memory. Per-issue detail belongs in logs and the database.

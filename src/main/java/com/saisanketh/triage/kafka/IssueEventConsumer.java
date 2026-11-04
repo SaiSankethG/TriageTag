@@ -4,6 +4,8 @@ import com.saisanketh.triage.domain.Issue;
 import com.saisanketh.triage.domain.SourceType;
 import com.saisanketh.triage.embedding.IssueEmbeddingService;
 import com.saisanketh.triage.github.GitHubIssueMapper;
+import com.saisanketh.triage.metrics.TriageMetrics;
+import com.saisanketh.triage.repository.WebhookDeliveryRepository;
 import com.saisanketh.triage.report.TriageService;
 import com.saisanketh.triage.service.IssueService;
 import com.saisanketh.triage.service.UpsertResult;
@@ -16,6 +18,8 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Set;
 
 /**
@@ -43,6 +47,9 @@ public class IssueEventConsumer {
     private final IssueService issueService;
     private final IssueEmbeddingService embeddingService;
     private final TriageService triageService;
+    private final WebhookDeliveryRepository deliveries;
+    private final TriageMetrics metrics;
+    private final Clock clock;
 
     @KafkaListener(topics = KafkaTopicsConfig.ISSUE_EVENTS, groupId = GROUP_ID)
     public void onIssueEvent(ConsumerRecord<String, String> record) {
@@ -67,10 +74,23 @@ public class IssueEventConsumer {
         }
         if ("opened".equals(action)) {
             // Only once per issue: a redelivered "opened" finds the report and doesn't pay for the LLM again.
-            issueService.findId(issue.getSource(), issue.getExternalId()).ifPresent(triageService::createIfMissing);
+            boolean created = issueService.findId(issue.getSource(), issue.getExternalId())
+                    .map(triageService::createIfMissing).orElse(false);
+            if (created) {
+                recordWebhookToReport(message);
+            }
         }
         log.info("Issue event {} (partition {}, offset {}): {}", record.key(), record.partition(),
                 record.offset(), result);
+    }
+
+    /** Metric: from the moment the webhook was accepted (webhook_delivery.received_at) to the stored report. */
+    private void recordWebhookToReport(JsonNode message) {
+        JsonNode deliveryId = message.get("deliveryId");
+        if (deliveryId != null) {
+            deliveries.receivedAt(deliveryId.asString())
+                    .ifPresent(received -> metrics.webhookToReport(Duration.between(received, clock.instant())));
+        }
     }
 
     /** Bad data can't be fixed by retrying, so it becomes a BadIssueEventException (sent to the DLT at once). */

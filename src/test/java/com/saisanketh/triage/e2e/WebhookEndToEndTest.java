@@ -56,6 +56,13 @@ class WebhookEndToEndTest extends FullStackTest {
         // ... and created its triage report (fake LLM in tests).
         waitUntil("the issue has a triage report", () -> countRows(
                 "select count(*) from triage_report where llm_model = 'fake'") == 1);
+
+        // M6: the latency from webhook to report and the Kafka consumer lag are on /actuator/prometheus.
+        HttpResponse<String> metrics = http.send(HttpRequest.newBuilder(
+                URI.create("http://localhost:" + port + "/actuator/prometheus")).GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(metrics.statusCode()).isEqualTo(200);
+        assertThat(metrics.body()).contains("triage_webhook_to_report_seconds_count", "triage_webhook_to_report_seconds_bucket",
+                "triage_duplicates_suggested_total", "triage_outbox_unsent", "kafka_consumer_fetch_manager_records_lag_max");
     }
 
     @Test
