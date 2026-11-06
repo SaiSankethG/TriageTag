@@ -94,7 +94,7 @@ roughly triple throughput.
 ```bash
 colima start              # the Docker runtime used here (any Docker works)
 docker-compose up -d      # Postgres + pgvector on localhost:5433 (database "triage"), Kafka on localhost:9092
-./mvnw spring-boot:run    # Flyway creates/updates the schema; open http://localhost:8080/ for the demo page
+./mvnw spring-boot:run    # Flyway creates/updates the schema; open http://localhost:8080/ (landing) or /app.html (reports)
 ```
 
 Postgres is on host port **5433**, so it doesn't clash with a locally installed Postgres. Secrets only ever come from env vars:

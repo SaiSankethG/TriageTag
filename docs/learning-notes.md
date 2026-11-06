@@ -2596,3 +2596,30 @@ hint text reused the class `note` (a boxed message style), so each hint was draw
    in both themes, the entrance animation is off for "reduced motion", and focus moves to the verdict after loading.
 3. **Why `type="text" inputmode="numeric"` instead of `type="number"`?** Number inputs add spinner arrows and accept things like
    "1e5"; a text field with a numeric keyboard and a digit check is simpler for an ID.
+
+## Landing page and several repositories (6 Nov 2026)
+
+sai: make a landing page like Dosu's: a sample, how it helps, how to use it (animated steps), individual developers vs engineering
+teams, several repositories, and "Check issues" goes to the reports. Files: `static/index.html` (new landing), `static/app.html`
+(the reports page, moved from `index.html`, now with a repository switcher), `static/guide.html` (links), `web/RepoController.java`
+(new `GET /repos`), Ingress (`/app.html`), tests.
+
+### What it does
+- `GET /repos` returns every repository the app has issues for, with how many issues and how many reports: one SQL query
+  (`issue LEFT JOIN triage_report ... GROUP BY repo`). The landing page's table and the reports page's switcher both use it.
+- The landing page's sample is **real**: it picks the newest report with a similarity of 75%+ and draws it as the same triage tag.
+- The four steps play one after another (a progress bar under the current one). Clicking, focusing a step or pointing at the
+  picture stops the autoplay; with "reduced motion" on, it doesn't autoplay at all.
+- "Who it's for" lists only features that exist (switcher, per-repo comment mode, daily budget, admin token, metrics). No prices:
+  there are no paid plans, and saying otherwise would be untrue.
+
+### One alternative I rejected
+A separate front-end app (React) for the landing page: it adds a build step and dependencies for one static page.
+
+### Likely interview questions
+1. **Why `LEFT JOIN` in `/repos`?** So repositories with issues but no reports still appear, with 0 triaged; an inner join
+   would hide them. `count(r.issue_id)` counts only matched rows.
+2. **Why is the landing page safe to make public?** It only reads (`GET`), inserts all text with `textContent`, and never
+   touches the admin token; the Ingress exposes only the read paths.
+3. **How do you make an autoplaying animation accessible?** Respect `prefers-reduced-motion`, stop on any interaction, make
+   each step a real button usable by keyboard, and hide the decorative picture from screen readers (`aria-hidden`).
