@@ -2686,3 +2686,26 @@ cross-fade (CSS view transitions, no library). All of it is off under `prefers-r
    animation off under `reduce`. Motion only shows what changed (a new report, a filter); nothing loops forever.
 3. **Why did an old server break a new page, and how would you stop it in production?** Front end and back end were out of
    step. In production they ship as one image, so they can't drift; and the page now degrades instead of crashing.
+
+## Scroll rail, tag that swings on hover, more room at the top (7 Nov 2026)
+
+sai: "more gap in the beginning", the tag should animate on hover or click, and a Dosu-style line that moves as you scroll.
+Files: `static/index.html`, `static/app.html`, `static/theme.css`, tests.
+
+- **Hero**: 128px above the headline (was 64px) so the page doesn't start right under the header.
+- **"How to use it" follows the scroll**: a thin rail joins the four step numbers and fills down to the middle of the screen;
+  the step whose number the fill has reached is the one shown, and the picture on the right stays in view (`position: sticky`)
+  while the steps go by. The old 3.6-second autoplay is gone: the visitor's scroll drives it, and a click still picks a step.
+  The scroll handler is `passive` and does its work once per frame (`requestAnimationFrame`), so scrolling stays smooth.
+- **Tag on hover or click**: a short "nudge" swing from where it hangs. One listener on the document (event delegation) covers
+  every tag, including ones drawn later; links and buttons on the tag still work. A 1-second timer removes the class even when
+  no animation runs (reduced motion), so nothing gets stuck.
+- Bug found while checking: the picture didn't stick, because the same CSS rule said `position: sticky` and later
+  `position: relative`; in one rule the last value wins.
+
+### Likely interview questions
+1. **Why `requestAnimationFrame` in a scroll handler?** Scroll events can fire many times per frame; doing the layout reads
+   once per frame avoids jank.
+2. **Why event delegation for the tag?** Tags are created after the page loads (each report is drawn by JS); one listener on
+   `document` with `closest('.tag')` works for all of them without re-binding.
+3. **Why replace autoplay with scroll?** Autoplay moves while you read; tying the step to the scroll lets the reader set the pace.

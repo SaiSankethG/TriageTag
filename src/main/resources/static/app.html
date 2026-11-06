@@ -593,6 +593,23 @@
     if (params.get('number')) showReport(repoValue(), params.get('number'));
     else renderWelcome(reports || []);
   })();
+
+  // The tag swings again when you point at it or click it; links and buttons on it still work as normal.
+  // The motion itself lives in theme.css and is off under prefers-reduced-motion.
+  function nudgeTag(event) {
+    const tag = event.target.closest('.tag');
+    if (!tag || event.target.closest('a, button')) return;
+    if (event.type === 'mouseover' && tag.contains(event.relatedTarget)) return;   // still inside the same tag
+    if (tag.classList.contains('nudge')) return;                                      // let the swing finish
+    tag.classList.remove('swing');
+    void tag.offsetWidth;                                                             // restart the animation
+    tag.classList.add('nudge');
+    const done = () => tag.classList.remove('nudge');
+    tag.addEventListener('animationend', done, { once: true });
+    setTimeout(done, 1000);                                                           // also when no animation runs (reduced motion)
+  }
+  document.addEventListener('mouseover', nudgeTag);
+  document.addEventListener('click', nudgeTag);
 </script>
 </body>
 </html>

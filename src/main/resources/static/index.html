@@ -41,8 +41,8 @@
   .btn.quiet { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 
   /* Hero */
-  .hero { padding-block: 64px 72px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
-  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; padding-block: 40px 56px; } }
+  .hero { padding-block: 128px 104px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; padding-block: 64px 56px; } }
   .hero .lede { margin: 18px 0 28px; }
   .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
 
@@ -75,8 +75,14 @@
 
   /* How to use: steps + animated stage */
   .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; margin-top: 32px; align-items: start; }
-  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } }
-  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .stage { order: -1; top: 8px; z-index: 2; min-height: 260px; } }
+  .steps-wrap { position: relative; }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 72px; position: relative; }
+  /* The rail joins the four numbers; its fill follows the scroll (set in setupSteps). */
+  .rail { position: absolute; left: 30px; width: 2px; background: var(--line); border-radius: 1px; }
+  .rail-fill { width: 100%; height: 0; background: var(--ink); border-radius: 1px; }
+  .steps .n { position: relative; z-index: 1; background: var(--bg); }
+  .steps button.done .n { background: var(--ink); color: var(--paper); box-shadow: none; }
   .steps button { width: 100%; text-align: left; border: 0; background: none; color: var(--ink); border-radius: 8px; padding: 14px 16px;
                   display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
   .steps button[aria-current="step"] { background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); }
@@ -86,10 +92,7 @@
   .steps .t { font-weight: 600; display: block; }
   .soon { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--amber-tint); box-shadow: inset 0 0 0 1px var(--amber); border-radius: 999px; padding: 0 8px; vertical-align: 1px; }
   .steps .d { font-size: 14px; color: var(--muted); display: block; }
-  .progress { height: 3px; background: var(--line); border-radius: 2px; margin-top: 10px; overflow: hidden; grid-column: 2; }
-  .steps button:not([aria-current="step"]) .progress { visibility: hidden; }
-  .progress > div { height: 100%; width: 0; background: var(--ink); }
-  .stage { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; min-height: 340px; padding: 24px; position: relative; overflow: hidden; }
+  .stage { position: sticky; top: 24px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; min-height: 340px; padding: 24px; overflow: hidden; }
   .scene { position: absolute; inset: 24px; display: grid; align-content: center; gap: 14px; opacity: 0; transform: translateY(12px); pointer-events: none; }
   .scene.on { opacity: 1; transform: none; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) { .scene { transition: opacity .45s ease, transform .45s ease; } }
@@ -195,12 +198,15 @@
     <div class="wrap">
       <h2 id="how-heading">How to use it</h2>
       <div class="how">
+        <div class="steps-wrap">
+        <div class="rail" id="rail" aria-hidden="true"><div class="rail-fill" id="rail-fill"></div></div>
         <ol class="steps" id="steps">
-          <li><button type="button" data-step="0"><span class="n" aria-hidden="true">1</span><span><span class="t">Install it on your repositories<span class="soon">Coming soon</span></span><span class="d">The GitHub App isn't public yet. Once it is, you add it to one repository or several.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
-          <li><button type="button" data-step="1"><span class="n" aria-hidden="true">2</span><span><span class="t">Someone opens an issue</span><span class="d">Nothing changes for the reporter.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
-          <li><button type="button" data-step="2"><span class="n" aria-hidden="true">3</span><span><span class="t">The assistant triages it in seconds</span><span class="d">You get a note with a coloured tag: likely duplicate, possible duplicate, needs info, or looks new.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
-          <li><button type="button" data-step="3"><span class="n" aria-hidden="true">4</span><span><span class="t">You decide</span><span class="d">Copy the draft reply, add a label, or close it as a duplicate. Nothing is posted for you.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
+          <li><button type="button" data-step="0"><span class="n" aria-hidden="true">1</span><span><span class="t">Install it on your repositories<span class="soon">Coming soon</span></span><span class="d">The GitHub App isn't public yet. Once it is, you add it to one repository or several.</span></span></button></li>
+          <li><button type="button" data-step="1"><span class="n" aria-hidden="true">2</span><span><span class="t">Someone opens an issue</span><span class="d">Nothing changes for the reporter.</span></span></button></li>
+          <li><button type="button" data-step="2"><span class="n" aria-hidden="true">3</span><span><span class="t">The assistant triages it in seconds</span><span class="d">You get a note with a coloured tag: likely duplicate, possible duplicate, needs info, or looks new.</span></span></button></li>
+          <li><button type="button" data-step="3"><span class="n" aria-hidden="true">4</span><span><span class="t">You decide</span><span class="d">Copy the draft reply, add a label, or close it as a duplicate. Nothing is posted for you.</span></span></button></li>
         </ol>
+        </div>
         <div class="stage" aria-hidden="true">
           <div class="scene" data-scene="0">
             <p class="small muted">Coming soon: what installing will look like.</p>
@@ -213,8 +219,8 @@
               <span class="small muted">spring.datasource.url is set, but the app connects to an in-memory database.</span></div>
           </div>
           <div class="scene" data-scene="2">
-            <div class="tag red"><div class="band"><div class="verdict">Likely duplicate</div></div>
-              <div class="body"><div class="score">93%<small>similar</small></div><div class="match">Same problem as an earlier issue that was fixed in 3.4.2.</div></div></div>
+            <div class="tag red swing"><div class="band"><div class="verdict">Likely duplicate</div><div class="small" style="margin-top:2px">Same problem, and the AI check agrees.</div></div>
+              <div class="body"><div class="match"><b>93%</b> similar to an earlier issue that was fixed in 3.4.2.</div><div class="meter"><div class="red" style="--w:93%"></div></div></div></div>
           </div>
           <div class="scene" data-scene="3">
             <div class="reply">This looks like an earlier issue that was fixed in 3.4.2. Could you try that version and tell us your Spring Boot version?</div>
@@ -335,33 +341,48 @@
   }
 
   // --- 3. the steps play one after another; a click, hover or focus stops the autoplay ---
+  // --- 3. the steps follow the scroll: the rail fills down to the middle of the screen, and the step whose number the fill has
+  //        reached is the one shown. A click also picks a step. Nothing plays on its own.
   function setupSteps() {
     const buttons = [...document.querySelectorAll('#steps button')];
     const scenes = [...document.querySelectorAll('.scene')];
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const STEP_MS = 3600;
-    let current = 0, timer = null, started = 0, playing = !reduced;
+    const circles = buttons.map(b => b.querySelector('.n'));
+    const rail = $('rail'), fill = $('rail-fill'), wrap = document.querySelector('.steps-wrap');
+    let current = -1, queued = false;
+    const centre = (node) => { const r = node.getBoundingClientRect(); return r.top + r.height / 2; };
     function show(i) {
+      if (i === current) return;
       current = i;
-      buttons.forEach((b, k) => { if (k === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+      buttons.forEach((b, k) => {
+        if (k === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+        b.classList.toggle('done', k < i);
+      });
       scenes.forEach((s, k) => s.classList.toggle('on', k === i));
-      buttons.forEach(b => { b.querySelector('.progress > div').style.width = '0'; });
-      started = performance.now();
     }
-    function tick(now) {
-      if (!playing) return;
-      const done = Math.min(1, (now - started) / STEP_MS);
-      buttons[current].querySelector('.progress > div').style.width = `${done * 100}%`;
-      if (done >= 1) show((current + 1) % buttons.length);
-      timer = requestAnimationFrame(tick);
+    function layout() {                       // the rail runs from the first number to the last
+      const top = centre(circles[0]) - wrap.getBoundingClientRect().top;
+      rail.style.top = `${top}px`;
+      rail.style.height = `${centre(circles[circles.length - 1]) - centre(circles[0])}px`;
     }
-    function stop() { playing = false; cancelAnimationFrame(timer); buttons.forEach(b => { b.querySelector('.progress > div').style.width = '0'; }); }
-    buttons.forEach((b, i) => b.addEventListener('click', () => { stop(); show(i); }));
-    $('steps').addEventListener('focusin', stop);
-    document.querySelector('.stage').addEventListener('pointerenter', stop);
+    function onScroll() {
+      queued = false;
+      const mid = innerHeight * 0.55;
+      const r = rail.getBoundingClientRect();
+      const done = Math.max(0, Math.min(1, (mid - r.top) / Math.max(1, r.height)));
+      fill.style.height = `${done * 100}%`;
+      let i = 0;
+      circles.forEach((c, k) => { if (centre(c) <= mid) i = k; });
+      show(i);
+    }
+    const request = () => { if (!queued) { queued = true; requestAnimationFrame(onScroll); } };
+    buttons.forEach((b, i) => b.addEventListener('click', () => show(i)));
+    addEventListener('scroll', request, { passive: true });
+    addEventListener('resize', () => { layout(); request(); });
+    layout();
     show(0);
-    if (playing) timer = requestAnimationFrame(tick);
+    onScroll();
   }
+
 
   (async function start() {
     setupSteps();
@@ -377,6 +398,23 @@
         el('div', { class: 'body' }, el('p', { class: 'muted small' }, 'Reports appear here once the first issues are triaged.'))));
     }
   })();
+
+  // The tag swings again when you point at it or click it; links and buttons on it still work as normal.
+  // The motion itself lives in theme.css and is off under prefers-reduced-motion.
+  function nudgeTag(event) {
+    const tag = event.target.closest('.tag');
+    if (!tag || event.target.closest('a, button')) return;
+    if (event.type === 'mouseover' && tag.contains(event.relatedTarget)) return;   // still inside the same tag
+    if (tag.classList.contains('nudge')) return;                                      // let the swing finish
+    tag.classList.remove('swing');
+    void tag.offsetWidth;                                                             // restart the animation
+    tag.classList.add('nudge');
+    const done = () => tag.classList.remove('nudge');
+    tag.addEventListener('animationend', done, { once: true });
+    setTimeout(done, 1000);                                                           // also when no animation runs (reduced motion)
+  }
+  document.addEventListener('mouseover', nudgeTag);
+  document.addEventListener('click', nudgeTag);
 </script>
 </body>
 </html>
