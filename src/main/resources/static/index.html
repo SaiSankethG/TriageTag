@@ -7,30 +7,15 @@
 <style>
   /* Landing page. Same identity as the reports page: the verdict is a triage tag (red / amber / green band); everything else
      quiet. Order: a live sample, what it does for your work, how to use it (animated steps), who it's for, your repositories. */
-  :root {
-    --bg: #eef1f0; --paper: #ffffff; --paper-2: #f6f8f7; --ink: #1c2126; --muted: #5c666e; --faint: #87919a;
-    --line: #d5dbda; --link: #245c8a; --focus: #245c8a;
-    --red: #c2362b; --amber: #c98a00; --green: #2e7a4e; --grey: #6b747c; --on-band: #ffffff; --on-amber: #1c2126;
-    --amber-tint: #faf0d8; --blue: #2f6690;
-    --condensed: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #171b1e; --paper: #20262a; --paper-2: #262d32; --ink: #e4e8ea; --muted: #9aa4ab; --faint: #76808a;
-      --line: #323a3f; --link: #8cb8e0; --focus: #8cb8e0;
-      --red: #e0574b; --amber: #e3a72b; --green: #4fa673; --grey: #8a939b; --on-band: #ffffff; --on-amber: #1c2126;
-      --amber-tint: #362c15; --blue: #3f7fbf;
-    }
-  }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
   html { scroll-behavior: smooth; }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
-  body { background: var(--bg); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.6 var(--body); }
   a { color: var(--link); text-underline-offset: 3px; text-decoration-thickness: 1px; }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
   button { font: inherit; cursor: pointer; }
-  h1, h2, h3, .condensed { font-family: var(--condensed); font-stretch: condensed; font-weight: 600; margin: 0; }
+  h1, h2, h3, .condensed { font-family: var(--condensed); font-stretch: 85%; font-weight: 600; margin: 0; }
   h1 { font-size: 52px; line-height: 1.05; letter-spacing: -.01em; max-width: 13ch; text-wrap: balance; }
   h2 { font-size: 34px; line-height: 1.15; max-width: 24ch; text-wrap: balance; }
   h3 { font-size: 21px; line-height: 1.25; }
@@ -44,8 +29,8 @@
 
   /* Header */
   .bar { border-bottom: 1px solid var(--line); background: var(--paper); }
-  .bar-inner { display: flex; align-items: center; gap: 18px; padding-block: 12px; flex-wrap: wrap; }
-  .name { font-family: var(--condensed); font-stretch: condensed; font-size: 21px; font-weight: 600; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  .bar-inner { max-width: 1260px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }  /* same as app.html and guide.html */
+  .name { font-family: var(--condensed); font-stretch: 85%; font-size: 21px; font-weight: 600; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
   .swatches { display: inline-flex; gap: 3px; }
   .swatches i { width: 6px; height: 18px; border-radius: 2px; display: block; }
   .bar nav { margin-left: auto; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
@@ -68,12 +53,12 @@
   .tag::before { content: ""; position: absolute; top: 9px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%;
                  background: var(--bg); box-shadow: inset 0 0 0 2px var(--line); }
   .tag .band { padding: 12px 20px 14px; color: var(--on-band); }
-  .tag.red .band { background: var(--red); } .tag.amber .band { background: var(--amber); color: var(--on-amber); }
-  .tag.green .band { background: var(--green); } .tag.grey .band { background: var(--grey); } .tag.blue .band { background: var(--blue); }
-  .tag .verdict { font-family: var(--condensed); font-stretch: condensed; font-size: 26px; font-weight: 700; line-height: 1.1; }
+  .tag.red .band { background: var(--red-band); } .tag.amber .band { background: var(--amber); color: var(--on-amber); }
+  .tag.green .band { background: var(--green-band); } .tag.grey .band { background: var(--grey); } .tag.blue .band { background: var(--blue-band); }
+  .tag .verdict { font-family: var(--condensed); font-stretch: 85%; font-size: 26px; font-weight: 700; line-height: 1.1; }
   .tag .body { padding: 16px 20px 20px; display: grid; gap: 12px; }
-  .tag .score { font-family: var(--condensed); font-stretch: condensed; font-size: 40px; font-weight: 600; line-height: 1; }
-  .tag .score small { font: 15px system-ui, sans-serif; color: var(--muted); margin-left: 6px; }
+  .tag .score { font-family: var(--condensed); font-stretch: 85%; font-size: 40px; font-weight: 600; line-height: 1; }
+  .tag .score small { font: 15px var(--body); color: var(--muted); margin-left: 6px; }
   .tag .issue { font-size: 14px; color: var(--muted); }
   .tag .issue b { color: var(--ink); font-weight: 600; display: block; overflow-wrap: anywhere; }
   .tag .match { font-size: 14px; overflow-wrap: anywhere; }
@@ -138,10 +123,14 @@
   .closing { text-align: left; display: grid; gap: 18px; justify-items: start; }
   footer { border-top: 1px solid var(--line); padding-block: 26px; color: var(--faint); font-size: 14px; }
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 <header class="bar">
-  <div class="wrap bar-inner">
+  <div class="bar-inner">
     <a class="name" href="/" aria-label="TriageTag, home">
       <span class="swatches" aria-hidden="true"><i style="background:var(--red)"></i><i style="background:var(--amber)"></i><i style="background:var(--green)"></i></span>
       TriageTag
@@ -150,7 +139,6 @@
       <a href="/" aria-current="page">Home</a>
       <a href="/app.html">Reports</a>
       <a href="/guide.html">How to use</a>
-      <a class="btn small-btn" href="/app.html">Check issues</a>
     </nav>
   </div>
 </header>
@@ -330,10 +318,10 @@
     const checks = m.status !== 'OK' ? null : el('ul', { class: 'mini' }, ...(missing.length
       ? missing.map(k => el('li', {}, el('span', { class: 'missing', 'aria-hidden': 'true' }, '✗'), `${names[k]} missing`))
       : [el('li', {}, el('span', { class: 'given', 'aria-hidden': 'true' }, '✓'), 'Nothing missing')]));
-    $('sample-tag').replaceChildren(el('div', { class: `tag ${colour}` },
+    $('sample-tag').replaceChildren(el('div', { class: `tag ${colour} swing` },
       el('div', { class: 'band' }, el('div', { class: 'verdict' }, word)),
       el('div', { class: 'body' },
-        el('div', { class: 'issue' }, `New issue #${r.number}`, el('b', {}, r.title)),
+        el('div', { class: 'issue' }, 'New issue ', el('span', { class: 'num' }, `#${r.number}`), el('b', {}, r.title)),
         top ? el('div', { class: 'match' }, el('b', {}, pct(top.score)), ' similar to ', el('a', { href: top.url, target: '_blank', rel: 'noopener' }, `#${top.number} ${top.title}`)) : null,
         checks)));
     $('sample-caption').replaceChildren('A real report for ', el('a', { href: appLink(repo, r.number) }, `${repo} #${r.number}`), '.');
@@ -379,7 +367,8 @@
     setupSteps();
     let settings = null, repos = [];
     try { settings = await (await fetch('/settings')).json(); } catch { settings = null; }
-    try { repos = await (await fetch('/repos')).json(); } catch { repos = []; }
+    try { const response = await fetch('/repos'); repos = response.ok ? await response.json() : []; } catch { repos = []; }
+    if (!Array.isArray(repos)) repos = [];
     renderRepos(repos);
     const repo = (repos.find(r => r.triaged > 0) || repos[0] || { repo: 'spring-projects/spring-boot' }).repo;
     try { await loadSample(repo, settings); }

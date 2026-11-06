@@ -107,7 +107,7 @@ class K3sManifestsTest {
         List<Object> paths = (List<Object>) map(map(rules.get(0)).get("http")).get("paths");
         List<String> routed = paths.stream().map(p -> (String) map(p).get("path")).toList();
 
-        assertThat(routed).containsExactlyInAnyOrder("/webhooks/github", "/", "/index.html", "/app.html", "/guide.html", "/reports", "/repos",
+        assertThat(routed).containsExactlyInAnyOrder("/webhooks/github", "/", "/index.html", "/app.html", "/guide.html", "/theme.css", "/reports", "/repos",
                 "/settings", "/actuator/health");
         assertThat(routed).noneMatch(p -> p.startsWith("/backfill") || p.startsWith("/eval") || p.startsWith("/embeddings")
                 || p.startsWith("/docs"));

@@ -7,30 +7,15 @@
 <style>
   /* Design: the verdict is a triage tag (red / amber / blue / green band, punched hole, a stamp for what maintainers decided later).
      Everything around it stays quiet: cool clinical grey, white paper, ink text, one condensed face for headings. */
-  :root {
-    --bg: #eef1f0; --paper: #ffffff; --paper-2: #f6f8f7; --ink: #1c2126; --muted: #5c666e; --faint: #87919a;
-    --line: #d5dbda; --link: #245c8a; --focus: #245c8a;
-    --red: #c2362b; --amber: #c98a00; --green: #2e7a4e; --grey: #6b747c; --on-band: #ffffff; --on-amber: #1c2126;
-    --red-tint: #f8e6e4; --amber-tint: #faf0d8; --green-tint: #e3f1e8; --blue: #2f6690; --amber-text: #8a5d00;
-    --condensed: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #171b1e; --paper: #20262a; --paper-2: #262d32; --ink: #e4e8ea; --muted: #9aa4ab; --faint: #76808a;
-      --line: #323a3f; --link: #8cb8e0; --focus: #8cb8e0;
-      --red: #e0574b; --amber: #e3a72b; --green: #4fa673; --grey: #8a939b; --on-band: #ffffff; --on-amber: #1c2126;
-      --red-tint: #3a2220; --amber-tint: #362c15; --green-tint: #1b3024; --blue: #3f7fbf; --amber-text: #e3a72b;
-    }
-  }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
-  body { background: var(--bg); color: var(--ink); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); }
   a { color: var(--link); text-underline-offset: 3px; text-decoration-thickness: 1px; }
   :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
   button { font: inherit; cursor: pointer; }
   input { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 9px 11px; width: 100%; }
   .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  h1, h2, .condensed { font-family: var(--condensed); font-stretch: condensed; }
+  h1, h2, .condensed { font-family: var(--condensed); font-stretch: 85%; }
   h1 { font-size: 30px; line-height: 1.15; font-weight: 600; margin: 0; letter-spacing: -.005em; max-width: 30ch; }
   h2 { font-size: 20px; line-height: 1.25; font-weight: 600; margin: 0 0 12px; }
   .muted { color: var(--muted); } .faint { color: var(--faint); } .small { font-size: 13px; }
@@ -38,7 +23,7 @@
   /* Header */
   .bar { border-bottom: 1px solid var(--line); background: var(--paper); }
   .bar-inner { max-width: 1260px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
-  .name { font-family: var(--condensed); font-stretch: condensed; font-size: 21px; font-weight: 600; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  .name { font-family: var(--condensed); font-stretch: 85%; font-size: 21px; font-weight: 600; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
   .name .swatches { display: inline-flex; gap: 3px; }
   .name .swatches i { width: 6px; height: 18px; border-radius: 2px; display: block; }
   .bar nav { margin-left: auto; display: flex; gap: 18px; }
@@ -103,9 +88,9 @@
   .tag::before { content: ""; position: absolute; top: 9px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%;
                  background: var(--bg); box-shadow: inset 0 0 0 2px var(--line); }
   .tag .band { padding: 12px 20px 14px; color: var(--on-band); }
-  .tag.red .band { background: var(--red); } .tag.amber .band { background: var(--amber); color: var(--on-amber); }
-  .tag.blue .band { background: var(--blue); } .tag.green .band { background: var(--green); }
-  .tag .band .verdict { font-family: var(--condensed); font-stretch: condensed; font-size: 32px; font-weight: 700; line-height: 1.1; }
+  .tag.red .band { background: var(--red-band); } .tag.amber .band { background: var(--amber); color: var(--on-amber); }
+  .tag.blue .band { background: var(--blue-band); } .tag.green .band { background: var(--green-band); }
+  .tag .band .verdict { font-family: var(--condensed); font-stretch: 85%; font-size: 32px; font-weight: 700; line-height: 1.1; }
   .tag .band .why { font-size: 14px; margin-top: 4px; overflow-wrap: anywhere; }
   .tag .body { padding: 14px 20px 18px; display: grid; gap: 10px; }
   .tag .score { font-size: 14px; color: var(--muted); }
@@ -115,12 +100,8 @@
   .gaps .x { color: var(--red); font-weight: 800; } .gaps .ok { color: var(--green); font-weight: 800; }
   .stamp { margin: 0 20px 20px; padding: 10px 12px; border: 2px dashed var(--muted); border-radius: 6px; transform: rotate(-1.2deg);
            font-size: 14px; color: var(--ink); background: var(--paper-2); }
-  .stamp b { font-family: var(--condensed); font-stretch: condensed; font-size: 16px; display: block; }
+  .stamp b { font-family: var(--condensed); font-stretch: 85%; font-size: 16px; display: block; }
   .stamp .hit { color: var(--green); font-weight: 600; } .stamp .miss { color: var(--red); font-weight: 600; }
-  @media (prefers-reduced-motion: no-preference) {
-    .tag.arrive { animation: arrive .45s cubic-bezier(.2, .8, .2, 1); transform-origin: 50% 0; }
-    @keyframes arrive { from { transform: rotate(-4deg) translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
-  }
 
   /* Actions next to the tag */
   .actions { display: grid; gap: 14px; align-content: start; }
@@ -130,7 +111,7 @@
 
   .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
   .draft { white-space: pre-wrap; word-break: break-word; margin: 10px 0 0; padding: 14px 16px; border-left: 3px solid var(--ink);
-           background: var(--paper-2); border-radius: 0 8px 8px 0; font: 15px/1.65 system-ui, sans-serif; max-width: 78ch; }
+           background: var(--paper-2); border-radius: 0 8px 8px 0; font: 15px/1.65 var(--body); max-width: 78ch; }
 
   /* This issue next to its best match */
   .side { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -138,13 +119,14 @@
   .side > div { background: var(--paper-2); border-radius: 8px; padding: 12px 14px; min-width: 0; }
   .side h3 { font-size: 15px; margin: 0 0 4px; font-weight: 600; }
   .side .sub { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
-  .side pre { white-space: pre-wrap; margin: 0; font: 14px/1.55 system-ui, sans-serif; max-height: 320px; overflow: auto; }
+  .side pre { white-space: pre-wrap; margin: 0; font: 14px/1.55 var(--body); max-height: 320px; overflow: auto; }
   .fixed { background: var(--amber-tint); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; font-size: 14px; }
   .row { padding: 10px 0; border-top: 1px solid var(--line); }
   .row:first-of-type { border-top: 0; padding-top: 2px; }
   .row .top { display: flex; justify-content: space-between; gap: 14px; align-items: baseline; }
   .row .pct { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .row .state { font-size: 13px; color: var(--muted); }
+  .row .state { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .meter > div.grey { background: var(--muted); }
   dl.meta { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 14px; }
   dl.meta dt { color: var(--muted); } dl.meta dd { margin: 0; overflow-wrap: anywhere; }
 
@@ -166,6 +148,10 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 <header class="bar">
@@ -207,7 +193,7 @@
       <input id="search" type="search" placeholder="Search titles, e.g. datasource" autocomplete="off">
     </div>
     <div id="list-status" class="small faint" aria-live="polite" style="margin-top:8px"></div>
-    <ul id="issue-list" class="list" aria-label="Issues"></ul>
+    <ul id="issue-list" class="list stagger" aria-label="Issues"></ul>
   </aside>
 
   <main>
@@ -320,7 +306,9 @@
   // --- repositories: the switcher lists every repository the assistant has issues for ---
   async function loadRepos(preferred) {
     let repos = [];
-    try { repos = await (await fetch('/repos')).json(); } catch { repos = []; }
+    // An older server has no GET /repos (it answers 404 with an error object): fall back to the default repository.
+    try { const response = await fetch('/repos'); repos = response.ok ? await response.json() : []; } catch { repos = []; }
+    if (!Array.isArray(repos)) repos = [];
     const names = repos.map(r => r.repo);
     const chosen = preferred && validRepo(preferred) ? preferred : (names[0] || 'spring-projects/spring-boot');
     if (!names.includes(chosen)) names.unshift(chosen);
@@ -341,10 +329,10 @@
     loadList();
   }
 
-  function listItem(number, title, colour, lines, onClick) {
-    return el('li', {}, el('button', { type: 'button', 'data-number': number, onclick: onClick },
+  function listItem(number, title, colour, lines, onClick, index = 0) {
+    return el('li', { style: `--i:${index}` }, el('button', { type: 'button', 'data-number': number, onclick: onClick },
       el('span', { class: `stripe ${colour || ''}`, 'aria-hidden': 'true' }),
-      el('span', { style: 'min-width:0' }, el('span', { class: 't' }, el('span', { class: 'faint' }, `#${number} `), title), ...lines)));
+      el('span', { style: 'min-width:0' }, el('span', { class: 't' }, el('span', { class: 'faint num' }, `#${number} `), title), ...lines)));
   }
 
   /** Filter buttons with counts, then the triaged list as filtered (open issues come first from the server). */
@@ -359,10 +347,10 @@
       k === 'all' ? null : el('i', { style: `background:var(--${KINDS[k].colour})`, 'aria-hidden': 'true' }),
       `${k === 'all' ? 'All' : KINDS[k].word} ${count(k)}`)));
     const shown = items.filter(x => filter === 'all' || x.kind === filter);
-    $('issue-list').replaceChildren(...shown.map(({ r, t, kind }) => listItem(r.number, r.title, KINDS[kind].colour, [
+    $('issue-list').replaceChildren(...shown.map(({ r, t, kind }, i) => listItem(r.number, r.title, KINDS[kind].colour, [
       el('span', { class: `w ${KINDS[kind].colour}`, style: 'display:block' }, KINDS[kind].word,
         r.state === 'closed' ? el('span', { class: 'faint' }, ', closed') : null),
-      el('span', { class: 'y', style: 'display:block' }, whyOf(kind, t))], () => showReport(repo, r.number))));
+      el('span', { class: 'y', style: 'display:block' }, whyOf(kind, t))], () => showReport(repo, r.number), i)));
     $('list-status').textContent = !triaged.length ? 'No issue has been triaged yet.'
       : shown.length ? 'Open issues first, then the newest.' : 'Nothing matches this filter.';
     markCurrent($('number').value);
@@ -387,9 +375,9 @@
       const response = await fetch(`/repos/${repo}/issues?${params}`);
       if (!response.ok) throw new Error(`server answered ${response.status}`);
       const page = await response.json();
-      $('issue-list').replaceChildren(...page.issues.map(issue => listItem(issue.number, issue.title, null,
+      $('issue-list').replaceChildren(...page.issues.map((issue, i) => listItem(issue.number, issue.title, null,
         [el('span', { class: 'm', style: 'display:block' }, `${issue.state}, ${fmtDate(issue.createdAt)}${isTeam(issue.authorAssociation) ? ', by the team' : ''}${issue.hasReport ? ', triaged' : ''}`)],
-        () => showReport(repo, issue.number))));
+        () => showReport(repo, issue.number), i)));
       $('list-status').textContent = page.total === 0
         ? (q ? `No titles contain "${q}".` : 'No stored issues for this repository.')
         : `${q ? 'Matching' : 'Newest'} ${page.issues.length} of ${page.total.toLocaleString()}`;
@@ -422,7 +410,7 @@
       el('h2', {}, examples.length ? 'Open an example' : 'Open an issue from the list'),
       examples.length ? el('div', { class: 'examples' }, ...examples.map(({ r, kind }) => el('button', { type: 'button', class: 'example', onclick: () => showReport(repo, r.number) },
         el('span', { class: `stripe ${KINDS[kind].colour}`, 'aria-hidden': 'true' }),
-        el('span', {}, el('span', { class: 'small faint', style: 'display:block' }, `#${r.number}, ${KINDS[kind].word.toLowerCase()}`), r.title)))) : null,
+        el('span', {}, el('span', { class: 'small faint', style: 'display:block' }, el('span', { class: 'num' }, `#${r.number}`), `, ${KINDS[kind].word.toLowerCase()}`), r.title)))) : null,
       el('p', { class: 'small muted', style: 'margin-top:22px' }, 'First time here? ', el('a', { href: '/guide.html' }, 'Read how to use it'), '. It takes two minutes.')));
   }
 
@@ -478,6 +466,12 @@
     return null;
   }
 
+  /** A thin bar that fills to the similarity (the fill is animated in theme.css). */
+  function meter(score, colour) {
+    return el('div', { class: 'meter', role: 'img', 'aria-label': `Similarity ${pct(score)}` },
+      el('div', { class: colour, style: `--w:${Math.max(2, Math.min(100, score * 100))}%` }));
+  }
+
   /** A button that copies text and says "Copied" for two seconds. */
   function copyButton(label, text, primary) {
     const button = el('button', { type: 'button', class: primary ? 'btn' : 'btn quiet', onclick: async () => {
@@ -499,7 +493,7 @@
 
     // Which issue this is (one line), then the answer
     parts.push(el('section', { class: 'issue-head' },
-      el('div', { class: 'who' }, `#${r.number}, opened ${fmtDate(card.createdAt)} by ${isTeam(card.authorAssociation) ? 'the team' : 'an outside reporter'}, `,
+      el('div', { class: 'who' }, el('span', { class: 'num' }, `#${r.number}`), `, opened ${fmtDate(card.createdAt)} by ${isTeam(card.authorAssociation) ? 'the team' : 'an outside reporter'}, `,
         el('span', { class: `chip ${card.state}` }, stateText(card.state, card.stateReason))),
       el('h1', {}, link(r.url, r.title))));
     const note = aiNote(r);
@@ -511,10 +505,11 @@
       : el('ul', { class: 'gaps', 'aria-label': 'Missing details' }, ...(t.missing.length
         ? t.missing.map(k => el('li', {}, el('span', { class: 'x', 'aria-hidden': 'true' }, '✗'), `${MISSING_NAMES[k][0].toUpperCase()}${MISSING_NAMES[k].slice(1)} missing`))
         : [el('li', {}, el('span', { class: 'ok', 'aria-hidden': 'true' }, '✓'), 'Nothing important missing')]));
-    const tagEl = el('section', { class: `tag ${KINDS[kind].colour} arrive`, role: 'status', tabindex: '-1', 'aria-label': `Verdict: ${KINDS[kind].word}` },
+    const tagEl = el('section', { class: `tag ${KINDS[kind].colour} swing`, role: 'status', tabindex: '-1', 'aria-label': `Verdict: ${KINDS[kind].word}` },
       el('div', { class: 'band' }, el('div', { class: 'verdict' }, KINDS[kind].word), el('div', { class: 'why' }, whyOf(kind, t))),
       el('div', { class: 'body' },
-        top ? el('div', { class: 'score' }, el('b', {}, pct(top.score)), ' similar to ', link(top.url, `#${top.number}`)) : null,
+        top ? el('div', { class: 'score' }, el('b', {}, pct(top.score)), ' similar to ', link(top.url, el('span', { class: 'num' }, `#${top.number}`))) : null,
+        top ? meter(top.score, KINDS[kind].colour) : null,
         gaps),
       stamp(r),
       card.state === 'closed' ? el('div', { class: 'small faint', style: 'padding:0 20px 18px' }, 'Already closed. The tag shows what the assistant would have said when it was opened.') : null);
@@ -554,7 +549,7 @@
         r.fixedHint ? el('div', { class: 'fixed' }, el('strong', {}, 'Already fixed? '), r.fixedHint.text, ' ',
           r.fixedHint.closerUrl ? link(r.fixedHint.closerUrl, 'See the fix') : null) : null,
         el('div', { class: 'side' },
-          el('div', {}, el('h3', {}, `This issue, #${r.number}`), el('div', { class: 'sub' }, `${stateText(card.state, card.stateReason)}, opened ${fmtDate(card.createdAt)}`),
+          el('div', {}, el('h3', {}, 'This issue, ', el('span', { class: 'num' }, `#${r.number}`)), el('div', { class: 'sub' }, `${stateText(card.state, card.stateReason)}, opened ${fmtDate(card.createdAt)}`),
             el('pre', {}, cut(card.bodyStart.slice(0, 600), card.bodyLength))),
           el('div', {}, el('h3', {}, link(top.url, `#${top.number} ${top.title}`)),
             el('div', { class: 'sub' }, `${pct(top.score)} similar, ${stateText(top.state, top.stateReason)}${top.createdAt ? `, opened ${fmtDate(top.createdAt)}` : ''}`),
@@ -567,7 +562,7 @@
       parts.push(el('details', { class: 'panel fold' }, el('summary', {}, `Other similar issues (${others.length})`),
         ...others.map(d => el('div', { class: 'row' },
           el('div', { class: 'top' }, el('div', {}, link(d.url, `#${d.number} ${d.title}`)), el('span', { class: 'pct' }, pct(d.score))),
-          el('div', { class: 'state' }, stateText(d.state, d.stateReason))))));
+          el('div', { class: 'state' }, stateText(d.state, d.stateReason)), meter(d.score, 'grey')))));
     }
 
     // 6. Details for the curious: the AI check, model, tokens

@@ -18,7 +18,7 @@ class DemoPageTest {
         assertThat(html).doesNotContain("innerHTML");          // text from issues and the LLM goes in as text only
         assertThat(html).doesNotContain("<script src=");       // no external scripts, no new dependency
         assertThat(html).contains("fetch('/settings')", "fetch('/repos')", "/repos/${repo}/issues?", "URLSearchParams(location.search)");
-        assertThat(html).contains("@media (max-width: 820px)", "prefers-color-scheme: dark", ":focus-visible");
+        assertThat(html).contains("@media (max-width: 820px)", ":focus-visible");   // dark mode lives in theme.css
         // Maintainer-first: four words instead of percentages, a one-line why, filters, and copy buttons (nothing is posted).
         assertThat(html).contains("'Likely duplicate'", "'Possible duplicate'", "'Needs info'", "'Looks new'", "function whyOf(",
                 "id=\"filters\"", "id=\"open-only\"", "Copy reply", "Duplicate of #", "Open on GitHub", "This issue and its best match");
@@ -57,5 +57,20 @@ class DemoPageTest {
         assertThat(landing).contains("Coming soon", "overflow-x: auto; position: relative;");  // App not public yet; no phone sideways scroll   // the step animation does not autoplay for users who turned motion off
         assertThat(landing).doesNotContain("innerHTML").doesNotContain("<script src=").doesNotContain("localStorage")
                 .doesNotContain("X-Admin-Token");                 // the landing page only reads
+    }
+
+    @Test
+    void everyPageSharesOneThemeAndOneHeaderBoxAndMotionStopsForReducedMotion() throws Exception {
+        for (String page : new String[]{"index.html", "app.html", "guide.html", "admin.html"}) {
+            String html = new ClassPathResource("static/" + page).getContentAsString(StandardCharsets.UTF_8);
+            assertThat(html).as(page).contains("<link rel=\"stylesheet\" href=\"/theme.css\">").doesNotContain(":root {");
+        }
+        for (String page : new String[]{"index.html", "app.html", "guide.html"}) {   // same header box: nothing jumps
+            assertThat(new ClassPathResource("static/" + page).getContentAsString(StandardCharsets.UTF_8)).as(page)
+                    .contains(".bar-inner { max-width: 1260px; margin: 0 auto; padding: 12px 16px;");
+        }
+        String theme = new ClassPathResource("static/theme.css").getContentAsString(StandardCharsets.UTF_8);
+        assertThat(theme).contains("@media (prefers-reduced-motion: reduce)", "animation: none !important",
+                "@keyframes swing", ".stagger", "@keyframes fill", "prefers-color-scheme: dark", "Bricolage Grotesque", "IBM Plex Sans", "IBM Plex Mono");
     }
 }

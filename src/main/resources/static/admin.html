@@ -7,16 +7,12 @@
 <title>Admin · TriageTag</title>
 <style>
   /* Not public: the Ingress doesn't route /admin.html, so this works only on a local run or through a port-forward. */
-  :root { --bg: #eef1f0; --paper: #ffffff; --ink: #1c2126; --muted: #5c666e; --line: #d5dbda; --link: #245c8a; --red: #c2362b; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #171b1e; --paper: #20262a; --ink: #e4e8ea; --muted: #9aa4ab; --line: #323a3f; --link: #8cb8e0; --red: #e0574b; }
-  }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 var(--body); }
   a { color: var(--link); }
   :focus-visible { outline: 3px solid var(--link); outline-offset: 2px; border-radius: 4px; }
   main { max-width: 560px; margin: 0 auto; padding: 32px 16px 64px; }
-  h1 { font-family: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", sans-serif; font-stretch: condensed; font-size: 30px; margin: 0 0 8px; }
+  h1 { font-family: var(--display); font-stretch: 85%; font-size: 30px; margin: 0 0 8px; }
   .muted { color: var(--muted); }
   form { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; gap: 12px; margin-top: 20px; }
   label { display: grid; gap: 4px; color: var(--muted); font-size: 14px; }
@@ -25,6 +21,10 @@
   #result { margin-top: 16px; }
   .error { color: var(--red); }
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="/theme.css">
 </head>
 <body>
 <main>

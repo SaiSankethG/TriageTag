@@ -2654,3 +2654,35 @@ first. Then: rename, because "Issue Triage Assistant" is also the name of an Ope
    upsets a reporter. Copying "Duplicate of #N" keeps a human decision and needs no write permission.
 3. **Why keep the admin page in the same app instead of deleting it?** It's still useful locally; hiding it from the Ingress plus
    the token on the POST is defence in depth: two independent checks.
+
+## Visual pass, one shared theme, and the empty-list bug (7 Nov 2026)
+
+sai: the Reports list was empty, the header jumped between Home and Reports, and the site looked generic. Files:
+`static/theme.css` (new), all four pages, Ingress (`/theme.css`), tests.
+
+### The empty list
+sai's app on port 8080 had been running since 4 Nov: old Java code, but `spring-boot:run` serves pages from `target/classes`,
+which had the new HTML. The new page called `GET /repos`, the old server answered 404 with an error object, and
+`repos.map(...)` threw, so nothing after it ran. Fix: restart the app; and the page now treats a non-OK answer or a non-array as
+"no repositories" (`response.ok` and `Array.isArray`) instead of crashing. Lesson: a page must not trust the shape of an API answer.
+
+### The jumping header
+Two causes: the landing header used a 1160px box and the others 1260px, and the landing body text was 16px while the others were
+15px, so the nav links had different widths. Now every page uses the same header box, and `theme.css` fixes the header's text
+sizes. A test checks the same `.bar-inner` rule is on every page.
+
+### The look
+One stylesheet, `theme.css`, holds the colours, fonts, grid and motion for all pages (each page links it after its own styles,
+so its tokens win). Warm paper with a faint 24px grid in light mode, ink blue in dark. Bricolage Grotesque for headings and the
+tag's word, IBM Plex Sans for text, IBM Plex Mono for issue numbers (loaded from Google Fonts; system fonts if they don't load).
+The coloured bands got their own darker shades so white text is at least 4.5:1 contrast in both modes.
+Motion: the tag swings in around its punched hole, list items come in one after another, similarity bars fill, pages
+cross-fade (CSS view transitions, no library). All of it is off under `prefers-reduced-motion: reduce`.
+
+### Likely interview questions
+1. **Why one shared CSS file now?** Four pages had four copies of the same colours, and they drifted (that's how the header
+   ended up different). One source of truth fixes the drift; still no build step.
+2. **How do you make motion accessible?** Wrap it in `prefers-reduced-motion: no-preference`, and as a safety net switch every
+   animation off under `reduce`. Motion only shows what changed (a new report, a filter); nothing loops forever.
+3. **Why did an old server break a new page, and how would you stop it in production?** Front end and back end were out of
+   step. In production they ship as one image, so they can't drift; and the page now degrades instead of crashing.

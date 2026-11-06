@@ -99,6 +99,7 @@ spec:
           - { path: /, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
           - { path: /index.html, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
           - { path: /guide.html, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
+          - { path: /theme.css, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
           - { path: /app.html, pathType: Exact, backend: { service: { name: triage-app, port: { number: 80 } } } }
           - { path: /reports, pathType: Prefix, backend: { service: { name: triage-app, port: { number: 80 } } } }
           - { path: /repos, pathType: Prefix, backend: { service: { name: triage-app, port: { number: 80 } } } }
