@@ -2623,3 +2623,34 @@ A separate front-end app (React) for the landing page: it adds a build step and 
    touches the admin token; the Ingress exposes only the read paths.
 3. **How do you make an autoplaying animation accessible?** Respect `prefers-reduced-motion`, stop on any interaction, make
    each step a real button usable by keyboard, and hide the decorative picture from screen readers (`aria-hidden`).
+
+## Maintainer-first reports page, and the name TriageTag (7 Nov 2026)
+
+sai: list open issues first with words not percentages, a one-line why and filters; report order tag, buttons, draft, side by
+side, other matches folded; only missing details; model/tokens behind Details; Admin off the public page; on phones the report
+first. Then: rename, because "Issue Triage Assistant" is also the name of an OpenClaw skill. Files: `static/app.html`,
+`static/admin.html` (new), `static/index.html`, `static/guide.html`, `TriageReportRepository` (list fields, match text), tests.
+
+### What changed and why
+- **Four words**: Likely duplicate, Possible duplicate, **Needs info** (new, blue), Looks new. A percentage makes the maintainer
+  do the thinking; a word plus one line of why ("Missing: logs.", or the AI's reason) is the decision already made. The % stays,
+  small, for anyone who wants it. A duplicate wins over missing details: closing it saves more work.
+- **List API**: `GET /reports/{repo}` now also returns the best match's title, the AI check's verdict and reason, and the missing
+  items, all read from the report's jsonb columns in the same query (`->>`, and `jsonb_each_text` for the missing keys).
+  It sorts `ORDER BY (i.state = 'open') DESC, r.created_at DESC`: open issues first, because those still need an answer.
+- **Buttons, honestly**: the app only reads GitHub, so "Mark as duplicate" is a **Copy "Duplicate of #N"** button. Posting that
+  text is how GitHub itself closes an issue as a duplicate; the maintainer stays in control.
+- **Side by side**: the report now carries the first 600 characters of each match's body, so the new issue and its best match sit
+  next to each other.
+- **Admin off the public page**: creating a report spends tokens, so it moved to `/admin.html`; the Ingress doesn't route that
+  path, and a test checks the public page has no token code at all. The POST is still protected by the token either way.
+- **Name**: TriageTag (the design is a triage tag). Only the display name changed; repo and Java package stay, because renaming
+  them touches everything for no gain.
+
+### Likely interview questions
+1. **Why sort in SQL and filter in the browser?** Sorting decides which 50 rows come back, so it must happen in the database;
+   filtering 50 rows by word is instant in the page and needs no extra request per click.
+2. **Why not let the app close duplicates itself?** Write access to someone's repository is a big trust step, and a wrong close
+   upsets a reporter. Copying "Duplicate of #N" keeps a human decision and needs no write permission.
+3. **Why keep the admin page in the same app instead of deleting it?** It's still useful locally; hiding it from the Ingress plus
+   the token on the POST is defence in depth: two independent checks.

@@ -1,7 +1,7 @@
 # CLAUDE.md: issue-triage-assistant
 
 ## What this project is
-A maintainer-side GitHub issue triage assistant. When an issue is opened, it
+TriageTag (display name since 7 Nov 2026; repo and package names unchanged): a maintainer-side GitHub issue triage assistant. When an issue is opened, it
 privately tells the maintainer: likely duplicates (with a score), suggested
 labels, missing details, and a draft answer from the repo's docs (RAG).
 Proof: a time-ordered replay over past issues, scored against duplicates and

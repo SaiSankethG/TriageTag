@@ -160,8 +160,23 @@ class TriageServiceDbTest extends PostgresTest {
         assertThat(recent.get(0).number()).isEqualTo(2);
         assertThat(recent.get(0).topNumber()).isEqualTo(1);
         assertThat(recent.get(0).topScore()).isGreaterThan(0.99);
+        assertThat(recent.get(0).topTitle()).isEqualTo("Datasource url not picked up");
+        assertThat(recent.get(0).missing()).isNotNull();
+        var match = reports.find("octo-org/hello", 2).orElseThrow().duplicates().get(0);
+        assertThat(match.path("bodyStart").asString()).isEqualTo("...");    // the side-by-side view shows the match's text
         assertThat(issueService.listIssues("octo-org/hello", 0, 10).issues())
                 .extracting(s -> s.number() + ":" + s.hasReport()).containsExactly("2:true", "1:false");
+    }
+
+    @Test
+    void recentReportsPutOpenIssuesFirst() {
+        save(1, "2024-01-01T00:00:00Z", 1, "Logger visibility", "...", "open", null);
+        long closed = save(2, "2024-02-01T00:00:00Z", 2, "Logger visibility again", "...", "closed", null);
+        long open = save(3, "2024-03-01T00:00:00Z", 3, "Logger visibility once more", "...", "open", null);
+        triageService.create(open);
+        triageService.create(closed);                                    // the newest report, but the issue is closed
+
+        assertThat(reports.recent("octo-org/hello", 10)).extracting(r -> r.number()).containsExactly(3, 2);
     }
 
     @Test

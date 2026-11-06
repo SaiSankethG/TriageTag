@@ -1,6 +1,6 @@
-# issue-triage-assistant
+# TriageTag
 
-A maintainer-side GitHub issue triage assistant. When an issue is opened, it **privately** tells the maintainer within seconds:
+**TriageTag** (repository: `issue-triage-assistant`) is a maintainer-side GitHub issue triage assistant. When an issue is opened, it **privately** tells the maintainer within seconds:
 likely duplicates (with a score and a second check by an LLM), suggested labels, which details the reporter left out, whether a
 similar issue was already fixed in a later version, and a draft reply grounded in the project's docs. Java 21, Spring Boot 4,
 Kafka, PostgreSQL + pgvector, Claude Haiku 5.5, k3s.

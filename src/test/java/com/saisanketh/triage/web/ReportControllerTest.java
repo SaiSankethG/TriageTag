@@ -72,11 +72,14 @@ class ReportControllerTest {
     @Test
     void listsRecentReportsWithALimitOfAtMost100() throws Exception {
         when(reports.recent("o/r", 100)).thenReturn(List.of(new com.saisanketh.triage.report.TriageReportRepository.ReportListItem(
-                5, "Title", "open", "NONE", Instant.parse("2026-11-04T00:00:00Z"), 3, 0.81)));
+                5, "Title", "open", "NONE", Instant.parse("2026-11-04T00:00:00Z"), 3, 0.81, "Older title", "YES", "Same bug.",
+                List.of("VERSION"))));
 
         mockMvc.perform(get("/reports/o/r?limit=500"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].number").value(5))
-                .andExpect(jsonPath("$[0].topNumber").value(3));
+                .andExpect(jsonPath("$[0].topNumber").value(3))
+                .andExpect(jsonPath("$[0].checkReason").value("Same bug."))
+                .andExpect(jsonPath("$[0].missing[0]").value("VERSION"));
     }
 }

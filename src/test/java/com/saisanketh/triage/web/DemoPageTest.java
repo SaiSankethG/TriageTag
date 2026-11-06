@@ -19,11 +19,23 @@ class DemoPageTest {
         assertThat(html).doesNotContain("<script src=");       // no external scripts, no new dependency
         assertThat(html).contains("fetch('/settings')", "fetch('/repos')", "/repos/${repo}/issues?", "URLSearchParams(location.search)");
         assertThat(html).contains("@media (max-width: 820px)", "prefers-color-scheme: dark", ":focus-visible");
+        // Maintainer-first: four words instead of percentages, a one-line why, filters, and copy buttons (nothing is posted).
+        assertThat(html).contains("'Likely duplicate'", "'Possible duplicate'", "'Needs info'", "'Looks new'", "function whyOf(",
+                "id=\"filters\"", "id=\"open-only\"", "Copy reply", "Duplicate of #", "Open on GitHub", "This issue and its best match");
+        assertThat(html).contains("body.reading main { order: -1; }");   // phones: the report first
+        // The public page only reads: no admin token box, no POST.
+        assertThat(html).doesNotContain("X-Admin-Token").doesNotContain("admin-token").doesNotContain("method: 'POST'")
+                .doesNotContain("localStorage");
+    }
+
+    @Test
+    void theAdminPageSendsTheTokenOnlyAsAHeaderAndIsNotRoutedPublicly() throws Exception {
+        String admin = new ClassPathResource("static/admin.html").getContentAsString(StandardCharsets.UTF_8);
+
         // The admin token is sent only as a header, kept only in sessionStorage, never put in the URL or localStorage.
-        assertThat(html).contains("'X-Admin-Token': adminToken()", "sessionStorage.setItem('triage-admin-token'",
-                "Only existing reports can be viewed on the public demo.");
-        assertThat(html).doesNotContain("localStorage");
-        assertThat(html).doesNotContainPattern("URLSearchParams\\([^)]*[Tt]oken");
+        assertThat(admin).contains("'X-Admin-Token': adminToken()", "sessionStorage.setItem('triage-admin-token'", "noindex");
+        assertThat(admin).doesNotContain("localStorage").doesNotContain("innerHTML").doesNotContain("<script src=");
+        assertThat(admin).doesNotContainPattern("URLSearchParams\\([^)]*[Tt]oken");
     }
 
     @Test

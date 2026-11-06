@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Issue Triage Assistant</title>
+<title>TriageTag: issue triage for maintainers</title>
 <style>
   /* Landing page. Same identity as the reports page: the verdict is a triage tag (red / amber / green band); everything else
      quiet. Order: a live sample, what it does for your work, how to use it (animated steps), who it's for, your repositories. */
@@ -11,7 +11,7 @@
     --bg: #eef1f0; --paper: #ffffff; --paper-2: #f6f8f7; --ink: #1c2126; --muted: #5c666e; --faint: #87919a;
     --line: #d5dbda; --link: #245c8a; --focus: #245c8a;
     --red: #c2362b; --amber: #c98a00; --green: #2e7a4e; --grey: #6b747c; --on-band: #ffffff; --on-amber: #1c2126;
-    --amber-tint: #faf0d8;
+    --amber-tint: #faf0d8; --blue: #2f6690;
     --condensed: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
@@ -19,7 +19,7 @@
       --bg: #171b1e; --paper: #20262a; --paper-2: #262d32; --ink: #e4e8ea; --muted: #9aa4ab; --faint: #76808a;
       --line: #323a3f; --link: #8cb8e0; --focus: #8cb8e0;
       --red: #e0574b; --amber: #e3a72b; --green: #4fa673; --grey: #8a939b; --on-band: #ffffff; --on-amber: #1c2126;
-      --amber-tint: #362c15;
+      --amber-tint: #362c15; --blue: #3f7fbf;
     }
   }
   * { box-sizing: border-box; }
@@ -69,7 +69,7 @@
                  background: var(--bg); box-shadow: inset 0 0 0 2px var(--line); }
   .tag .band { padding: 12px 20px 14px; color: var(--on-band); }
   .tag.red .band { background: var(--red); } .tag.amber .band { background: var(--amber); color: var(--on-amber); }
-  .tag.green .band { background: var(--green); } .tag.grey .band { background: var(--grey); }
+  .tag.green .band { background: var(--green); } .tag.grey .band { background: var(--grey); } .tag.blue .band { background: var(--blue); }
   .tag .verdict { font-family: var(--condensed); font-stretch: condensed; font-size: 26px; font-weight: 700; line-height: 1.1; }
   .tag .body { padding: 16px 20px 20px; display: grid; gap: 12px; }
   .tag .score { font-family: var(--condensed); font-stretch: condensed; font-size: 40px; font-weight: 600; line-height: 1; }
@@ -142,9 +142,9 @@
 <body>
 <header class="bar">
   <div class="wrap bar-inner">
-    <a class="name" href="/" aria-label="Issue Triage Assistant, home">
+    <a class="name" href="/" aria-label="TriageTag, home">
       <span class="swatches" aria-hidden="true"><i style="background:var(--red)"></i><i style="background:var(--amber)"></i><i style="background:var(--green)"></i></span>
-      Issue Triage Assistant
+      TriageTag
     </a>
     <nav aria-label="Main">
       <a href="/" aria-current="page">Home</a>
@@ -210,7 +210,7 @@
         <ol class="steps" id="steps">
           <li><button type="button" data-step="0"><span class="n" aria-hidden="true">1</span><span><span class="t">Install it on your repositories<span class="soon">Coming soon</span></span><span class="d">The GitHub App isn't public yet. Once it is, you add it to one repository or several.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
           <li><button type="button" data-step="1"><span class="n" aria-hidden="true">2</span><span><span class="t">Someone opens an issue</span><span class="d">Nothing changes for the reporter.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
-          <li><button type="button" data-step="2"><span class="n" aria-hidden="true">3</span><span><span class="t">The assistant triages it in seconds</span><span class="d">You get a note with a coloured tag: likely duplicate, possible duplicate, or probably new.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
+          <li><button type="button" data-step="2"><span class="n" aria-hidden="true">3</span><span><span class="t">The assistant triages it in seconds</span><span class="d">You get a note with a coloured tag: likely duplicate, possible duplicate, needs info, or looks new.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
           <li><button type="button" data-step="3"><span class="n" aria-hidden="true">4</span><span><span class="t">You decide</span><span class="d">Copy the draft reply, add a label, or close it as a duplicate. Nothing is posted for you.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
         </ol>
         <div class="stage" aria-hidden="true">
@@ -287,7 +287,7 @@
 </main>
 
 <footer>
-  <div class="wrap">Issue Triage Assistant is open source. <a href="/guide.html">How to use it</a>.</div>
+  <div class="wrap">TriageTag is open source. <a href="/guide.html">How to use it</a>.</div>
 </footer>
 
 <script>
@@ -319,13 +319,14 @@
     const r = await (await fetch(`/reports/${repo}/${pick.number}`)).json();
     const top = (r.duplicates || [])[0];
     const yes = r.duplicateCheck && r.duplicateCheck.verdict === 'YES';
-    const [colour, word] = !top ? ['grey', 'No earlier issues']
-      : top.score >= high && yes ? ['red', 'Likely duplicate']
-      : top.score >= possible ? ['amber', 'Possible duplicate'] : ['green', 'Probably new'];
     const names = { VERSION: 'Version', STEPS_TO_REPRODUCE: 'Steps to reproduce', EXPECTED_VS_ACTUAL: 'Expected and actual', LOGS_OR_STACK_TRACE: 'Logs' };
     const m = r.missing || {};
     // Only what the reporter left out: that is what a maintainer has to ask for.
     const missing = m.status === 'OK' ? Object.keys(names).filter(k => m.details[k] === 'MISSING') : [];
+    // The same four words as the reports page.
+    const [colour, word] = top && top.score >= high && yes ? ['red', 'Likely duplicate']
+      : top && top.score >= possible ? ['amber', 'Possible duplicate']
+      : missing.length ? ['blue', 'Needs info'] : ['green', 'Looks new'];
     const checks = m.status !== 'OK' ? null : el('ul', { class: 'mini' }, ...(missing.length
       ? missing.map(k => el('li', {}, el('span', { class: 'missing', 'aria-hidden': 'true' }, '✗'), `${names[k]} missing`))
       : [el('li', {}, el('span', { class: 'given', 'aria-hidden': 'true' }, '✓'), 'Nothing missing')]));
@@ -333,8 +334,7 @@
       el('div', { class: 'band' }, el('div', { class: 'verdict' }, word)),
       el('div', { class: 'body' },
         el('div', { class: 'issue' }, `New issue #${r.number}`, el('b', {}, r.title)),
-        top ? el('div', { class: 'score' }, pct(top.score), el('small', {}, 'similar')) : null,
-        top ? el('div', { class: 'match' }, 'Best match: ', el('a', { href: top.url, target: '_blank', rel: 'noopener' }, `#${top.number} ${top.title}`)) : null,
+        top ? el('div', { class: 'match' }, el('b', {}, pct(top.score)), ' similar to ', el('a', { href: top.url, target: '_blank', rel: 'noopener' }, `#${top.number} ${top.title}`)) : null,
         checks)));
     $('sample-caption').replaceChildren('A real report for ', el('a', { href: appLink(repo, r.number) }, `${repo} #${r.number}`), '.');
   }

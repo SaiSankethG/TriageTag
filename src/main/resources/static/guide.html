@@ -3,16 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How to use · Issue Triage Assistant</title>
+<title>How to use · TriageTag</title>
 <style>
   :root {
     --bg: #eef1f0; --paper: #ffffff; --paper-2: #f6f8f7; --ink: #1c2126; --muted: #5c666e; --line: #d5dbda; --link: #245c8a;
-    --red: #c2362b; --amber: #c98a00; --green: #2e7a4e;
+    --red: #c2362b; --amber: #c98a00; --green: #2e7a4e; --blue: #2f6690;
     --condensed: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #171b1e; --paper: #20262a; --paper-2: #262d32; --ink: #e4e8ea; --muted: #9aa4ab; --line: #323a3f; --link: #8cb8e0;
-            --red: #e0574b; --amber: #e3a72b; --green: #4fa673; }
+            --red: #e0574b; --amber: #e3a72b; --green: #4fa673; --blue: #3f7fbf; }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
@@ -45,9 +45,9 @@
 <body>
 <header class="bar">
   <div class="bar-inner">
-    <a class="name" href="/" aria-label="Issue Triage Assistant, home">
+    <a class="name" href="/" aria-label="TriageTag, home">
       <span class="swatches" aria-hidden="true"><i style="background:var(--red)"></i><i style="background:var(--amber)"></i><i style="background:var(--green)"></i></span>
-      Issue Triage Assistant
+      TriageTag
     </a>
     <nav aria-label="Main">
       <a href="/">Home</a>
@@ -58,7 +58,7 @@
 </header>
 
 <main>
-  <h1>How to use the Issue Triage Assistant</h1>
+  <h1>How to use TriageTag</h1>
   <p class="lead">A two-minute guide for maintainers: what the assistant does, how to read a report, and what stays private.</p>
 
   <h2>What it does</h2>
@@ -80,20 +80,24 @@
           <tr><th>Tag</th><th>Meaning</th><th>What to do</th></tr>
           <tr><td><span class="swatch" style="background:var(--red)"></span>Likely duplicate</td><td>Very similar (90%+) and the AI check agrees it is the same problem.</td><td>Open the match; close as duplicate if it fits.</td></tr>
           <tr><td><span class="swatch" style="background:var(--amber)"></span>Possible duplicate</td><td>Similar (75%+), or very similar but the AI check isn't sure.</td><td>Have a look at the match before answering.</td></tr>
-          <tr><td><span class="swatch" style="background:var(--green)"></span>Probably new</td><td>Nothing earlier is close enough.</td><td>Triage it as a new issue.</td></tr>
+          <tr><td><span class="swatch" style="background:var(--blue)"></span>Needs info</td><td>Not a duplicate, but the reporter left out the version, steps, expected vs actual, or logs.</td><td>Ask for what's missing.</td></tr>
+          <tr><td><span class="swatch" style="background:var(--green)"></span>Looks new</td><td>Nothing earlier is close, and nothing important is missing.</td><td>Triage it as a new issue.</td></tr>
         </table>
       </div>
     </li>
-    <li><strong>Check the similar issues.</strong> The bar shows how close each one is. The tag next to it says whether that issue is
-        open or how it was closed (fixed, not planned, duplicate). An "Already fixed?" note appears when the best match was fixed in a release.</li>
+    <li><strong>Look at what's missing.</strong> The tag lists only the details the reporter left out (✗). "Nothing important missing" means you can start.</li>
+    <li><strong>Use the buttons.</strong> <em>Copy reply</em> copies the draft; <em>Copy "Duplicate of #N"</em> copies the text that lets GitHub
+        close the issue as a duplicate when you post it; <em>Open on GitHub</em> opens the issue. Nothing is posted for you.</li>
+    <li><strong>Compare side by side.</strong> Under the draft, the new issue and its best match are shown next to each other, so you can
+        judge in one look. Other similar issues are folded below. An "Already fixed?" note appears when the best match was fixed in a release.</li>
     <li>For an issue that is already closed, a stamp on the tag says what maintainers decided later, and whether the assistant found it.</li>
-    <li><strong>Look at "What the reporter gave".</strong> ✓ = given, ✗ = missing (worth asking for), – = not needed for this kind of issue.</li>
-    <li><strong>Use the draft reply if it helps.</strong> Press <em>Copy reply</em>, paste it into GitHub, and edit it. Its sources are listed under it.</li>
+    <li>The model, tokens and the AI check's full answer are under <em>Details</em>.</li>
   </ol>
 
   <h2>Finding an issue on this page</h2>
   <ul>
-    <li><strong>Triaged</strong> (left side): the newest issues the assistant has looked at. The stripe colour shows how close the best match is.</li>
+    <li><strong>Triaged</strong> (left side): open issues first, then the newest. Each line shows the word and a one-line reason.
+        Filter by word, or tick <em>Open issues only</em>.</li>
     <li><strong>All issues</strong>: every stored issue, with a search by title.</li>
     <li><strong>Issue number</strong>: type it at the top left and press <em>Open</em>.</li>
     <li>Every report has its own link (<code>?repo=…&amp;number=…</code>), so you can share it.</li>
@@ -105,7 +109,7 @@
     <li>By default it <strong>never posts anything</strong> on GitHub (shadow mode). Reports are only on this page.</li>
     <li>A maintainer can switch on <strong>comment mode</strong> for one repository. Then the assistant posts at most one comment per issue,
         only for issues from outside the team, and only when the match is 90%+ and the AI check agrees. The comment says that a bot suggested it.</li>
-    <li>Creating new reports on this page needs an admin token, so visitors can't run up costs.</li>
+    <li>The public pages only read. Creating a report spends AI tokens, so it needs an admin token, on an admin page that isn't public.</li>
   </ul>
 
   <h2>How good is it?</h2>

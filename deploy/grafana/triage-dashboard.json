@@ -8,7 +8,7 @@
       "pluginName": "Prometheus"
     }
   ],
-  "title": "Issue Triage Assistant",
+  "title": "TriageTag",
   "uid": "issue-triage-assistant",
   "description": "Metrics from /actuator/prometheus (M6). Import: Dashboards \u2192 New \u2192 Import \u2192 upload this file \u2192 pick the Prometheus data source.",
   "tags": [

@@ -54,24 +54,36 @@ public class TriageReportRepository {
                 r.promptVersions(), r.costTokens(), r.notes());
     }
 
-    /** One line of the demo page's "has a report" list: the issue and its best match. */
+    /**
+     * One line of the reports page's list: the issue, its best match, the AI check's answer and one-line reason, and which
+     * details the reporter left out. The page turns these into one word (Likely duplicate / Possible duplicate / Needs info /
+     * Looks new) and a one-line "why".
+     */
     public record ReportListItem(int number, String title, String state, String authorAssociation, Instant reportCreatedAt,
-                                 Integer topNumber, Double topScore) {
+                                 Integer topNumber, Double topScore, String topTitle, String checkVerdict, String checkReason,
+                                 List<String> missing) {
     }
 
-    /** The most recent reports of a repo, newest first, for the demo page's sidebar. */
+    /** The most recent reports of a repo, open issues first (that's what a maintainer still has to answer), then newest. */
     public List<ReportListItem> recent(String repo, int limit) {
         return jdbc.query("""
                 SELECT i.number, i.title, i.state, i.author_association, r.created_at,
                        (r.duplicates -> 0 ->> 'number')::int AS top_number,
-                       (r.duplicates -> 0 ->> 'score')::float8 AS top_score
+                       (r.duplicates -> 0 ->> 'score')::float8 AS top_score,
+                       r.duplicates -> 0 ->> 'title' AS top_title,
+                       r.duplicate_check ->> 'verdict' AS check_verdict,
+                       r.duplicate_check ->> 'reason' AS check_reason,
+                       ARRAY(SELECT d.key FROM jsonb_each_text(r.missing -> 'details') d
+                             WHERE r.missing ->> 'status' = 'OK' AND d.value = 'MISSING' ORDER BY d.key) AS missing
                 FROM triage_report r JOIN issue i ON i.id = r.issue_id
                 WHERE lower(i.repo) = lower(?)
-                ORDER BY r.created_at DESC
+                ORDER BY (i.state = 'open') DESC, r.created_at DESC
                 LIMIT ?
                 """, (rs, row) -> new ReportListItem(rs.getInt("number"), rs.getString("title"), rs.getString("state"),
                 rs.getString("author_association"), rs.getTimestamp("created_at").toInstant(),
-                (Integer) rs.getObject("top_number"), (Double) rs.getObject("top_score")), repo, limit);
+                (Integer) rs.getObject("top_number"), (Double) rs.getObject("top_score"), rs.getString("top_title"),
+                rs.getString("check_verdict"), rs.getString("check_reason"),
+                Arrays.asList((String[]) rs.getArray("missing").getArray())), repo, limit);
     }
 
     /** The report of an issue (by repo + number), joined with the issue's title, link and card. */
@@ -94,7 +106,13 @@ public class TriageReportRepository {
         return dto;
     }
 
-    /** Each duplicate gets the matched issue's current state ("open"/"closed") and state reason, looked up now. */
+    /** How much of a matched issue's body the page shows next to the new issue. */
+    static final int MATCH_BODY_CHARS = 600;
+
+    /**
+     * Each duplicate gets the matched issue's current state ("open"/"closed"), state reason, opening date and the start of
+     * its body, looked up now: the page shows the new issue and its best match side by side.
+     */
     private void addMatchStates(String repo, JsonNode duplicates) {
         if (duplicates == null || !duplicates.isArray() || duplicates.isEmpty()) {
             return;
@@ -102,15 +120,21 @@ public class TriageReportRepository {
         List<Integer> numbers = new ArrayList<>();
         duplicates.forEach(d -> numbers.add(d.path("number").asInt()));
         Map<Integer, String[]> states = new HashMap<>();
-        jdbc.query("SELECT number, state, state_reason FROM issue WHERE repo = ? AND number = ANY (?)",
-                (RowCallbackHandler) rs -> states.put(rs.getInt("number"),
-                        new String[]{rs.getString("state"), rs.getString("state_reason")}),
-                repo, numbers.toArray(new Integer[0]));
+        jdbc.query("""
+                SELECT number, state, state_reason, created_at, left(coalesce(body, ''), ?) AS body_start
+                FROM issue WHERE repo = ? AND number = ANY (?)
+                """,
+                (RowCallbackHandler) rs -> states.put(rs.getInt("number"), new String[]{rs.getString("state"),
+                        rs.getString("state_reason"), rs.getTimestamp("created_at").toInstant().toString(),
+                        rs.getString("body_start")}),
+                MATCH_BODY_CHARS, repo, numbers.toArray(new Integer[0]));
         for (JsonNode d : duplicates) {
             String[] state = states.get(d.path("number").asInt());
             if (d instanceof ObjectNode o && state != null) {
                 o.put("state", state[0]);
                 o.put("stateReason", state[1]);
+                o.put("createdAt", state[2]);
+                o.put("bodyStart", state[3]);
             }
         }
     }
