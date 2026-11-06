@@ -2566,3 +2566,33 @@ say: the report shows what the assistant would have said when the issue was open
 2. **Why can't it find some originals?** Time order (the original was opened later) or the original isn't an issue (a pull request);
    the same exclusions the replay evaluation counts separately.
 3. **How did you find the confusion?** A user's screenshot: when two parts of a page disagree, explain the difference on the page.
+
+## Second redesign: the report as a triage tag (6 Nov 2026)
+
+sai: "we need to redesign it", and "remove the incrementer" (the up/down arrows of the number box). Files: `static/index.html`,
+`static/guide.html` (same look), `docs/user-guide.md`. No API changes.
+
+### The idea
+The product is called a *triage* assistant, and triage already has a physical object everybody recognises: the hospital
+**triage tag**, with a coloured band (red / amber / green) and a punched hole. The verdict is now drawn as that tag: the band says
+**Likely duplicate / Possible duplicate / Probably new** in words, below it the similarity (big number and a scale with the 75% and
+90% marks), the best match and the AI check. On older issues a dashed **stamp** on the tag says what maintainers decided later.
+Everything else stays quiet: a cool grey-green background, white panels, ink text, one condensed typeface for headings (system
+fonts only, nothing downloaded). The issue list uses the same colours as thin stripes, so you can scan for red/amber at a glance.
+The number box is plain text with `inputmode="numeric"`: no arrows, and phones still show the number keyboard.
+
+### What I avoided on purpose
+All-caps labels, "A · B · C" meta strings and monospace labels (common "generated page" tells), and identical cards for
+everything: the tag is the one bold element, the panels around it are plain.
+
+### Checked
+Desktop light and dark, phone light, keyboard focus, no sideways scrolling. Found and fixed during the check: the checklist's small
+hint text reused the class `note` (a boxed message style), so each hint was drawn in a box; the issue list had a sideways scrollbar.
+
+### Likely interview questions
+1. **Why a triage tag?** It's the most familiar picture of "triage", so the colour-coded answer reads in a second; the design comes
+   from the subject instead of a generic dashboard kit.
+2. **How do you keep a bold design accessible?** Colour is never alone (the band says the verdict in words), contrast is checked
+   in both themes, the entrance animation is off for "reduced motion", and focus moves to the verdict after loading.
+3. **Why `type="text" inputmode="numeric"` instead of `type="number"`?** Number inputs add spinner arrows and accept things like
+   "1e5"; a text field with a numeric keyboard and a digit check is simpler for an ID.

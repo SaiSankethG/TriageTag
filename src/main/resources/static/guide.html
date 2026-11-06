@@ -6,48 +6,49 @@
 <title>How to use · Issue Triage Assistant</title>
 <style>
   :root {
-    --bg: #f4f5f7; --surface: #ffffff; --surface-2: #f8f9fb; --text: #16181d; --muted: #5f6672; --faint: #8a909b;
-    --line: #e2e5ea; --brand: #3451c7; --brand-soft: #e8ecfb; --on-brand: #ffffff; --grey-soft: #eef0f3;
-    --green: #1d7a46; --amber: #925f00; --red: #b42318; --shadow: 0 1px 2px rgba(16, 24, 40, .06), 0 1px 3px rgba(16, 24, 40, .08);
+    --bg: #eef1f0; --paper: #ffffff; --paper-2: #f6f8f7; --ink: #1c2126; --muted: #5c666e; --line: #d5dbda; --link: #245c8a;
+    --red: #c2362b; --amber: #c98a00; --green: #2e7a4e;
+    --condensed: "Avenir Next Condensed", "Roboto Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #111316; --surface: #1a1d22; --surface-2: #20242a; --text: #eceef1; --muted: #a5abb5; --faint: #7d838d;
-      --line: #2e333a; --brand: #8ea2ff; --brand-soft: #232a45; --on-brand: #0d1020; --grey-soft: #262a30;
-      --green: #6fd496; --amber: #f2b75b; --red: #ff8f85; --shadow: none;
-    }
+    :root { --bg: #171b1e; --paper: #20262a; --paper-2: #262d32; --ink: #e4e8ea; --muted: #9aa4ab; --line: #323a3f; --link: #8cb8e0;
+            --red: #e0574b; --amber: #e3a72b; --green: #4fa673; }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; }
-  body { background: var(--bg); color: var(--text); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  a { color: var(--brand); text-underline-offset: 2px; }
-  :focus-visible { outline: 3px solid var(--brand); outline-offset: 2px; border-radius: 4px; }
-  .topbar { background: var(--surface); border-bottom: 1px solid var(--line); }
-  .topbar-inner { max-width: 1240px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 16px; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 17px; color: var(--text); text-decoration: none; }
-  .logo { width: 28px; height: 28px; border-radius: 8px; background: var(--brand); color: var(--on-brand); display: grid;
-          place-items: center; font-weight: 700; font-size: 15px; }
-  .topbar nav { display: flex; gap: 4px; margin-left: auto; }
-  .topbar nav a { color: var(--muted); text-decoration: none; padding: 6px 10px; border-radius: 6px; }
-  .topbar nav a:hover, .topbar nav a[aria-current="page"] { background: var(--grey-soft); color: var(--text); }
-  main { max-width: 760px; margin: 0 auto; padding: 28px 16px 64px; }
-  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; }
-  h2 { font-size: 20px; margin: 36px 0 10px; }
+  body { background: var(--bg); color: var(--ink); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--link); text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  :focus-visible { outline: 3px solid var(--link); outline-offset: 2px; border-radius: 4px; }
+  h1, h2 { font-family: var(--condensed); font-stretch: condensed; font-weight: 600; }
+  .bar { border-bottom: 1px solid var(--line); background: var(--paper); }
+  .bar-inner { max-width: 1260px; margin: 0 auto; padding: 12px 16px; display: flex; align-items: center; gap: 18px; }
+  .name { font-family: var(--condensed); font-stretch: condensed; font-size: 21px; font-weight: 600; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+  .name .swatches { display: inline-flex; gap: 3px; }
+  .name .swatches i { width: 6px; height: 18px; border-radius: 2px; display: block; }
+  .bar nav { margin-left: auto; display: flex; gap: 18px; }
+  .bar nav a { color: var(--muted); text-decoration: none; padding: 4px 0; border-bottom: 2px solid transparent; }
+  .bar nav a[aria-current="page"], .bar nav a:hover { color: var(--ink); border-bottom-color: var(--ink); }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 38px; line-height: 1.15; margin: 0 0 10px; }
+  h2 { font-size: 24px; margin: 38px 0 10px; }
   .lead { color: var(--muted); font-size: 18px; margin: 0 0 24px; }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; margin: 14px 0; }
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 14px 0; }
   ol, ul { padding-left: 22px; } li { margin: 6px 0; }
   table { width: 100%; border-collapse: collapse; font-size: 15px; }
   th, td { text-align: left; padding: 8px 10px; border-top: 1px solid var(--line); vertical-align: top; }
   th { color: var(--muted); font-weight: 600; border-top: 0; }
-  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
-  code { background: var(--grey-soft); padding: 1px 6px; border-radius: 5px; font-size: 14px; }
+  .swatch { display: inline-block; width: 8px; height: 16px; border-radius: 2px; margin-right: 8px; vertical-align: -2px; }
+  code { background: var(--paper-2); padding: 1px 6px; border-radius: 5px; font-size: 14px; }
   .muted { color: var(--muted); }
 </style>
 </head>
 <body>
-<header class="topbar">
-  <div class="topbar-inner">
-    <a class="brand" href="/" aria-label="Issue Triage Assistant, home"><span class="logo" aria-hidden="true">T</span>Issue Triage Assistant</a>
+<header class="bar">
+  <div class="bar-inner">
+    <a class="name" href="/" aria-label="Issue Triage Assistant, home">
+      <span class="swatches" aria-hidden="true"><i style="background:var(--red)"></i><i style="background:var(--amber)"></i><i style="background:var(--green)"></i></span>
+      Issue Triage Assistant
+    </a>
     <nav aria-label="Main">
       <a href="/">Reports</a>
       <a href="/guide.html" aria-current="page">How to use</a>
@@ -72,25 +73,26 @@
 
   <h2>How to read a report</h2>
   <ol>
-    <li><strong>Start with the coloured box at the top.</strong> It answers "is this a duplicate?" in words:
+    <li><strong>Start with the tag.</strong> Its coloured band answers "is this a duplicate?" in words:
       <div class="card">
         <table>
-          <tr><th>Box</th><th>Meaning</th><th>What to do</th></tr>
+          <tr><th>Tag</th><th>Meaning</th><th>What to do</th></tr>
           <tr><td><span class="swatch" style="background:var(--red)"></span>Likely duplicate</td><td>Very similar (90%+) and the AI check agrees it is the same problem.</td><td>Open the match; close as duplicate if it fits.</td></tr>
           <tr><td><span class="swatch" style="background:var(--amber)"></span>Possible duplicate</td><td>Similar (75%+), or very similar but the AI check isn't sure.</td><td>Have a look at the match before answering.</td></tr>
-          <tr><td><span class="swatch" style="background:var(--green)"></span>Probably not a duplicate</td><td>Nothing earlier is close enough.</td><td>Triage it as a new issue.</td></tr>
+          <tr><td><span class="swatch" style="background:var(--green)"></span>Probably new</td><td>Nothing earlier is close enough.</td><td>Triage it as a new issue.</td></tr>
         </table>
       </div>
     </li>
     <li><strong>Check the similar issues.</strong> The bar shows how close each one is. The tag next to it says whether that issue is
-        open or how it was closed (fixed, not planned, duplicate). A yellow "Already fixed?" box appears when the best match was fixed in a release.</li>
-    <li><strong>Look at "Details the reporter gave".</strong> ✓ = given, ✗ = missing (worth asking for), – = not needed for this kind of issue.</li>
+        open or how it was closed (fixed, not planned, duplicate). An "Already fixed?" note appears when the best match was fixed in a release.</li>
+    <li>For an issue that is already closed, a stamp on the tag says what maintainers decided later, and whether the assistant found it.</li>
+    <li><strong>Look at "What the reporter gave".</strong> ✓ = given, ✗ = missing (worth asking for), – = not needed for this kind of issue.</li>
     <li><strong>Use the draft reply if it helps.</strong> Press <em>Copy reply</em>, paste it into GitHub, and edit it. Its sources are listed under it.</li>
   </ol>
 
   <h2>Finding an issue on this page</h2>
   <ul>
-    <li><strong>With a report</strong> (left side): the newest issues the assistant has looked at.</li>
+    <li><strong>Triaged</strong> (left side): the newest issues the assistant has looked at. The stripe colour shows how close the best match is.</li>
     <li><strong>All issues</strong>: every stored issue, with a search by title.</li>
     <li><strong>Issue number</strong>: type it at the top left and press <em>Open</em>.</li>
     <li>Every report has its own link (<code>?repo=…&amp;number=…</code>), so you can share it.</li>
