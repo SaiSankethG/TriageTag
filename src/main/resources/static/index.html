@@ -72,14 +72,14 @@
   @media (max-width: 720px) { .benefits { grid-template-columns: 1fr; } }
   .benefit { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px; display: grid; gap: 8px; align-content: start; }
   .benefit .fact { font-size: 14px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
-  /* Each box borrows one colour of the tag: a tinted fill and a coloured edge, so the page changes as you scroll. */
-  .benefit.red { background: var(--red-tint); border-color: transparent; box-shadow: inset 4px 0 0 var(--red); }
-  .benefit.blue { background: var(--blue-tint); border-color: transparent; box-shadow: inset 4px 0 0 var(--blue); }
-  .benefit.green { background: var(--green-tint); border-color: transparent; box-shadow: inset 4px 0 0 var(--green); }
-  .benefit.amber { background: var(--amber-tint); border-color: transparent; box-shadow: inset 4px 0 0 var(--amber); }
+  /* Each box borrows one colour of the tag: a tinted fill and a thin top edge, so the page changes as you scroll. */
+  .benefit.red { background: var(--red-tint); border-color: transparent; box-shadow: inset 0 3px 0 var(--red); }
+  .benefit.blue { background: var(--blue-tint); border-color: transparent; box-shadow: inset 0 3px 0 var(--blue); }
+  .benefit.green { background: var(--green-tint); border-color: transparent; box-shadow: inset 0 3px 0 var(--green); }
+  .benefit.amber { background: var(--amber-tint); border-color: transparent; box-shadow: inset 0 3px 0 var(--amber); }
   .benefit .fact { border-top-color: color-mix(in srgb, var(--ink) 14%, transparent); }
-  /* "How to use it" sits on its own band so the sections read as separate stops. */
-  section.band { background: color-mix(in srgb, var(--paper-2) 75%, transparent); }
+  /* Sections alternate: the page background (warm paper / ink), then a lighter band, so each reads as its own stop. */
+  section.band { background: var(--band); }
 
   /* How to use: steps + animated stage */
   .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; margin-top: 32px; align-items: start; }
@@ -173,7 +173,7 @@
   </div>
 
   <!-- 2. What it does for your work -->
-  <section class="block" aria-labelledby="work-heading">
+  <section class="block band" aria-labelledby="work-heading">
     <div class="wrap">
       <h2 id="work-heading">Less time sorting issues, more time fixing them</h2>
       <div class="benefits">
@@ -187,12 +187,12 @@
           <p class="muted">Version, steps to reproduce, expected and actual behaviour, logs. You see at once what to ask for.</p>
           <p class="fact">Items that don't apply, like steps for a feature request, are marked as not needed.</p>
         </div>
-        <div class="benefit green">
+        <div class="benefit amber">
           <h3>Drafts the first reply</h3>
           <p class="muted">A short answer built from your own documentation and earlier issues, with links. You edit it before posting.</p>
           <p class="fact">If nothing relevant is found, there is no draft instead of a guess.</p>
         </div>
-        <div class="benefit amber">
+        <div class="benefit green">
           <h3>Tells you when it's already fixed</h3>
           <p class="muted">If a very similar issue was fixed in a release, the note says which one, and whether the reporter is on an older version.</p>
           <p class="fact">This comes from GitHub's own records, not from the AI.</p>
@@ -202,7 +202,7 @@
   </section>
 
   <!-- 3. How to use it: four steps, played as a short animation -->
-  <section class="block band" id="how" aria-labelledby="how-heading">
+  <section class="block" id="how" aria-labelledby="how-heading">
     <div class="wrap">
       <h2 id="how-heading">How to use it</h2>
       <div class="how">
@@ -240,7 +240,7 @@
   </section>
 
   <!-- 4. Who it's for -->
-  <section class="block" aria-labelledby="who-heading">
+  <section class="block band" aria-labelledby="who-heading">
     <div class="wrap">
       <h2 id="who-heading">Who it's for</h2>
       <div class="who">
@@ -279,7 +279,7 @@
     </div>
   </section>
 
-  <section class="block">
+  <section class="block band">
     <div class="wrap closing">
       <h2>See today's issues</h2>
       <p class="lede">Open the reports to see what the assistant found for the newest issues.</p>

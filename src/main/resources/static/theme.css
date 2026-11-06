@@ -2,12 +2,13 @@
    <style>, so these tokens win. Light = warm paper, dark = ink blue. Fonts: Bricolage Grotesque (headings, the tag's word),
    IBM Plex Sans (text), IBM Plex Mono (issue numbers). If the fonts don't load, the system fonts below take over. */
 :root {
-  --bg: #f3ede1; --paper: #fbf8f1; --paper-2: #f1ebdd; --ink: #1d2433; --muted: #5a6172; --faint: #858b98;
+  --bg: #f3ede1; --paper: #fbf8f1; --paper-2: #f1ebdd; --ink: #1d2433; --muted: #5a6172; --faint: #5f6574;
   --line: #ddd4c2; --link: #2350a8; --focus: #2350a8; --grid: rgba(35, 80, 168, .06);
   --red: #c0392b; --amber: #c88a0a; --green: #2f7d4f; --blue: #2f5f9e; --grey: #6e7480;
   --on-band: #ffffff; --on-amber: #1d2433; --amber-text: #8a5d00;
   --red-band: #c0392b; --green-band: #2f7d4f; --blue-band: #2f5f9e;   /* band fills: white text stays readable */
   --red-tint: #f6e1dc; --amber-tint: #f6ead0; --green-tint: #e0eee3; --blue-tint: #e2e9f4;
+  --band: #fbf8f2;   /* the lighter section band */
   --display: "Bricolage Grotesque", "Avenir Next Condensed", "Arial Narrow", sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -15,12 +16,13 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e1626; --paper: #152036; --paper-2: #1b2842; --ink: #e5e9f2; --muted: #9ba6bd; --faint: #77839c;
+    --bg: #0e1626; --paper: #152036; --paper-2: #1b2842; --ink: #e5e9f2; --muted: #9ba6bd; --faint: #8a96ad;
     --line: #26355a; --link: #8fb4ff; --focus: #8fb4ff; --grid: rgba(143, 180, 255, .05);
     --red: #e5584a; --amber: #e6a832; --green: #4fae78; --blue: #5b8fd9; --grey: #8892a6;
     --on-band: #ffffff; --on-amber: #1d2433; --amber-text: #e6a832;
     --red-band: #c43d31; --green-band: #2b7d50; --blue-band: #3566b8;
     --red-tint: #3a2026; --amber-tint: #382d16; --green-tint: #17302a; --blue-tint: #172b4d;
+    --band: #172238;
   }
 }
 
