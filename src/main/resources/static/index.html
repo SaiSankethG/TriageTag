@@ -99,6 +99,7 @@
               box-shadow: inset 0 0 0 2px var(--line); color: var(--muted); }
   .steps button[aria-current="step"] .n { background: var(--ink); color: var(--paper); box-shadow: none; }
   .steps .t { font-weight: 600; display: block; }
+  .soon { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--amber-tint); box-shadow: inset 0 0 0 1px var(--amber); border-radius: 999px; padding: 0 8px; vertical-align: 1px; }
   .steps .d { font-size: 14px; color: var(--muted); display: block; }
   .progress { height: 3px; background: var(--line); border-radius: 2px; margin-top: 10px; overflow: hidden; grid-column: 2; }
   .steps button:not([aria-current="step"]) .progress { visibility: hidden; }
@@ -127,7 +128,7 @@
   .both { margin-top: 18px; color: var(--muted); font-size: 15px; }
 
   /* Repositories */
-  .repos { margin-top: 28px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+  .repos { margin-top: 28px; background: var(--paper); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; position: relative; }
   .repos table { width: 100%; border-collapse: collapse; min-width: 520px; }
   .repos th, .repos td { text-align: left; padding: 12px 16px; border-top: 1px solid var(--line); }
   .repos th { color: var(--muted); font-weight: 600; font-size: 14px; border-top: 0; }
@@ -207,13 +208,14 @@
       <h2 id="how-heading">How to use it</h2>
       <div class="how">
         <ol class="steps" id="steps">
-          <li><button type="button" data-step="0"><span class="n" aria-hidden="true">1</span><span><span class="t">Install it on your repositories</span><span class="d">Add the GitHub App to one repository or several.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
+          <li><button type="button" data-step="0"><span class="n" aria-hidden="true">1</span><span><span class="t">Install it on your repositories<span class="soon">Coming soon</span></span><span class="d">The GitHub App isn't public yet. Once it is, you add it to one repository or several.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
           <li><button type="button" data-step="1"><span class="n" aria-hidden="true">2</span><span><span class="t">Someone opens an issue</span><span class="d">Nothing changes for the reporter.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
           <li><button type="button" data-step="2"><span class="n" aria-hidden="true">3</span><span><span class="t">The assistant triages it in seconds</span><span class="d">You get a note with a coloured tag: likely duplicate, possible duplicate, or probably new.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
           <li><button type="button" data-step="3"><span class="n" aria-hidden="true">4</span><span><span class="t">You decide</span><span class="d">Copy the draft reply, add a label, or close it as a duplicate. Nothing is posted for you.</span></span><span class="progress" aria-hidden="true"><div></div></span></button></li>
         </ol>
         <div class="stage" aria-hidden="true">
           <div class="scene" data-scene="0">
+            <p class="small muted">Coming soon: what installing will look like.</p>
             <div class="repo-chip"><span class="swatches"><i style="background:var(--green)"></i></span>your-org/api-server<span class="ok">Installed</span></div>
             <div class="repo-chip"><span class="swatches"><i style="background:var(--green)"></i></span>your-org/web-client<span class="ok">Installed</span></div>
             <div class="repo-chip"><span class="swatches"><i style="background:var(--line)"></i></span>your-org/docs<span class="ok" style="color:var(--muted)">Not installed</span></div>
@@ -244,7 +246,7 @@
           <h3>Individual developers</h3>
           <p class="muted">You maintain an open-source project next to your day job, and new issues pile up.</p>
           <ul>
-            <li>One repository, set up in minutes</li>
+            <li>One repository (self-install coming soon)</li>
             <li>Private notes only: nothing is posted on your project</li>
             <li>Runs on a free cloud server; the AI part costs under a tenth of a cent per issue</li>
           </ul>
@@ -322,11 +324,11 @@
       : top.score >= possible ? ['amber', 'Possible duplicate'] : ['green', 'Probably new'];
     const names = { VERSION: 'Version', STEPS_TO_REPRODUCE: 'Steps to reproduce', EXPECTED_VS_ACTUAL: 'Expected and actual', LOGS_OR_STACK_TRACE: 'Logs' };
     const m = r.missing || {};
-    const checks = m.status === 'OK' ? el('ul', { class: 'mini' }, ...Object.keys(names).map(k => {
-      const a = m.details[k];
-      const [mark, cls] = a === 'PRESENT' ? ['✓', 'given'] : a === 'MISSING' ? ['✗', 'missing'] : ['–', 'na'];
-      return el('li', {}, el('span', { class: cls, 'aria-hidden': 'true' }, mark), `${names[k]} ${a === 'PRESENT' ? 'given' : a === 'MISSING' ? 'missing' : 'not needed'}`);
-    })) : null;
+    // Only what the reporter left out: that is what a maintainer has to ask for.
+    const missing = m.status === 'OK' ? Object.keys(names).filter(k => m.details[k] === 'MISSING') : [];
+    const checks = m.status !== 'OK' ? null : el('ul', { class: 'mini' }, ...(missing.length
+      ? missing.map(k => el('li', {}, el('span', { class: 'missing', 'aria-hidden': 'true' }, '✗'), `${names[k]} missing`))
+      : [el('li', {}, el('span', { class: 'given', 'aria-hidden': 'true' }, '✓'), 'Nothing missing')]));
     $('sample-tag').replaceChildren(el('div', { class: `tag ${colour}` },
       el('div', { class: 'band' }, el('div', { class: 'verdict' }, word)),
       el('div', { class: 'body' },
@@ -341,7 +343,7 @@
   function renderRepos(repos) {
     $('repo-rows').replaceChildren(...(repos.length ? repos.map(r => el('tr', {},
       el('td', {}, r.repo), el('td', { class: 'num' }, r.issues.toLocaleString()), el('td', { class: 'num' }, r.triaged.toLocaleString()),
-      el('td', {}, el('a', { href: appLink(r.repo) }, 'Open')))) : [el('tr', {}, el('td', { colspan: '4', class: 'muted' }, 'No repositories yet. Install the GitHub App on one to start.'))]));
+      el('td', {}, el('a', { href: appLink(r.repo) }, 'Open')))) : [el('tr', {}, el('td', { colspan: '4', class: 'muted' }, 'No repositories yet. Installing the GitHub App yourself is coming soon.'))]));
   }
 
   // --- 3. the steps play one after another; a click, hover or focus stops the autoplay ---

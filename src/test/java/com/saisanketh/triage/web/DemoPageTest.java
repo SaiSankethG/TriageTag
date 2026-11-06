@@ -41,7 +41,8 @@ class DemoPageTest {
 
         assertThat(landing).contains("href=\"/app.html\">Check issues</a>", "fetch('/repos')", "fetch(`/reports/${repo}?limit=50`)",
                 "Who it's for", "Individual developers", "Engineering teams", "How to use it");
-        assertThat(landing).contains("prefers-reduced-motion");   // the step animation does not autoplay for users who turned motion off
+        assertThat(landing).contains("prefers-reduced-motion");
+        assertThat(landing).contains("Coming soon", "overflow-x: auto; position: relative;");  // App not public yet; no phone sideways scroll   // the step animation does not autoplay for users who turned motion off
         assertThat(landing).doesNotContain("innerHTML").doesNotContain("<script src=").doesNotContain("localStorage")
                 .doesNotContain("X-Admin-Token");                 // the landing page only reads
     }
