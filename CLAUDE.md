@@ -50,7 +50,8 @@ It is sai's interview portfolio project. Clarity beats cleverness.
 
 ## Current step (sai updates this line)
 Phase 0, M0-M6 done (4 Nov 2026; reports: docs/m1-report.md ... m6-report.md). STOP C (outreach + first OSS PR: docs/outreach.md)
-and STOP B (Oracle VM + k3s, GitHub App, HTTPS choice, demo video: docs/m5-report.md) are sai's. Hand scores still open:
+and STOP B (Oracle VM + k3s, GitHub App, HTTPS choice, demo video: docs/m5-report.md) are sai's.
+ON HOLD (sai, 7 Nov 2026): no Oracle VM / deploy until the UI is stable; current focus is fixing the UI. Don't suggest the VM as a next step. Hand scores still open:
 docs/m4-scoring.md, docs/m4-scoring-v3.md (blind A/B), docs/m4-results.md section 4 (48 false alarms).
 Flyway V1-V11. Outbox (V10). Comment mode off by default (0.90 + LLM yes). Admin POSTs need X-Admin-Token (TRIAGE_ADMIN_TOKEN).
 Metrics: /actuator/prometheus; dashboard deploy/grafana/. Load test: receiver p50 7 ms / p95 13 ms (500 webhooks).
