@@ -46,4 +46,7 @@ small monospace, identical card styles, header position, console errors) on `/`,
   other pages. A swinging tag's corners briefly widened the page -> `overflow-x: clip` on html/body (clip keeps sticky
   working). On phones the "How to use" picture was pinned mid-screen over the steps -> the phone rule lost to a later
   desktop rule; raised its specificity, now pinned at the top (8px).
-- Round 4 (375px and 1470px, light and dark): all measured checks pass, no console errors, tests green. Stop.
+- Round 4 (keyboard, pressed for real): Tab reaches every control in order with a visible ring, but Enter on a filter lost
+  focus (the row is redrawn) -> focus goes back to the chosen filter. Then Tab to an issue, Enter opens it, focus lands on
+  the tag. Reduced motion is checked in the CSS and by a test (the preview browser can't switch that setting on).
+- Round 5 (375px and 1470px, light and dark): all measured checks pass, no console errors, tests green. Stop.

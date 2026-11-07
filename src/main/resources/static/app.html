@@ -362,7 +362,9 @@
       .filter(x => !openOnly || x.r.state === 'open');
     const count = (k) => items.filter(x => k === 'all' || x.kind === k).length;
     $('filters').replaceChildren(...['all', 'likely', 'possible', 'info', 'new'].map(k => el('button', {
-      type: 'button', 'aria-pressed': String(filter === k), onclick: () => { filter = k; renderTriaged(); } },
+      type: 'button', 'aria-pressed': String(filter === k),
+      // the row is redrawn, so put keyboard focus back on the chosen filter instead of losing it
+      onclick: () => { filter = k; renderTriaged(); $('filters').querySelector('[aria-pressed="true"]').focus(); } },
       k === 'all' ? null : el('i', { style: `background:var(--${KINDS[k].colour})`, 'aria-hidden': 'true' }),
       `${k === 'all' ? 'All' : KINDS[k].word} ${count(k)}`)));
     const PRIORITY = { likely: 0, possible: 1, info: 2, new: 3 };   // what to look at first
