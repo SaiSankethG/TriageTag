@@ -70,3 +70,4 @@ small monospace, identical card styles, header position, console errors) on `/`,
   4 of 5 visible, scrollbar hidden until hover or keyboard focus; full title as a tooltip. Measured: Spring Boot titles
   average 88 characters and the median needs 574px, so only 9% fit one line at 460px; "most fit" would need a ~660px column.
 - Round 11 (sai): Reports list titles on 2 lines, cut with "…" after 2; the full-title tooltip stays.
+- Round 12 (sai: bigger step text, bigger picture box, bigger "Who it's for" text): step titles 28px in the display font (22px on phones), descriptions 18px, numbers 40px; the picture box takes more width (1.25fr), 36px padding, larger rows, issue card, reply and tag; persona text 18px, headings 26px. Phone sizes kept smaller so the pinned picture doesn't cover the steps.
