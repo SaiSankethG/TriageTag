@@ -90,6 +90,6 @@ class DemoPageTest {
         assertThat(themeJs).contains("data-theme", "localStorage").doesNotContainIgnoringCase("token");   // only the light/dark choice is stored
         String theme = new ClassPathResource("static/theme.css").getContentAsString(StandardCharsets.UTF_8);
         assertThat(theme).contains("@media (prefers-reduced-motion: reduce)", "animation: none !important",
-                ":root[data-theme=\"dark\"]", ":root:not([data-theme=\"light\"])", ".bar .bar-inner { max-width: 1160px; margin: 0 auto;", "@keyframes swing", ".stagger", "@keyframes fill", "prefers-color-scheme: dark", ".hero-glow::before", "body::after", "feTurbulence", "@keyframes drift", "Bricolage Grotesque", "IBM Plex Sans", "IBM Plex Mono");
+                ":root[data-theme=\"dark\"]", ":root:not([data-theme=\"light\"])", ".bar .bar-inner { max-width: 1200px; margin: 0 auto;", "@keyframes swing", ".stagger", "@keyframes fill", "prefers-color-scheme: dark", ".hero-glow::before", "body::after", "feTurbulence", "@keyframes drift", "Bricolage Grotesque", "IBM Plex Sans", "IBM Plex Mono");
     }
 }
