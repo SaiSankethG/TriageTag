@@ -63,7 +63,7 @@
   .stripe { border-radius: 3px; background: var(--line); }
   .stripe.red { background: var(--red); } .stripe.amber { background: var(--amber); } .stripe.blue { background: var(--blue); } .stripe.green { background: var(--green); }
   .list .t, .example, .row a, .tag .match, .issue-head h1, .side pre, .side h3 { overflow-wrap: anywhere; }
-  .list .t { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list .t { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }   /* two lines, then "…"; the full title is in the tooltip */
   .list .w { font-size: 13px; font-weight: 600; }
   .list .w.red { color: var(--red); } .list .w.amber { color: var(--amber-text); } .list .w.blue { color: var(--blue); } .list .w.green { color: var(--green); }
   .list .w .faint { font-weight: 400; }

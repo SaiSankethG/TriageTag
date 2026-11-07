@@ -69,3 +69,4 @@ small monospace, identical card styles, header position, console errors) on `/`,
   column `clamp(340px, 34vw, 460px)`: 460px at 1470 (report 851px), 435px at 1280 (report 686px); filters back to one row,
   4 of 5 visible, scrollbar hidden until hover or keyboard focus; full title as a tooltip. Measured: Spring Boot titles
   average 88 characters and the median needs 574px, so only 9% fit one line at 460px; "most fit" would need a ~660px column.
+- Round 11 (sai): Reports list titles on 2 lines, cut with "…" after 2; the full-title tooltip stays.
