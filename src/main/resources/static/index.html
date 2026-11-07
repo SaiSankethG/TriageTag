@@ -47,7 +47,17 @@
   .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
 
   /* The sample tag */
-  .sample { justify-self: center; width: min(100%, 380px); }
+  .sample { justify-self: center; width: min(100%, 440px); }
+  /* The live triage window: what the assistant does for one real issue, typed out line by line, then the tag swings in. */
+  .console { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .console-bar { display: flex; align-items: center; gap: 6px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--paper-2); font-size: 14px; color: var(--muted); }
+  .console-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .console-bar span { margin-left: 8px; overflow-wrap: anywhere; }
+  .console-body { margin: 0; font-family: var(--mono); font-size: 15px; line-height: 1.75; padding: 14px 16px; min-height: 12.4em; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
+  .console-body .ok { color: var(--green); } .console-body .bad { color: var(--red); } .console-body .dim { color: var(--muted); }
+  .cursor { display: inline-block; width: .55em; height: 1.05em; background: var(--ink); vertical-align: -.15em; }
+  @media (prefers-reduced-motion: no-preference) { .cursor { animation: blink 1s steps(1) infinite; } @keyframes blink { 50% { opacity: 0; } } }
+  #sample-tag.waiting { visibility: hidden; }
   .tag { position: relative; background: var(--paper); border-radius: 6px 6px 12px 12px; padding-top: 30px;
          clip-path: polygon(26px 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 0 100%, 0 26px); }
   .tag::before { content: ""; position: absolute; top: 9px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%;
@@ -180,6 +190,10 @@
       </div>
     </div>
     <div class="sample" aria-live="polite">
+      <div class="console" aria-hidden="true">
+        <div class="console-bar"><i></i><i></i><i></i><span id="console-repo">TriageTag</span></div>
+        <pre class="console-body" id="console-body"></pre>
+      </div>
       <div id="sample-tag"><div class="tag grey"><div class="band"><div class="verdict">Loading a real report…</div></div><div class="body"><p class="muted small">One moment.</p></div></div></div>
       <p class="sample-caption" id="sample-caption"></p>
     </div>
@@ -327,7 +341,7 @@
   const appLink = (repo, number) => `/app.html?${new URLSearchParams(number ? { repo, number: String(number) } : { repo })}`;
 
   // --- 1. the live sample: a real report from the newest triaged issues ---
-  async function loadSample(repo, settings) {
+  async function loadSample(repo, settings, issueCount) {
     const possible = settings ? settings.possibleThreshold : 0.75;
     const high = settings ? settings.commentThreshold : 0.90;
     const list = await (await fetch(`/reports/${repo}?limit=50`)).json();
@@ -354,6 +368,46 @@
         top ? el('div', { class: 'match' }, el('b', {}, pct(top.score)), ' similar to ', el('a', { href: top.url, target: '_blank', rel: 'noopener' }, `#${top.number} ${top.title}`)) : null,
         checks)));
     $('sample-caption').replaceChildren('A real report for ', el('a', { href: appLink(repo, r.number) }, `${repo} #${r.number}`), '.');
+    const cut = (t, n) => t.length > n ? t.slice(0, n - 1) + '…' : t;
+    const draftOk = r.draftReply && r.draftReply.status === 'OK';
+    playConsole(repo, [
+      ['dim', `> New issue #${r.number} opened`],
+      ['', `  ${cut(r.title, 40)}`],
+      ['ok', `✓ Compared with ${issueCount ? issueCount.toLocaleString() : 'all'} earlier issues`],
+      top ? ['ok', `✓ Best match #${top.number}, ${pct(top.score)} similar`] : ['dim', '– No earlier issue is close'],
+      missing.length ? ['bad', `✗ Missing: ${missing.map(k => names[k].toLowerCase()).join(', ')}`] : ['ok', '✓ Nothing important missing'],
+      draftOk ? ['ok', '✓ Draft reply ready from the docs'] : ['dim', '– No draft: nothing relevant in the docs'],
+    ]);
+  }
+
+  /** Types the lines into the console one character at a time, then lets the tag swing in. Reduced motion: all at once. */
+  function playConsole(repo, lines) {
+    const body = $('console-body'), tag = $('sample-tag');
+    $('console-repo').textContent = repo;
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const cursor = el('span', { class: 'cursor' });
+    const line = (kind) => body.appendChild(el('span', { class: kind }));
+    if (still) {
+      lines.forEach(([kind, text], i) => { line(kind).textContent = text + (i < lines.length - 1 ? '\n' : ''); });
+      return;
+    }
+    tag.classList.add('waiting');
+    // Reserve the final height first (all lines, then measured), so wrapping lines don't push the hero down while typing.
+    lines.forEach(([kind, text], k) => { line(kind).textContent = text + (k < lines.length - 1 ? '\n' : ''); });
+    body.style.minHeight = `${body.offsetHeight}px`;
+    body.replaceChildren();
+    let i = 0, j = 0, span = line(lines[0][0]);
+    body.appendChild(cursor);
+    (function next() {
+      const [, text] = lines[i];
+      if (j < text.length) { span.textContent += text[j++]; setTimeout(next, 16); return; }
+      if (++i < lines.length) { span.textContent += '\n'; j = 0; span = line(lines[i][0]); body.appendChild(cursor); setTimeout(next, 260); return; }
+      // done typing: the cursor goes (no endless blinking) and the tag swings in under the window
+      cursor.remove();
+      tag.classList.remove('waiting');
+      const t = tag.querySelector('.tag');
+      if (t) { t.classList.remove('swing'); void t.offsetWidth; t.classList.add('swing'); }
+    })();
   }
 
   // --- 5. the repositories the assistant has issues for ---
@@ -399,6 +453,9 @@
       fill.style.height = `${done * 100}%`;
       let i = 0;
       circles.forEach((c, k) => { if (centre(c) <= mid) i = k; });
+      // The last step sits too low to reach that line before the section ends (the picture stops being pinned and both
+      // scroll away together), so it becomes active once the end of the steps comes up to the bottom of the picture.
+      if (beside && wrap.getBoundingClientRect().bottom <= stage.bottom + 40) i = circles.length - 1;
       show(i);
     }
     const request = () => { if (!queued) { queued = true; requestAnimationFrame(onScroll); } };
@@ -419,10 +476,13 @@
     if (!Array.isArray(repos)) repos = [];
     renderRepos(repos);
     const repo = (repos.find(r => r.triaged > 0) || repos[0] || { repo: 'spring-projects/spring-boot' }).repo;
-    try { await loadSample(repo, settings); }
+    const picked = repos.find(x => x.repo === repo);
+    try { await loadSample(repo, settings, picked ? picked.issues : 0); }
     catch (e) {
       $('sample-tag').replaceChildren(el('div', { class: 'tag grey' }, el('div', { class: 'band' }, el('div', { class: 'verdict' }, 'No sample yet')),
         el('div', { class: 'body' }, el('p', { class: 'muted small' }, 'Reports appear here once the first issues are triaged.'))));
+      $('sample-tag').classList.remove('waiting');
+      $('console-body').textContent = '> Waiting for the first triaged issue.';
     }
   })();
 
