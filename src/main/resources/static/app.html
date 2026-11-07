@@ -63,6 +63,7 @@
   .list .y { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .list .m { font-size: 12px; color: var(--faint); }
   .repo-select { font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; width: 100%; }
+  @media (max-width: 820px) { #repo-chip { display: none; } }
   .to-list { display: none; font-size: 14px; margin-bottom: 10px; }
   @media (max-width: 820px) {
     body.reading main { order: -1; }                      /* phones: the report first, the list below it */
@@ -174,6 +175,7 @@
     <h2 id="pick-heading" class="visually-hidden">Choose an issue</h2>
     <label for="repo" class="small muted" style="display:block;margin-bottom:4px">Repository</label>
     <select id="repo" class="repo-select"><option value="spring-projects/spring-boot">spring-projects/spring-boot</option></select>
+    <div id="repo-count" class="small faint" style="margin-top:4px" aria-live="polite"></div>
     <form id="number-form" class="open-row" style="margin-top:12px">
       <label for="number" class="visually-hidden">Issue number</label>
       <!-- Text, not type=number: no up/down arrows; only digits are accepted when opening. -->
@@ -210,6 +212,7 @@
   let searchTimer = null;
   let tab = 'reports';          // which list the picker shows
   let filter = 'all';           // which kind of triaged issue the list shows
+  let repoList = [];            // GET /repos, for the counts under the picker
   let triaged = [];             // the last loaded triaged list; filters run on the page
 
   function el(tag, attrs = {}, ...children) {
@@ -314,9 +317,17 @@
     if (!names.includes(chosen)) names.unshift(chosen);
     $('repo').replaceChildren(...names.map(name => {
       const r = repos.find(x => x.repo === name);
-      return el('option', { value: name }, r ? `${name} (${r.triaged.toLocaleString()} triaged)` : name);
+      return el('option', { value: name }, name);
     }));
     $('repo').value = chosen;
+    repoList = repos;
+    showRepoCount();
+  }
+
+  /** "33 triaged of 43,810 issues" under the picker, for the repository chosen now. */
+  function showRepoCount() {
+    const r = repoList.find(x => x.repo === repoValue());
+    $('repo-count').textContent = r ? `${r.triaged.toLocaleString()} triaged of ${r.issues.toLocaleString()} issues` : '';
   }
 
   // --- the picker list ---
@@ -580,7 +591,7 @@
   // --- wiring ---
   $('number-form').addEventListener('submit', (e) => { e.preventDefault(); showReport(repoValue(), $('number').value.trim()); });
   $('search').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadList, 300); });
-  $('repo').addEventListener('change', async () => { history.replaceState(null, '', '?' + new URLSearchParams({ repo: repoValue() })); renderWelcome(await loadList() || []); });
+  $('repo').addEventListener('change', async () => { showRepoCount(); history.replaceState(null, '', '?' + new URLSearchParams({ repo: repoValue() })); renderWelcome(await loadList() || []); });
   $('open-only').addEventListener('change', renderTriaged);
   $('tab-reports').addEventListener('click', () => setTab('reports'));
   $('tab-all').addEventListener('click', () => setTab('all'));

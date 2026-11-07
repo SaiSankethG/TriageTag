@@ -23,6 +23,7 @@ class DemoPageTest {
         assertThat(html).contains("'Likely duplicate'", "'Possible duplicate'", "'Needs info'", "'Looks new'", "function whyOf(",
                 "id=\"filters\"", "id=\"open-only\"", "Copy reply", "Duplicate of #", "Open on GitHub", "This issue and its best match");
         assertThat(html).contains("body.reading main { order: -1; }");   // phones: the report first
+        assertThat(html).contains("id=\"repo-count\"", "triaged of ${r.issues.toLocaleString()} issues");   // counts under the picker, not cut off inside it
         // The public page only reads: no admin token box, no POST.
         assertThat(html).doesNotContain("X-Admin-Token").doesNotContain("admin-token").doesNotContain("method: 'POST'")
                 .doesNotContain("localStorage");
