@@ -33,11 +33,11 @@
   /* Layout */
   .layout { max-width: none; margin: 0; padding: 28px 24px 64px; display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 40px; align-items: start; }
   @media (min-width: 1100px) { .layout { gap: 96px; } .welcome { margin-left: min(8vw, 140px); } }   /* room between the list and what you read */
-  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; gap: 20px; } .list { max-height: 34vh; } }
+  @media (max-width: 820px) { .layout { grid-template-columns: minmax(0, 1fr); gap: 20px; } .list { max-height: 34vh; } }
   @media (min-width: 821px) { .picker { position: sticky; top: 16px; } }   /* sticky only beside the report, never on phones */
 
   /* Picker (the inbox on the left) */
-  .picker { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+  .picker { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 18px; min-width: 0; }   /* lets the filter row scroll instead of widening the card */
   .open-row { display: flex; gap: 8px; }
   .btn { border: 0; background: var(--ink); color: var(--paper); padding: 9px 16px; border-radius: 6px; font-weight: 600; text-decoration: none; display: inline-block; }
   .btn.quiet { background: var(--paper); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
@@ -116,6 +116,9 @@
   .label { font-size: 13px; padding: 2px 10px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); color: var(--ink); }
 
   .panel { background: var(--paper); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  /* Only the draft is a boxed card; the comparison and the folded parts are plain sections with a rule above them. */
+  .plain { padding: 18px 0 0; border-top: 1px solid var(--line); }
+  details.plain { padding-top: 14px; }
   .draft { white-space: pre-wrap; word-break: break-word; margin: 10px 0 0; padding: 14px 16px; border-left: 3px solid var(--ink);
            background: var(--paper-2); border-radius: 0 8px 8px 0; font: 15px/1.65 var(--body); max-width: 78ch; }
 
@@ -371,7 +374,7 @@
         i === 0 ? el('span', { class: 'first' }, 'Look at this first') : null),
       el('span', { class: 'y' }, whyOf(kind, t))], () => showReport(repo, r.number), i)));
     $('list-status').textContent = !triaged.length ? 'No issue has been triaged yet.'
-      : shown.length ? 'Most important first: likely duplicates, then possible, needs info, looks new.' : 'Nothing matches this filter.';
+      : shown.length ? 'Pick an issue to see its report. Most important first.' : 'Nothing matches this filter.';
     markCurrent($('number').value);
   }
 
@@ -542,7 +545,7 @@
     const labels = r.labels || [];
     parts.push(el('div', { class: 'top-row' }, tagEl, el('div', { class: 'actions' }, buttons,
       el('p', { class: 'small muted', style: 'margin:0' }, 'Nothing is posted for you. Copy, then paste on GitHub.',
-        offerDuplicate ? ` Posting "Duplicate of #${top.number}" lets GitHub close the issue as a duplicate.` : null),
+        offerDuplicate ? ` Posting "Duplicate of #${top.number}" in a comment marks the issue as a duplicate on GitHub (it stays open until someone closes it).` : null),
       labels.length ? el('div', { class: 'labels' }, 'Suggested labels:', ...labels.map(l => el('span', { class: 'label', title: `${pct(l.share)} of similar issues have it` }, l.label))) : null)));
 
     // 3. The draft
@@ -564,7 +567,7 @@
     // 4. This issue next to its best match, so the maintainer can judge in one look
     if (top) {
       const cut = (text, full) => (text || '').trim() ? text + (full > text.length ? '…' : '') : '(No description.)';
-      parts.push(el('section', { class: 'panel' }, el('h2', {}, 'This issue and its best match'),
+      parts.push(el('section', { class: 'plain' }, el('h2', {}, 'This issue and its best match'),
         r.fixedHint ? el('div', { class: 'fixed' }, el('strong', {}, 'Already fixed? '), r.fixedHint.text, ' ',
           r.fixedHint.closerUrl ? link(r.fixedHint.closerUrl, 'See the fix') : null) : null,
         el('div', { class: 'side' },
@@ -578,14 +581,14 @@
     // 5. The other matches, folded
     const others = (r.duplicates || []).slice(1);
     if (others.length) {
-      parts.push(el('details', { class: 'panel fold' }, el('summary', {}, `Other similar issues (${others.length})`),
+      parts.push(el('details', { class: 'plain fold' }, el('summary', {}, `Other similar issues (${others.length})`),
         ...others.map(d => el('div', { class: 'row' },
           el('div', { class: 'top' }, el('div', {}, link(d.url, `#${d.number} ${d.title}`)), el('span', { class: 'pct' }, pct(d.score))),
           el('div', { class: 'state' }, stateText(d.state, d.stateReason)), meter(d.score, 'grey')))));
     }
 
     // 6. Details for the curious: the AI check, model, tokens
-    parts.push(el('details', { class: 'panel fold' }, el('summary', {}, 'Details'),
+    parts.push(el('details', { class: 'plain fold' }, el('summary', {}, 'Details'),
       el('dl', { class: 'meta' },
         el('dt', {}, 'AI check'), el('dd', {}, r.duplicateCheck ? `${CHECK_WORDS[r.duplicateCheck.verdict]}. ${r.duplicateCheck.reason || ''}` : `only runs at ${settings ? pct(settings.commentThreshold) : '90%'} or more`),
         el('dt', {}, 'Made'), el('dd', {}, new Date(r.createdAt).toLocaleString()),

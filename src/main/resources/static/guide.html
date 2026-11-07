@@ -12,7 +12,7 @@
   :focus-visible { outline: 3px solid var(--link); outline-offset: 2px; border-radius: 4px; }
   h1, h2 { font-family: var(--condensed); font-stretch: 85%; font-weight: 600; }
   .bar { border-bottom: 1px solid var(--line); background: var(--paper); }
-  .bar-inner { max-width: none; margin: 0; padding: 12px 24px; display: flex; align-items: center; gap: 18px; }
+  .bar-inner { max-width: none; margin: 0; padding: 12px 24px; display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
   .name { font-family: var(--condensed); font-stretch: 85%; font-size: 21px; font-weight: 600; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
   .name .swatches { display: inline-flex; gap: 3px; }
   .name .swatches i { width: 6px; height: 18px; border-radius: 2px; display: block; }
@@ -21,6 +21,8 @@
   .bar nav a[aria-current="page"], .bar nav a:hover { color: var(--ink); border-bottom-color: var(--ink); }
   main { max-width: 720px; margin: 0 auto; padding: 8px 16px 64px; }
   .guide-top { max-width: 720px; margin: 0 auto; padding: 72px 16px 28px; }
+  .next { margin: 0; font-size: 16px; }
+  .btn-link { display: inline-block; background: var(--ink); color: var(--paper); padding: 6px 14px; border-radius: 6px; font-weight: 600; text-decoration: none; }
   h1 { font-size: 38px; line-height: 1.15; margin: 0 0 10px; }
   h2 { font-size: 24px; margin: 38px 0 10px; }
   .lead { color: var(--muted); font-size: 18px; margin: 0 0 24px; }
@@ -57,6 +59,7 @@
   <div class="guide-top">
     <h1>How to use TriageTag</h1>
     <p class="lead">A two-minute guide for maintainers: what the assistant does, how to read a report, and what stays private.</p>
+    <p class="next">Read on, or <a class="btn-link" href="/app.html">open the reports</a> and pick an issue.</p>
   </div>
 </div>
 <main>
@@ -78,7 +81,7 @@
       <div class="card">
         <table>
           <tr><th>Tag</th><th>Meaning</th><th>What to do</th></tr>
-          <tr><td><span class="swatch" style="background:var(--red)"></span>Likely duplicate</td><td>Very similar (90%+) and the AI check agrees it is the same problem.</td><td>Open the match; close as duplicate if it fits.</td></tr>
+          <tr><td><span class="swatch" style="background:var(--red)"></span>Likely duplicate</td><td>Very similar (90%+) and the AI check agrees it is the same problem.</td><td>Open the match; mark it as a duplicate if it fits.</td></tr>
           <tr><td><span class="swatch" style="background:var(--amber)"></span>Possible duplicate</td><td>Similar (75%+), or very similar but the AI check isn't sure.</td><td>Have a look at the match before answering.</td></tr>
           <tr><td><span class="swatch" style="background:var(--blue)"></span>Needs info</td><td>Not a duplicate, but the reporter left out the version, steps, expected vs actual, or logs.</td><td>Ask for what's missing.</td></tr>
           <tr><td><span class="swatch" style="background:var(--green)"></span>Looks new</td><td>Nothing earlier is close, and nothing important is missing.</td><td>Triage it as a new issue.</td></tr>
@@ -86,8 +89,8 @@
       </div>
     </li>
     <li><strong>Look at what's missing.</strong> The tag lists only the details the reporter left out (✗). "Nothing important missing" means you can start.</li>
-    <li><strong>Use the buttons.</strong> <em>Copy reply</em> copies the draft; <em>Copy "Duplicate of #N"</em> copies the text that lets GitHub
-        close the issue as a duplicate when you post it; <em>Open on GitHub</em> opens the issue. Nothing is posted for you.</li>
+    <li><strong>Use the buttons.</strong> <em>Copy reply</em> copies the draft; <em>Copy "Duplicate of #N"</em> copies the comment that marks the issue
+        as a duplicate on GitHub when you post it (it doesn't close the issue); <em>Open on GitHub</em> opens the issue. Nothing is posted for you.</li>
     <li><strong>Compare side by side.</strong> Under the draft, the new issue and its best match are shown next to each other, so you can
         judge in one look. Other similar issues are folded below. An "Already fixed?" note appears when the best match was fixed in a release.</li>
     <li>For an issue that is already closed, a stamp on the tag says what maintainers decided later, and whether the assistant found it.</li>

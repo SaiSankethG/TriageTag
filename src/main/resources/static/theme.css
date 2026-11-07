@@ -33,6 +33,8 @@
 }
 
 body { font-family: var(--body); background-color: var(--bg); }
+/* A swinging tag's corners must never make the page scroll sideways. `clip` (not `hidden`) keeps position: sticky working. */
+html, body { overflow-x: clip; }
 /* Fine grain over everything: a tiny SVG noise tile, very faint, on top of the page but never in the way of clicks.
    At this opacity it changes text contrast by well under 1%. */
 body::after {
@@ -66,7 +68,9 @@ body::after {
 .wash-green { --wash: var(--wash-green); } .wash-amber { --wash: var(--wash-amber); }
 section.block[class*="wash-"] { background: linear-gradient(to bottom, var(--wash), transparent 80%), var(--base, transparent); }
 h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-optical-sizing: auto; letter-spacing: -.01em; }
-.num { font-family: var(--mono); font-size: .92em; letter-spacing: 0; }
+.num { font-family: var(--mono); font-size: 1em; letter-spacing: 0; }
+/* In small text the numbers use the text font: no small monospace labels. */
+:where(.small, .sub, .y, .m, .state) .num { font-family: inherit; }
 .bar { background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(6px); }
 /* The header's text size is fixed here, not inherited from each page's body size, so the links sit in the same place everywhere. */
 .bar .name { font-size: 21px; }

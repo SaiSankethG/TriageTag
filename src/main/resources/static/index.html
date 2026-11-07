@@ -83,7 +83,7 @@
 
   /* How to use: steps + animated stage */
   .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; margin-top: 32px; align-items: start; }
-  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .stage { order: -1; top: 8px; z-index: 2; } .steps > li { min-height: 72vh; } }
+  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .how .stage { order: -1; top: 8px; z-index: 2; }   /* .how raises specificity: the desktop .stage rule comes later */ .steps > li { min-height: 72vh; } }
   .steps-wrap { position: relative; }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; position: relative; }
   .steps > li { min-height: 93vh; }            /* about 1.5x the old scroll per step, so the line runs longer */
@@ -218,7 +218,7 @@
           <li><button type="button" data-step="0"><span class="n" aria-hidden="true">1</span><span><span class="t">Install it on your repositories<span class="soon">Coming soon</span></span><span class="d">The GitHub App isn't public yet. Once it is, you add it to one repository or several.</span></span></button></li>
           <li><button type="button" data-step="1"><span class="n" aria-hidden="true">2</span><span><span class="t">Someone opens an issue</span><span class="d">Nothing changes for the reporter.</span></span></button></li>
           <li><button type="button" data-step="2"><span class="n" aria-hidden="true">3</span><span><span class="t">The assistant triages it in seconds</span><span class="d">You get a note with a coloured tag: likely duplicate, possible duplicate, needs info, or looks new.</span></span></button></li>
-          <li><button type="button" data-step="3"><span class="n" aria-hidden="true">4</span><span><span class="t">You decide</span><span class="d">Copy the draft reply, add a label, or close it as a duplicate. Nothing is posted for you.</span></span></button></li>
+          <li><button type="button" data-step="3"><span class="n" aria-hidden="true">4</span><span><span class="t">You decide</span><span class="d">Copy the draft reply, add a label, or mark it as a duplicate. Nothing is posted for you.</span></span></button></li>
         </ol>
         </div>
         <div class="stage" aria-hidden="true">
@@ -238,7 +238,7 @@
           </div>
           <div class="scene" data-scene="3">
             <div class="reply">This looks like an earlier issue that was fixed in 3.4.2. Could you try that version and tell us your Spring Boot version?</div>
-            <div class="actions"><span class="primary">Copy reply</span><span>Add label</span><span>Close as duplicate</span></div>
+            <div class="actions"><span class="primary">Copy reply</span><span>Add label</span><span>Mark as duplicate</span></div>
           </div>
         </div>
       </div>
