@@ -118,6 +118,23 @@
   /* The rail joins the four numbers; its fill follows the scroll (set in setupSteps). */
   .rail { position: absolute; left: 39px; width: 2px; background: var(--line); border-radius: 1px; }
   .rail-fill { width: 100%; height: 0; background: var(--ink); border-radius: 1px; }
+  /* The marker rides the end of the fill, so you can see where you are on the line. */
+  .rail-dot { position: absolute; left: 50%; top: 0; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%;   /* passes behind the step numbers (they sit above it) */
+              background: var(--ink); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ink) 15%, transparent); }   /* ink, not amber: amber means "possible duplicate" */
+  /* Each picture plays a short entrance when its step becomes active (only without reduced motion). */
+  @media (prefers-reduced-motion: no-preference) {
+    .scene.on .repo-chip { animation: chip-in .45s cubic-bezier(.2, .8, .2, 1) both; }
+    .scene.on .repo-chip:nth-of-type(2) { animation-delay: .15s; } .scene.on .repo-chip:nth-of-type(3) { animation-delay: .3s; }
+    .scene.on .repo-chip .ok { animation: chip-in .3s ease-out both; animation-delay: inherit; }
+    .scene.on .gh-issue { animation: drop-in .6s cubic-bezier(.2, .8, .2, 1) both; }
+    .scene.on .tag { animation: swing 1.1s cubic-bezier(.3, .7, .3, 1) both; transform-origin: 50% 16px; }
+    .scene.on .reply { animation: chip-in .5s cubic-bezier(.2, .8, .2, 1) both; }
+    .scene.on .actions span { animation: chip-in .35s ease-out both; }
+    .scene.on .actions span:nth-child(1) { animation-delay: .35s; } .scene.on .actions span:nth-child(2) { animation-delay: .45s; } .scene.on .actions span:nth-child(3) { animation-delay: .55s; }
+    @keyframes chip-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: none; } }
+    @keyframes drop-in { from { opacity: 0; transform: translateY(-22px) scale(.97); } 70% { transform: translateY(3px); } to { opacity: 1; transform: none; } }
+    .rail-dot { transition: top .12s linear; }
+  }
   .steps .n { position: relative; z-index: 1; background: var(--bg); }
   .steps button.done .n { background: var(--ink); color: var(--paper); box-shadow: none; }
   .steps button { width: 100%; text-align: left; border: 0; background: none; color: var(--ink); border-radius: 8px; padding: 18px 20px;
@@ -273,7 +290,7 @@
       <h2 id="how-heading">How to use it</h2>
       <div class="how">
         <div class="steps-wrap">
-        <div class="rail" id="rail" aria-hidden="true"><div class="rail-fill" id="rail-fill"></div></div>
+        <div class="rail" id="rail" aria-hidden="true"><div class="rail-fill" id="rail-fill"></div><div class="rail-dot" id="rail-dot"></div></div>
         <ol class="steps" id="steps">
           <li><button type="button" data-step="0"><span class="n" aria-hidden="true">1</span><span><span class="t">Install it on your repositories<span class="soon">Coming soon</span></span><span class="d">The GitHub App isn't public yet. Once it is, you add it to one repository or several.</span></span></button></li>
           <li><button type="button" data-step="1"><span class="n" aria-hidden="true">2</span><span><span class="t">Someone opens an issue</span><span class="d">Nothing changes for the reporter.</span></span></button></li>
@@ -461,7 +478,7 @@
     const buttons = [...document.querySelectorAll('#steps button')];
     const scenes = [...document.querySelectorAll('.scene')];
     const circles = buttons.map(b => b.querySelector('.n'));
-    const rail = $('rail'), fill = $('rail-fill'), wrap = document.querySelector('.steps-wrap');
+    const rail = $('rail'), fill = $('rail-fill'), dot = $('rail-dot'), wrap = document.querySelector('.steps-wrap');
     let current = -1, queued = false;
     const centre = (node) => { const r = node.getBoundingClientRect(); return r.top + r.height / 2; };
     function show(i) {
@@ -488,6 +505,7 @@
       const r = rail.getBoundingClientRect();
       const done = Math.max(0, Math.min(1, (mid - r.top) / Math.max(1, r.height)));
       fill.style.height = `${done * 100}%`;
+      dot.style.top = `${done * 100}%`;
       let i = 0;
       circles.forEach((c, k) => { if (centre(c) <= mid) i = k; });
       // The last step sits too low to reach that line before the section ends (the picture stops being pinned and both
