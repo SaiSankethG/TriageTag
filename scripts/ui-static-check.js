@@ -29,6 +29,9 @@ for (const page of pages) {
 check(/@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none !important/.test(theme), 'theme.css: all motion off under prefers-reduced-motion');
 check(/:root\[data-theme="dark"\]/.test(theme) && /:root:not\(\[data-theme="light"\]\)/.test(theme), 'theme.css: dark colours for both the system setting and the toggle');
 check(!/text-transform:\s*uppercase/.test(theme), 'theme.css: no ALL-CAPS labels');
+const landing = read('index.html');
+check(/\.steps > li:last-child \{ min-height: 540px; \}/.test(landing), 'index.html: room after step 4 so it can reach the activation line');
+check(landing.includes('if (atBottom && visible >= lastBox.height / 2) i = circles.length - 1;'), 'index.html: step 4 also activates at the page bottom when half visible');
 const js = read('theme.js');
 check(!/token/i.test(js), 'theme.js: stores only the light/dark choice');
 

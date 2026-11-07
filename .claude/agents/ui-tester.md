@@ -16,9 +16,14 @@ Run, from the repository root:
 3. If the writer gave you measurements from the browser (widths, positions, font sizes), compare them with what sai asked
    for in the newest entry of `docs/ui-checklist.md` and say which match and which don't.
 
+4. "How to use it" step order: the writer runs `scripts/steps-order-check.js` in the browser at laptop width (1470px)
+   and phone width (375px) and gives you its output lines. PASS only if both say `down: 1 2 3 4  up: 4 3 2 1`. If the
+   writer gave no output for this, report "Step order: not run" as a FAIL; never assume it passed.
+
 Answer in this shape, short:
 - **Result:** PASS or FAIL.
 - **Tests:** the summary line.
 - **Static checks:** PASS, or each FAIL line.
+- **Step order:** PASS / FAIL per width, from the writer's steps-order-check output.
 - **Measurements:** match / mismatch, if any were given.
 Report only what the commands and files show; don't guess.
