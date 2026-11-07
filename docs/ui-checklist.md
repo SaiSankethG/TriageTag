@@ -52,3 +52,7 @@ small monospace, identical card styles, header position, console errors) on `/`,
 - Round 5 (375px and 1470px, light and dark): all measured checks pass, no console errors, tests green. Stop.
 - Round 6 (sai: "this is too long"): steps took 93% of the screen each and the picture started mid-screen, far below step 1
   -> 50% per step (40% on phones), picture pinned 96px from the top so it lines up with the steps. Section 2457px -> 1559px.
+- Round 7 (sai: section about 2 screens; the picture lines up with the active step; same on phone): kept 50% per step (the
+  section is 1.9 screens on a laptop, 2.2 on a phone; 100% per step would have been 4 screens). A step now becomes active
+  when it reaches the picture's top edge (desktop: step top 84px, picture top 96px) or comes out just under the picture
+  (phones), so the active step and the picture always line up.

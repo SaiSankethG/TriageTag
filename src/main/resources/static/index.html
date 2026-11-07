@@ -355,8 +355,8 @@
   }
 
   // --- 3. the steps play one after another; a click, hover or focus stops the autoplay ---
-  // --- 3. the steps follow the scroll: the rail fills down to the middle of the screen, and the step whose number the fill has
-  //        reached is the one shown. A click also picks a step. Nothing plays on its own.
+  // --- 3. the steps follow the scroll: the rail fills down to the picture's top edge (desktop) or just under the picture
+  //        (phones), and the step whose number the fill has reached is the one shown. A click also picks a step. Nothing plays on its own.
   function setupSteps() {
     const buttons = [...document.querySelectorAll('#steps button')];
     const scenes = [...document.querySelectorAll('.scene')];
@@ -380,7 +380,11 @@
     }
     function onScroll() {
       queued = false;
-      const mid = innerHeight * 0.55;
+      // The line where a step becomes active: the picture's top edge when it sits beside the steps (desktop), or just
+      // under the picture when it sits above them (phones). So the active step always lines up with the picture.
+      const stage = document.querySelector('.stage').getBoundingClientRect();
+      const beside = stage.left > circles[0].getBoundingClientRect().right;
+      const mid = beside ? stage.top + 24 : stage.bottom + 120;   // phones: the first step showing under the picture
       const r = rail.getBoundingClientRect();
       const done = Math.max(0, Math.min(1, (mid - r.top) / Math.max(1, r.height)));
       fill.style.height = `${done * 100}%`;
