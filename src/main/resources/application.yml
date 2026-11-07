@@ -1,6 +1,13 @@
 spring:
   application:
     name: issue-triage-assistant
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          # Pages, theme.css and theme.js: the browser must re-check them on every load (it still reuses its copy when
+          # nothing changed). Without this, browsers mixed old and new files and the header looked different per page.
+          no-cache: true
   datasource:
     url: jdbc:postgresql://localhost:5433/triage
     username: copilot

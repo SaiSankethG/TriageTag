@@ -56,3 +56,8 @@ small monospace, identical card styles, header position, console errors) on `/`,
   section is 1.9 screens on a laptop, 2.2 on a phone; 100% per step would have been 4 screens). A step now becomes active
   when it reaches the picture's top edge (desktop: step top 84px, picture top 96px) or comes out just under the picture
   (phones), so the active step and the picture always line up.
+- Round 8 (sai: no light/dark toggle; "the header keeps changing" on How to use): sai's screenshots were old cached files
+  (the guide had no "open the reports" line), so the server now sends `Cache-Control: no-cache` for pages, theme.css and
+  theme.js: browsers re-check every load. Added a light/dark toggle (sun/moon) to the header on every page; the choice is
+  remembered in the browser (theme.js, localStorage) and overrides the system setting both ways. Header measured identical on
+  /, /app.html, /guide.html: logo 24px, Home 1175px, toggle 1397px.

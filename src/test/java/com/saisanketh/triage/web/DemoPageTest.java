@@ -16,7 +16,7 @@ class DemoPageTest {
 
         assertThat(html).contains("fetch(`/reports/${repo}/${number}`");
         assertThat(html).doesNotContain("innerHTML");          // text from issues and the LLM goes in as text only
-        assertThat(html).doesNotContain("<script src=");       // no external scripts, no new dependency
+        assertThat(html).doesNotContain("<script src=\"http");       // no external scripts, no new dependency
         assertThat(html).contains("fetch('/settings')", "fetch('/repos')", "/repos/${repo}/issues?", "URLSearchParams(location.search)");
         assertThat(html).contains("@media (max-width: 820px)", ":focus-visible");   // dark mode lives in theme.css
         // Maintainer-first: four words instead of percentages, a one-line why, filters, and copy buttons (nothing is posted).
@@ -41,7 +41,7 @@ class DemoPageTest {
 
         // The admin token is sent only as a header, kept only in sessionStorage, never put in the URL or localStorage.
         assertThat(admin).contains("'X-Admin-Token': adminToken()", "sessionStorage.setItem('triage-admin-token'", "noindex");
-        assertThat(admin).doesNotContain("localStorage").doesNotContain("innerHTML").doesNotContain("<script src=");
+        assertThat(admin).doesNotContain("localStorage").doesNotContain("innerHTML").doesNotContain("<script src=\"http");
         assertThat(admin).doesNotContainPattern("URLSearchParams\\([^)]*[Tt]oken");
     }
 
@@ -51,7 +51,7 @@ class DemoPageTest {
         String page = new ClassPathResource("static/app.html").getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(page).contains("href=\"/guide.html\"", "href=\"/\"", "fetch(`/reports/${repo}?limit=50`)");
-        assertThat(guide).contains("How to read a report", "What is private, what is public").doesNotContain("<script");
+        assertThat(guide).contains("How to read a report", "What is private, what is public").doesNotContain("<script>");   // no inline script; only the shared theme.js
     }
 
     @Test
@@ -67,7 +67,7 @@ class DemoPageTest {
         assertThat(landing).contains(".steps > li { min-height: 50vh; }", "class=\"hero-glow\"", "with-grid", "wash-red", "wash-green");
         assertThat(landing).contains("id=\"rail\"", "addEventListener('scroll', request, { passive: true })", "function nudgeTag(");
         assertThat(landing).contains("Coming soon", "overflow-x: auto; position: relative;");  // App not public yet; no phone sideways scroll   // the step animation does not autoplay for users who turned motion off
-        assertThat(landing).doesNotContain("innerHTML").doesNotContain("<script src=").doesNotContain("localStorage")
+        assertThat(landing).doesNotContain("innerHTML").doesNotContain("<script src=\"http").doesNotContain("localStorage")
                 .doesNotContain("X-Admin-Token");                 // the landing page only reads
     }
 
@@ -81,8 +81,15 @@ class DemoPageTest {
             assertThat(new ClassPathResource("static/" + page).getContentAsString(StandardCharsets.UTF_8)).as(page)
                     .contains(".bar-inner { max-width: none; margin: 0; padding: 12px 24px;");
         }
+        for (String page : new String[]{"index.html", "app.html", "guide.html", "admin.html"}) {   // the only script file is our own theme.js
+            String html = new ClassPathResource("static/" + page).getContentAsString(StandardCharsets.UTF_8);
+            assertThat(html).as(page).contains("<script src=\"/theme.js\"></script>");
+            if (!page.equals("admin.html")) assertThat(html).as(page).contains("class=\"theme-toggle\"");
+        }
+        String themeJs = new ClassPathResource("static/theme.js").getContentAsString(StandardCharsets.UTF_8);
+        assertThat(themeJs).contains("data-theme", "localStorage").doesNotContainIgnoringCase("token");   // only the light/dark choice is stored
         String theme = new ClassPathResource("static/theme.css").getContentAsString(StandardCharsets.UTF_8);
         assertThat(theme).contains("@media (prefers-reduced-motion: reduce)", "animation: none !important",
-                "@keyframes swing", ".stagger", "@keyframes fill", "prefers-color-scheme: dark", ".hero-glow::before", "body::after", "feTurbulence", "@keyframes drift", "Bricolage Grotesque", "IBM Plex Sans", "IBM Plex Mono");
+                ":root[data-theme=\"dark\"]", ":root:not([data-theme=\"light\"])", "@keyframes swing", ".stagger", "@keyframes fill", "prefers-color-scheme: dark", ".hero-glow::before", "body::after", "feTurbulence", "@keyframes drift", "Bricolage Grotesque", "IBM Plex Sans", "IBM Plex Mono");
     }
 }

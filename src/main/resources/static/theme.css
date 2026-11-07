@@ -16,9 +16,11 @@
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --condensed: var(--display);
+  --sun: none; --moon: inline-block;   /* which icon the theme toggle shows */
 }
+/* Dark: when the system is dark and the visitor hasn't picked light, or when the visitor picked dark (header toggle). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0e1626; --paper: #152036; --paper-2: #1b2842; --ink: #e5e9f2; --muted: #b1bacd; --faint: #abb5ca;
     --line: #26355a; --link: #8fb4ff; --focus: #8fb4ff; --grid: rgba(143, 180, 255, .05);
     --red: #e5584a; --amber: #e6a832; --green: #4fae78; --blue: #5b8fd9; --grey: #8892a6;
@@ -29,7 +31,21 @@
     --glow-1: rgba(229, 88, 74, .15); --glow-2: rgba(230, 168, 50, .11); --glow-3: rgba(91, 143, 217, .20); --glow-4: rgba(79, 174, 120, .13);
     --wash-red: rgba(229, 88, 74, .08); --wash-blue: rgba(91, 143, 217, .09); --wash-green: rgba(79, 174, 120, .08); --wash-amber: rgba(230, 168, 50, .07);
     --grain: .05;
+    --sun: inline-block; --moon: none; color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1626; --paper: #152036; --paper-2: #1b2842; --ink: #e5e9f2; --muted: #b1bacd; --faint: #abb5ca;
+  --line: #26355a; --link: #8fb4ff; --focus: #8fb4ff; --grid: rgba(143, 180, 255, .05);
+  --red: #e5584a; --amber: #e6a832; --green: #4fae78; --blue: #5b8fd9; --grey: #8892a6;
+  --on-band: #ffffff; --on-amber: #1d2433; --amber-text: #e6a832;
+  --red-band: #c43d31; --green-band: #2b7d50; --blue-band: #3566b8;
+  --red-tint: #3a2026; --amber-tint: #382d16; --green-tint: #17302a; --blue-tint: #172b4d;
+  --band: #172238;
+  --glow-1: rgba(229, 88, 74, .15); --glow-2: rgba(230, 168, 50, .11); --glow-3: rgba(91, 143, 217, .20); --glow-4: rgba(79, 174, 120, .13);
+  --wash-red: rgba(229, 88, 74, .08); --wash-blue: rgba(91, 143, 217, .09); --wash-green: rgba(79, 174, 120, .08); --wash-amber: rgba(230, 168, 50, .07);
+  --grain: .05;
+  --sun: inline-block; --moon: none; color-scheme: dark;
 }
 
 body { font-family: var(--body); background-color: var(--bg); }
@@ -75,6 +91,7 @@ h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-opti
 /* The header's text size is fixed here, not inherited from each page's body size, so the links sit in the same place everywhere. */
 .bar .name { font-size: 21px; }
 .bar nav a { font-size: 15px; line-height: 1.6; }
+.bar nav { align-items: center; }   /* links and the theme toggle on one line, on every page */
 
 /* Moving between pages: a short cross-fade; the header keeps its place (same box on every page). */
 @view-transition { navigation: auto; }
@@ -122,3 +139,10 @@ h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-opti
 .meter > div { height: 100%; border-radius: 3px; width: var(--w, 0); }
 .meter > div.red { background: var(--red); } .meter > div.amber { background: var(--amber); }
 .meter > div.blue { background: var(--blue); } .meter > div.green { background: var(--green); }
+
+/* The light/dark toggle in the header: a moon in light mode (switch to dark), a sun in dark mode (switch to light). */
+.theme-toggle { display: inline-grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 8px; background: transparent;
+                color: var(--muted); cursor: pointer; box-shadow: inset 0 0 0 1px var(--line); }
+.theme-toggle:hover { color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.theme-toggle .sun { display: var(--sun); } .theme-toggle .moon { display: var(--moon); }

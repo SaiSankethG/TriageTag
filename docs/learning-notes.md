@@ -2769,3 +2769,21 @@ first" marker; one-line titles, reason only on the selected or hovered item.
 2. **Why show the reason on focus as well as hover?** Hover doesn't exist for keyboard or touch users; focus and selection do.
 3. **Why sort in the page and not in SQL?** The word (Likely/Possible/...) is computed in the page from score, AI verdict and
    missing details; sorting where the word is known avoids duplicating that rule in SQL.
+
+## Light/dark toggle and stale browser files (7 Nov 2026)
+
+- **Why the header "kept changing"**: browsers cache static files. Spring served them without a `Cache-Control` header, so the
+  browser guessed how long to keep them and showed old copies of some pages next to new ones. `spring.web.resources.cache.
+  cachecontrol.no-cache: true` makes the browser re-check every time; it still reuses its copy when the file hasn't changed
+  (the server answers 304), so it stays fast.
+- **Toggle**: `theme.js` (loaded in `<head>`, so the saved choice applies before the page is drawn) sets `data-theme` on
+  `<html>` and remembers it in localStorage. `theme.css` defines dark colours twice: for "system is dark and the visitor didn't
+  pick light" and for "the visitor picked dark", so the choice wins in both directions.
+
+### Likely interview questions
+1. **What does `Cache-Control: no-cache` mean?** Not "don't cache": "cache, but check with the server before using it". The
+   check is cheap (a 304 with no body when nothing changed).
+2. **Why load theme.js in the head, not at the end?** To set the theme before the first paint; otherwise dark-mode users see a
+   flash of light colours.
+3. **Why is localStorage fine here when the admin token must not use it?** The theme is a harmless preference; a token is a
+   secret that would outlive the tab and be readable by any script on the page.
