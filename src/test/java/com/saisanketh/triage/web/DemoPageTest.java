@@ -64,7 +64,7 @@ class DemoPageTest {
         // "How it helps": one tag colour per box (duplicates red, missing details blue, draft amber, already fixed green); bands alternate.
         assertThat(landing).containsSubsequence("benefit red", "benefit blue", "benefit amber", "benefit green")
                 .contains("<section class=\"block band wash-");
-        assertThat(landing).contains(".steps > li { min-height: 93vh; }", "class=\"hero-glow\"", "with-grid", "wash-red", "wash-green");
+        assertThat(landing).contains(".steps > li { min-height: 50vh; }", "class=\"hero-glow\"", "with-grid", "wash-red", "wash-green");
         assertThat(landing).contains("id=\"rail\"", "addEventListener('scroll', request, { passive: true })", "function nudgeTag(");
         assertThat(landing).contains("Coming soon", "overflow-x: auto; position: relative;");  // App not public yet; no phone sideways scroll   // the step animation does not autoplay for users who turned motion off
         assertThat(landing).doesNotContain("innerHTML").doesNotContain("<script src=").doesNotContain("localStorage")

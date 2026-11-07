@@ -83,10 +83,10 @@
 
   /* How to use: steps + animated stage */
   .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; margin-top: 32px; align-items: start; }
-  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .how .stage { order: -1; top: 8px; z-index: 2; }   /* .how raises specificity: the desktop .stage rule comes later */ .steps > li { min-height: 72vh; } }
+  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .how .stage { order: -1; top: 8px; z-index: 2; }   /* .how raises specificity: the desktop .stage rule comes later */ .steps > li { min-height: 40vh; } }
   .steps-wrap { position: relative; }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; position: relative; }
-  .steps > li { min-height: 93vh; }            /* about 1.5x the old scroll per step, so the line runs longer */
+  .steps > li { min-height: 50vh; }            /* half a screen of scrolling per step: the line still moves, without empty gaps */
   .steps > li:last-child { min-height: 0; }
   /* The rail joins the four numbers; its fill follows the scroll (set in setupSteps). */
   .rail { position: absolute; left: 30px; width: 2px; background: var(--line); border-radius: 1px; }
@@ -103,7 +103,7 @@
   .soon { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--amber-tint); box-shadow: inset 0 0 0 1px var(--amber); border-radius: 999px; padding: 0 8px; vertical-align: 1px; }
   .steps .d { font-size: 14px; color: var(--muted); display: block; }
   /* The box is as tall as the scene it shows: only the current scene takes up space; the others sit on top, faded out. */
-  .stage { position: sticky; top: calc(50vh - 130px); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 24px; overflow: hidden; }
+  .stage { position: sticky; top: 96px; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 24px; overflow: hidden; }
   .scene { position: absolute; inset: 24px; display: grid; align-content: center; gap: 14px; opacity: 0; transform: translateY(12px); pointer-events: none; }
   .scene.on { position: relative; inset: auto; opacity: 1; transform: none; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) { .scene { transition: opacity .45s ease, transform .45s ease; } }

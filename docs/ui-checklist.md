@@ -50,3 +50,5 @@ small monospace, identical card styles, header position, console errors) on `/`,
   focus (the row is redrawn) -> focus goes back to the chosen filter. Then Tab to an issue, Enter opens it, focus lands on
   the tag. Reduced motion is checked in the CSS and by a test (the preview browser can't switch that setting on).
 - Round 5 (375px and 1470px, light and dark): all measured checks pass, no console errors, tests green. Stop.
+- Round 6 (sai: "this is too long"): steps took 93% of the screen each and the picture started mid-screen, far below step 1
+  -> 50% per step (40% on phones), picture pinned 96px from the top so it lines up with the steps. Section 2457px -> 1559px.
