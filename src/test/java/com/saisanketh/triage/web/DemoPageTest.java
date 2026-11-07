@@ -73,7 +73,7 @@ class DemoPageTest {
         }
         for (String page : new String[]{"index.html", "app.html", "guide.html"}) {   // same header box: nothing jumps
             assertThat(new ClassPathResource("static/" + page).getContentAsString(StandardCharsets.UTF_8)).as(page)
-                    .contains(".bar-inner { max-width: 1260px; margin: 0 auto; padding: 12px 16px;");
+                    .contains(".bar-inner { max-width: 1400px; margin: 0 auto; padding: 12px 16px;");
         }
         String theme = new ClassPathResource("static/theme.css").getContentAsString(StandardCharsets.UTF_8);
         assertThat(theme).contains("@media (prefers-reduced-motion: reduce)", "animation: none !important",
