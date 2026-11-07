@@ -183,6 +183,18 @@
 
   /* Closing */
   .closing { text-align: left; display: grid; gap: 18px; justify-items: start; }
+  /* The numbers: four equal tiles (different units, so no bar heights that would suggest a comparison). They rest in place;
+     JS adds .pending until they scroll into view, then they rise one after another and count up. */
+  .numbers { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
+  @media (max-width: 900px) { .numbers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .stat-tile { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 22px 20px 20px; display: grid; gap: 8px; align-content: start; }
+  .stat { font-family: var(--display); font-size: 40px; line-height: 1.05; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .stat-tile span { color: var(--muted); font-size: 16px; line-height: 1.5; }
+  .numbers.pending .stat-tile { opacity: 0; transform: translateY(28px); }
+  @media (prefers-reduced-motion: no-preference) {
+    .stat-tile { transition: opacity .6s ease, transform .7s cubic-bezier(.2, .8, .2, 1); transition-delay: calc(var(--i) * 120ms); }
+  }
+  @media (max-width: 480px) { .stat { font-size: 32px; } }
   footer { border-top: 1px solid var(--line); padding-block: 26px; color: var(--faint); font-size: 14px; }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -333,7 +345,7 @@
           <ul>
             <li>One repository (self-install coming soon)</li>
             <li>Private notes only: nothing is posted on your project</li>
-            <li>Runs on a free cloud server; the AI part costs under a tenth of a cent per issue</li>
+            <li>Runs on a free cloud server; the AI part costs a tenth of a cent or less per issue</li>
           </ul>
         </div>
         <div class="persona team">
@@ -364,6 +376,13 @@
 
   <section class="block band wash-blue">
     <div class="wrap closing">
+      <!-- The project's own measured numbers (README "Results" and the load test), rising in one after another. -->
+      <div class="numbers" id="numbers" role="list">
+        <div class="stat-tile" role="listitem" style="--i:0"><b class="stat" data-to="833">833</b><span>real Spring Boot duplicates tested</span></div>
+        <div class="stat-tile" role="listitem" style="--i:1"><b class="stat" data-to="46.2" data-dec="1" data-suffix="%">46.2%</b><span>found the original in the top 3 (keyword search: 26.5%)</span></div>
+        <div class="stat-tile" role="listitem" style="--i:2"><b class="stat">$0.001 or less</b><span>AI cost per report, on Claude Haiku 5.5</span></div>
+        <div class="stat-tile" role="listitem" style="--i:3"><b class="stat" data-to="13" data-suffix=" ms">13 ms</b><span>to answer GitHub's webhook (95th percentile, 500 test webhooks)</span></div>
+      </div>
       <h2>See today's issues</h2>
       <p class="lede">Open the reports to see what the assistant found for the newest issues.</p>
       <a class="btn" href="/app.html">Check issues</a>
@@ -539,9 +558,33 @@
     seen.observe(proof);
   }
 
+  // --- 5b. the numbers rise in when they come into view and count up from zero (they show their real values without JS) ---
+  function setupNumbers() {
+    const box = $('numbers');
+    if (!box || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    box.classList.add('pending');
+    const countUp = (b) => {
+      const to = parseFloat(b.dataset.to), dec = +(b.dataset.dec || 0), suffix = b.dataset.suffix || '', start = performance.now();
+      const step = (now) => {
+        const t = Math.min(1, (now - start) / 1100), eased = 1 - Math.pow(1 - t, 3);
+        b.textContent = (to * eased).toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suffix;
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);   // the final value is already in the page; it only changes once frames run
+    };
+    const seen = new IntersectionObserver((entries) => {
+      if (!entries.some(e => e.isIntersecting)) return;
+      box.classList.remove('pending');
+      box.querySelectorAll('.stat[data-to]').forEach(countUp);
+      seen.disconnect();
+    }, { threshold: 0.35 });
+    seen.observe(box);
+  }
+
   (async function start() {
     setupSteps();
     setupProof();
+    setupNumbers();
     let settings = null, repos = [];
     try { settings = await (await fetch('/settings')).json(); } catch { settings = null; }
     try { const response = await fetch('/repos'); repos = response.ok ? await response.json() : []; } catch { repos = []; }
