@@ -82,8 +82,8 @@
   section.band { --base: var(--band); background: var(--band); }
 
   /* How to use: steps + animated stage */
-  .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 48px; margin-top: 32px; align-items: start; }
-  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .how .stage { order: -1; top: 8px; z-index: 2; }   /* .how raises specificity: the desktop .stage rule comes later */ .steps > li { min-height: 40vh; } .how .steps .t { font-size: 22px; } .how .steps .d { font-size: 16px; } .how .stage { padding: 22px; min-height: 0; } .how .scene { inset: 22px; } .who .persona { font-size: 16px; } .who .persona h3 { font-size: 22px; } .how .gh-issue { padding: 16px 18px; font-size: 15px; } .how .gh-issue b { font-size: 18px; } .how .repo-chip { padding: 12px 14px; font-size: 16px; } .how .reply { font-size: 16px; padding: 14px 16px; } }
+  .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 560px); gap: 48px; margin-top: 32px; align-items: start; }
+  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .how .stage { order: -1; top: 8px; z-index: 2; }   /* .how raises specificity: the desktop .stage rule comes later */ .steps > li { min-height: 40vh; } .how .steps .t { font-size: 24px; } .how .steps .d { font-size: 18px; } .how .stage { padding: 22px; min-height: 0; } .how .scene { inset: 22px; } .who .persona { font-size: 18px; } .who .persona h3 { font-size: 24px; } .how .gh-issue { padding: 16px 18px; font-size: 15px; } .how .gh-issue b { font-size: 18px; } .how .repo-chip { padding: 12px 14px; font-size: 16px; } .how .reply { font-size: 16px; padding: 14px 16px; } }
   .steps-wrap { position: relative; }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; position: relative; }
   .steps > li { min-height: 50vh; }            /* half a screen of scrolling per step: the line still moves, without empty gaps */
@@ -99,26 +99,26 @@
   .steps .n { width: 40px; height: 40px; font-size: 18px; border-radius: 50%; display: grid; place-items: center; font-family: var(--condensed); font-weight: 700;
               box-shadow: inset 0 0 0 2px var(--line); color: var(--muted); }
   .steps button[aria-current="step"] .n { background: var(--ink); color: var(--paper); box-shadow: none; }
-  .steps .t { display: block; font-family: var(--display); font-size: 28px; font-weight: 600; line-height: 1.2; letter-spacing: -.01em; }
+  .steps .t { display: block; font-family: var(--display); font-size: 32px; font-weight: 600; line-height: 1.2; letter-spacing: -.01em; }
   .soon { display: inline-block; margin-left: 8px; font-size: 14px; font-weight: 600; color: var(--ink); background: var(--amber-tint); box-shadow: inset 0 0 0 1px var(--amber); border-radius: 999px; padding: 1px 10px; vertical-align: 4px; font-family: var(--body); }
   .steps .d { display: block; margin-top: 8px; font-size: 18px; line-height: 1.6; color: var(--muted); max-width: 44ch; }
   /* The box is as tall as the scene it shows: only the current scene takes up space; the others sit on top, faded out. */
-  .stage { position: sticky; top: 96px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 36px; overflow: hidden; min-height: 340px; display: grid; align-content: center; }
-  .scene { position: absolute; inset: 36px; display: grid; align-content: center; gap: 14px; opacity: 0; transform: translateY(12px); pointer-events: none; }
+  .stage { position: sticky; top: 96px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 40px; overflow: hidden; min-height: 480px; display: grid; align-content: center; }   /* nearly square: 560 x 480+ */
+  .scene { position: absolute; inset: 40px; display: grid; align-content: center; gap: 14px; opacity: 0; transform: translateY(12px); pointer-events: none; }
   .scene.on { position: relative; inset: auto; opacity: 1; transform: none; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) { .scene { transition: opacity .45s ease, transform .45s ease; } }
-  .repo-chip { display: flex; align-items: center; gap: 10px; background: var(--paper-2); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; font-size: 18px; }
+  .repo-chip { display: flex; align-items: center; gap: 10px; background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px; padding: 22px 24px; font-size: 20px; }
   .repo-chip .ok { margin-left: auto; color: var(--green); font-weight: 700; font-size: 14px; }
-  .gh-issue { background: var(--paper-2); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; font-size: 17px; }
-  .gh-issue .open-pill { display: inline-block; font-size: 14px; font-weight: 600; color: var(--paper); background: var(--green); border-radius: 999px; padding: 2px 12px; }
-  .gh-issue b { display: block; margin: 12px 0 6px; font-size: 22px; line-height: 1.3; }
-  .reply { background: var(--paper-2); border-left: 3px solid var(--ink); border-radius: 0 10px 10px 0; padding: 18px 20px; font-size: 18px; line-height: 1.6; }
+  .gh-issue { background: var(--paper-2); border: 1px solid var(--line); border-radius: 12px; padding: 28px 30px; font-size: 19px; }
+  .gh-issue .open-pill { display: inline-block; font-size: 16px; font-weight: 600; color: var(--paper); background: var(--green); border-radius: 999px; padding: 3px 14px; }
+  .gh-issue b { display: block; margin: 14px 0 8px; font-size: 26px; line-height: 1.3; }
+  .reply { background: var(--paper-2); border-left: 3px solid var(--ink); border-radius: 0 10px 10px 0; padding: 22px 24px; font-size: 20px; line-height: 1.6; }
   .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .actions span { font-size: 16px; padding: 9px 16px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line); }
+  .actions span { font-size: 18px; padding: 11px 18px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--line); }
   .actions span.primary { background: var(--ink); color: var(--paper); box-shadow: none; }
-  .scene .small { font-size: 16px; }
-  .scene .tag .verdict { font-size: 32px; } .scene .tag .band .small { font-size: 16px; } .scene .tag .match { font-size: 17px; }
-  .scene .tag { width: min(100%, 440px); justify-self: center; background: var(--paper-2); box-shadow: 0 0 0 1px var(--line); }
+  .scene .small { font-size: 18px; }
+  .scene .tag .verdict { font-size: 40px; } .scene .tag .band .small { font-size: 18px; } .scene .tag .match { font-size: 20px; } .scene .tag .meter { height: 8px; }
+  .scene .tag { width: 100%; justify-self: center; background: var(--paper-2); box-shadow: 0 0 0 1px var(--line); }
 
   /* Who it's for */
   .who { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 32px; }
@@ -127,7 +127,7 @@
   .persona.team { border-top-color: var(--amber); background: var(--amber-tint); }
   .persona ul { margin: 0; padding-left: 22px; display: grid; gap: 10px; }
   .persona { font-size: 18px; line-height: 1.6; }
-  .persona h3 { font-size: 26px; }
+  .persona h3 { font-size: 24px; }
   .both { margin-top: 20px; color: var(--muted); font-size: 17px; }
 
   /* Repositories */
