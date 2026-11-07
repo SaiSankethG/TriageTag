@@ -2728,3 +2728,26 @@ sai: make "How to use it" more elongated; the background was only "a grid or a b
    compute the WCAG ratio there; if the worst point passes, everything does.
 3. **Doesn't a moving background distract?** It moves a few percent over 40 seconds, never under the reader's eye, and stops
    completely under `prefers-reduced-motion`.
+
+## Background in layers, longer steps, fitted picture (7 Nov 2026)
+
+sai's spec: steps 1.5x longer; the picture box fits its content; a drifting 4-colour glow behind the hero only, fading into
+the page colour; fine grain over everything; the grid only in "How to use it"; a faint colour wash per section; motion off for
+reduced motion; contrast at least 4.5:1.
+- **Steps**: `min-height: 93vh` per step (was 62vh; 72vh on phones). The section is 2457px tall on a 768px screen.
+- **Fitted picture**: only the current scene is in the normal flow (`position: relative`); the others are `absolute` on top
+  and faded out, so the box is exactly as tall as what it shows.
+- **Layers**: hero glow = `.hero-glow::before` (four radial gradients, masked to fade at the bottom, 40 s drift);
+  grain = `body::after`, an inline SVG `feTurbulence` noise tile at 5% opacity, fixed, `pointer-events: none`;
+  grid = `.with-grid::before` on one section, masked to fade at its edges; washes = a top-to-bottom gradient of one tag colour
+  per section over its base colour (`--base`).
+- **Contrast**: I computed the worst case for grey text with everything stacked (two overlapping glows or a wash, plus grain):
+  light 4.57:1, dark 4.95:1 after lightening the dark-mode greys.
+
+### Likely interview questions
+1. **How does an SVG noise texture work without an image file?** `feTurbulence` generates noise on the fly; the SVG is inlined
+   as a data URI in CSS, so it's one tiny tile, no request.
+2. **Why `isolation: isolate` on the hero?** The glow sits at `z-index: -1`; isolation keeps it behind the hero's own content
+   instead of slipping behind the page background.
+3. **Why does only the active scene take space?** An absolutely positioned element doesn't affect its parent's height, so the
+   box sizes to the one in-flow scene and the others can still fade over it.

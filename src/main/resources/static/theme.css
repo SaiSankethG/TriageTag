@@ -1,4 +1,4 @@
-/* Shared look for every page: colours, fonts, the faint grid, and the motion rules. Each page links this AFTER its own
+/* Shared look for every page: colours, fonts, grain, the hero glow, grid and washes, and the motion rules. Each page links this AFTER its own
    <style>, so these tokens win. Light = warm paper, dark = ink blue. Fonts: Bricolage Grotesque (headings, the tag's word),
    IBM Plex Sans (text), IBM Plex Mono (issue numbers). If the fonts don't load, the system fonts below take over. */
 :root {
@@ -10,6 +10,8 @@
   --red-tint: #f6e1dc; --amber-tint: #f6ead0; --green-tint: #e0eee3; --blue-tint: #e2e9f4;
   --band: #fbf8f2;   /* the lighter section band */
   --glow-1: rgba(192, 57, 43, .12); --glow-2: rgba(200, 138, 10, .15); --glow-3: rgba(47, 95, 158, .12); --glow-4: rgba(47, 125, 79, .11);
+  --wash-red: rgba(192, 57, 43, .06); --wash-blue: rgba(47, 95, 158, .06); --wash-green: rgba(47, 125, 79, .06); --wash-amber: rgba(200, 138, 10, .07);
+  --grain: .05;
   --display: "Bricolage Grotesque", "Avenir Next Condensed", "Arial Narrow", sans-serif;
   --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
@@ -17,7 +19,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0e1626; --paper: #152036; --paper-2: #1b2842; --ink: #e5e9f2; --muted: #aab4c9; --faint: #a3adc3;
+    --bg: #0e1626; --paper: #152036; --paper-2: #1b2842; --ink: #e5e9f2; --muted: #b1bacd; --faint: #abb5ca;
     --line: #26355a; --link: #8fb4ff; --focus: #8fb4ff; --grid: rgba(143, 180, 255, .05);
     --red: #e5584a; --amber: #e6a832; --green: #4fae78; --blue: #5b8fd9; --grey: #8892a6;
     --on-band: #ffffff; --on-amber: #1d2433; --amber-text: #e6a832;
@@ -25,30 +27,44 @@
     --red-tint: #3a2026; --amber-tint: #382d16; --green-tint: #17302a; --blue-tint: #172b4d;
     --band: #172238;
     --glow-1: rgba(229, 88, 74, .15); --glow-2: rgba(230, 168, 50, .11); --glow-3: rgba(91, 143, 217, .20); --glow-4: rgba(79, 174, 120, .13);
+    --wash-red: rgba(229, 88, 74, .08); --wash-blue: rgba(91, 143, 217, .09); --wash-green: rgba(79, 174, 120, .08); --wash-amber: rgba(230, 168, 50, .07);
+    --grain: .05;
   }
 }
 
 body { font-family: var(--body); background-color: var(--bg); }
-/* The background, in two fixed layers behind everything:
-   1. soft glows in the tag's four colours (red, amber, blue, green), drifting very slowly;
-   2. the faint 24px grid on top, fading out toward the edges so it reads as paper, not a spreadsheet.
-   The lighter section bands are solid, so the page alternates between "glow" and "plain" as you scroll. */
-body::before, body::after { content: ""; position: fixed; pointer-events: none; z-index: -1; }
-body::before {
-  inset: -15vmax;
-  background:
-    radial-gradient(38vmax 30vmax at 12% 8%, var(--glow-1), transparent 70%),
-    radial-gradient(34vmax 28vmax at 88% 18%, var(--glow-2), transparent 70%),
-    radial-gradient(42vmax 34vmax at 72% 92%, var(--glow-3), transparent 70%),
-    radial-gradient(30vmax 30vmax at 8% 78%, var(--glow-4), transparent 70%);
-}
+/* Fine grain over everything: a tiny SVG noise tile, very faint, on top of the page but never in the way of clicks.
+   At this opacity it changes text contrast by well under 1%. */
 body::after {
-  inset: 0;
+  content: ""; position: fixed; inset: 0; z-index: 100; pointer-events: none; opacity: var(--grain);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+/* Behind the hero only: soft glows in the tag's four colours, fading into the page colour at the bottom. */
+.hero-glow { position: relative; isolation: isolate; overflow: clip; }
+.hero-glow::before {
+  content: ""; position: absolute; inset: -8% -6% 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(34% 46% at 14% 18%, var(--glow-1), transparent 70%),
+    radial-gradient(30% 42% at 86% 14%, var(--glow-2), transparent 70%),
+    radial-gradient(36% 50% at 70% 78%, var(--glow-3), transparent 70%),
+    radial-gradient(28% 44% at 30% 86%, var(--glow-4), transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+}
+/* The grid lives in one place only ("How to use it"), fading out toward its edges. */
+.with-grid { position: relative; isolation: isolate; }
+.with-grid::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 24px 24px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 35%, transparent 100%);
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 35%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 70% at 50% 45%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 75% 70% at 50% 45%, #000 40%, transparent 100%);
 }
+/* A faint colour wash at the top of each section, one tag colour each, over the section's own base colour. */
+.wash-red { --wash: var(--wash-red); } .wash-blue { --wash: var(--wash-blue); }
+.wash-green { --wash: var(--wash-green); } .wash-amber { --wash: var(--wash-amber); }
+section.block[class*="wash-"] { background: linear-gradient(to bottom, var(--wash), transparent 80%), var(--base, transparent); }
 h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-optical-sizing: auto; letter-spacing: -.01em; }
 .num { font-family: var(--mono); font-size: .92em; letter-spacing: 0; }
 .bar { background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(6px); }
@@ -82,8 +98,8 @@ h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-opti
     85% { transform: rotate(-.8deg); }
     100% { transform: none; }
   }
-  /* The glows drift: a slow 40-second loop, barely noticeable, so the page feels alive without moving under the text. */
-  body::before { animation: drift 40s ease-in-out infinite alternate; }
+  /* The hero glows drift: a slow 40-second loop, barely noticeable, so the page feels alive without moving under the text. */
+  .hero-glow::before { animation: drift 40s ease-in-out infinite alternate; }
   @keyframes drift { from { transform: translate3d(-2vmax, -1vmax, 0) rotate(0deg); } to { transform: translate3d(2vmax, 1.5vmax, 0) rotate(6deg); } }
   /* List items come in one after another; each sets --i (its position) inline. */
   .stagger > * { animation: rise .42s ease-out both; animation-delay: calc(min(var(--i, 0), 14) * 35ms); }

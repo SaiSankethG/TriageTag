@@ -79,14 +79,14 @@
   .benefit.amber { background: var(--amber-tint); border-color: transparent; box-shadow: inset 0 3px 0 var(--amber); }
   .benefit .fact { border-top-color: color-mix(in srgb, var(--ink) 14%, transparent); }
   /* Sections alternate: the page background (warm paper / ink), then a lighter band, so each reads as its own stop. */
-  section.band { background: var(--band); }
+  section.band { --base: var(--band); background: var(--band); }
 
   /* How to use: steps + animated stage */
   .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 40px; margin-top: 32px; align-items: start; }
-  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .stage { order: -1; top: 8px; z-index: 2; min-height: 260px; } .steps > li { min-height: 48vh; } }
+  @media (max-width: 900px) { .how { grid-template-columns: 1fr; } .stage { order: -1; top: 8px; z-index: 2; } .steps > li { min-height: 72vh; } }
   .steps-wrap { position: relative; }
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; position: relative; }
-  .steps > li { min-height: 62vh; }            /* about a screen of scrolling per step */
+  .steps > li { min-height: 93vh; }            /* about 1.5x the old scroll per step, so the line runs longer */
   .steps > li:last-child { min-height: 0; }
   /* The rail joins the four numbers; its fill follows the scroll (set in setupSteps). */
   .rail { position: absolute; left: 30px; width: 2px; background: var(--line); border-radius: 1px; }
@@ -102,9 +102,10 @@
   .steps .t { font-weight: 600; display: block; }
   .soon { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--amber-tint); box-shadow: inset 0 0 0 1px var(--amber); border-radius: 999px; padding: 0 8px; vertical-align: 1px; }
   .steps .d { font-size: 14px; color: var(--muted); display: block; }
-  .stage { position: sticky; top: calc(50vh - 200px); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; min-height: 400px; padding: 24px; overflow: hidden; }
+  /* The box is as tall as the scene it shows: only the current scene takes up space; the others sit on top, faded out. */
+  .stage { position: sticky; top: calc(50vh - 130px); background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 24px; overflow: hidden; }
   .scene { position: absolute; inset: 24px; display: grid; align-content: center; gap: 14px; opacity: 0; transform: translateY(12px); pointer-events: none; }
-  .scene.on { opacity: 1; transform: none; pointer-events: auto; }
+  .scene.on { position: relative; inset: auto; opacity: 1; transform: none; pointer-events: auto; }
   @media (prefers-reduced-motion: no-preference) { .scene { transition: opacity .45s ease, transform .45s ease; } }
   .repo-chip { display: flex; align-items: center; gap: 10px; background: var(--paper-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 15px; }
   .repo-chip .ok { margin-left: auto; color: var(--green); font-weight: 700; font-size: 14px; }
@@ -158,6 +159,7 @@
 
 <main>
   <!-- 1. A live sample: a real report from the running app -->
+  <div class="hero-glow">
   <div class="wrap hero">
     <div>
       <h1>Every new issue, triaged before you read it</h1>
@@ -174,8 +176,10 @@
     </div>
   </div>
 
+  </div>
+
   <!-- 2. What it does for your work -->
-  <section class="block band" aria-labelledby="work-heading">
+  <section class="block band wash-red" aria-labelledby="work-heading">
     <div class="wrap">
       <h2 id="work-heading">Less time sorting issues, more time fixing them</h2>
       <div class="benefits">
@@ -204,7 +208,7 @@
   </section>
 
   <!-- 3. How to use it: four steps, played as a short animation -->
-  <section class="block" id="how" aria-labelledby="how-heading">
+  <section class="block with-grid wash-blue" id="how" aria-labelledby="how-heading">
     <div class="wrap">
       <h2 id="how-heading">How to use it</h2>
       <div class="how">
@@ -242,7 +246,7 @@
   </section>
 
   <!-- 4. Who it's for -->
-  <section class="block band" aria-labelledby="who-heading">
+  <section class="block band wash-green" aria-labelledby="who-heading">
     <div class="wrap">
       <h2 id="who-heading">Who it's for</h2>
       <div class="who">
@@ -270,7 +274,7 @@
   </section>
 
   <!-- 5. Several repositories -->
-  <section class="block" aria-labelledby="repos-heading">
+  <section class="block wash-amber" aria-labelledby="repos-heading">
     <div class="wrap">
       <h2 id="repos-heading">Works across your repositories</h2>
       <p class="lede" style="margin-top:12px">Each repository is searched on its own, so a duplicate is always from the same project.</p>
@@ -281,7 +285,7 @@
     </div>
   </section>
 
-  <section class="block band">
+  <section class="block band wash-blue">
     <div class="wrap closing">
       <h2>See today's issues</h2>
       <p class="lede">Open the reports to see what the assistant found for the newest issues.</p>
