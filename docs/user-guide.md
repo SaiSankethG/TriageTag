@@ -13,6 +13,6 @@ In short:
   **Copy "Duplicate of #N"**, **Open on GitHub**), the draft reply, the issue and its best match side by side, other similar
   issues (folded), and **Details** (AI check, model, tokens). On a phone the report comes first.
 - Every report has its own link (`?repo=…&number=…`).
-- Private by default: nothing is posted on GitHub unless a maintainer switches comment mode on for the repository.
+- Not posted on GitHub by default: nothing appears on GitHub unless a maintainer switches comment mode on for the repository. Reports are on this site, readable by anyone with the link.
 - The public pages only read. Creating a report needs the admin token, on `/admin.html`, which the Ingress does not route
   (local run or port-forward only).

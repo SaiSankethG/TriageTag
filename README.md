@@ -1,6 +1,6 @@
 # TriageTag
 
-**TriageTag** (repository: `issue-triage-assistant`) is a maintainer-side GitHub issue triage assistant. When an issue is opened, it **privately** tells the maintainer within seconds:
+**TriageTag** (repository: `issue-triage-assistant`) is a maintainer-side GitHub issue triage assistant. When an issue is opened, it tells the maintainer within seconds, **without posting on GitHub**:
 likely duplicates (with a score and a second check by an LLM), suggested labels, which details the reporter left out, whether a
 similar issue was already fixed in a later version, and a draft reply grounded in the project's docs. Java 21, Spring Boot 4,
 Kafka, PostgreSQL + pgvector, Claude Haiku 5.5, k3s.
@@ -65,7 +65,7 @@ it had just been opened, against **earlier issues of the same repo only**. The a
 
 The LLM check halves the false alarms. But only ~4% of new external issues are duplicates, so even then most public comments
 would point at the wrong issue (many of the rest are the team's own forward-port clones, which comment mode now skips). That is
-why the default is **shadow mode**: a private top 3 for the maintainer.
+why the default is **shadow mode**: a top 3 for the maintainer, not posted on GitHub.
 
 - **Labels:** suggested for 30.6% of recent external issues; the top label is right 69.3% of the time.
 - **Cost:** a full report is ~1,000–5,800 tokens on Claude Haiku 5.5 (≈ $0.0002–0.001).
@@ -138,7 +138,7 @@ and a secret *template*).
   an outbox table in the same transaction; a relay publishes it. Events are never lost, and webhooks are accepted while Kafka
   is down.
 - **Shadow mode first.** Measured: at a 4% duplicate base rate, automatic public comments are mostly wrong even with an LLM
-  check. So the default is a private report; public comments are opt-in, strict, and never repeated.
+  check. So the default is a report that is not posted on GitHub; public comments are opt-in, strict, and never repeated.
 - **Our own interfaces around the AI.** `EmbeddingService` and `TriageLlm` are ours; tests use a fake LLM; prompts are
   versioned files; LLM output is parsed as strict JSON with one retry, else "unknown"; every report stores the model,
   prompt versions and tokens.

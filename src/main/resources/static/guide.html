@@ -63,7 +63,7 @@
 <div class="hero-glow">
   <div class="guide-top">
     <h1>How to use TriageTag</h1>
-    <p class="lead">A two-minute guide for maintainers: what the assistant does, how to read a report, and what stays private.</p>
+    <p class="lead">A two-minute guide for maintainers: what the assistant does, how to read a report, and what gets posted on GitHub.</p>
     <p class="next">Read on, or <a class="btn-link" href="/app.html">open the reports</a> and pick an issue.</p>
   </div>
 </div>
@@ -111,10 +111,11 @@
     <li>Every report has its own link (<code>?repo=…&amp;number=…</code>), so you can share it.</li>
   </ul>
 
-  <h2>What is private, what is public</h2>
+  <h2>What is posted on GitHub</h2>
   <ul>
     <li>It only reads <strong>public</strong> issues and your public documentation.</li>
-    <li>By default it <strong>never posts anything</strong> on GitHub (shadow mode). Reports are only on this page.</li>
+    <li>By default it <strong>never posts anything</strong> on GitHub (shadow mode). Reports are only on this site, and anyone with
+        the link can read them, like the issues themselves.</li>
     <li>A maintainer can switch on <strong>comment mode</strong> for one repository. Then the assistant posts at most one comment per issue,
         only for issues from outside the team, and only when the match is 90%+ and the AI check agrees. The comment says that a bot suggested it.</li>
     <li>The public pages only read. Creating a report spends AI tokens, so it needs an admin token, on an admin page that isn't public.</li>
@@ -123,11 +124,11 @@
   <h2>How good is it?</h2>
   <p>Measured on Spring Boot's history, on 833 issues that maintainers closed as duplicates, each searched as if it had just been
      opened: the real original is in the top 3 for <strong>46%</strong> of them (keyword search: 26%) and in the top 10 for 61%.
-     It is a helper, not a judge: duplicates are rare, so a high score alone is often wrong. That's why it is private by default.</p>
+     It is a helper, not a judge: duplicates are rare, so a high score alone is often wrong. That's why, by default, nothing is posted on GitHub.</p>
 
   <h2>Try it on your repository</h2>
-  <p class="muted">The assistant is in a free trial phase. If you maintain a public Java project and would like a two-week private
-     trial (read-only, nothing posted), get in touch through the project's GitHub page.</p>
+  <p class="muted">The assistant is in a free trial phase. If you maintain a public Java project and would like a two-week
+     trial (read-only, nothing posted on GitHub), get in touch through the project's GitHub page.</p>
   <p><a href="/app.html">Open the reports</a></p>
 </main>
 </body>

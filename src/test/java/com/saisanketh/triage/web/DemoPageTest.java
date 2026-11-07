@@ -51,7 +51,7 @@ class DemoPageTest {
         String page = new ClassPathResource("static/app.html").getContentAsString(StandardCharsets.UTF_8);
 
         assertThat(page).contains("href=\"/guide.html\"", "href=\"/\"", "fetch(`/reports/${repo}?limit=50`)");
-        assertThat(guide).contains("How to read a report", "What is private, what is public").doesNotContain("<script>");   // no inline script; only the shared theme.js
+        assertThat(guide).contains("How to read a report", "What is posted on GitHub").doesNotContain("<script>");   // no inline script; only the shared theme.js
     }
 
     @Test
