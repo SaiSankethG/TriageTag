@@ -2709,3 +2709,22 @@ Files: `static/index.html`, `static/app.html`, `static/theme.css`, tests.
 2. **Why event delegation for the tag?** Tags are created after the page loads (each report is drawn by JS); one listener on
    `document` with `closest('.tag')` works for all of them without re-binding.
 3. **Why replace autoplay with scroll?** Autoplay moves while you read; tying the step to the scroll lets the reader set the pace.
+
+## Elongated steps and a living background (7 Nov 2026)
+
+sai: make "How to use it" more elongated; the background was only "a grid or a blue colour".
+- **Elongated**: each step now takes about 62% of the screen height to scroll past (48% on phones), and the picture is pinned
+  in the middle of the screen (`top: calc(50vh - 200px)`) the whole time, so the rail fills slowly, like Dosu's scroll story.
+- **Background**: two fixed layers behind the page (`body::before` and `body::after`). The first has four soft radial glows in
+  the tag's colours that drift on a 40-second loop; the second is the grid, now faded out toward the edges with a mask. The
+  lighter section bands are solid, so the page alternates "glow" and "plain".
+- **Contrast kept at 4.5:1 or more**: glows lighten or tint what's behind the text, so I computed the grey text against the
+  worst case (two glows overlapping at full strength) and darkened the greys until it passed: at least 4.9:1 in both modes.
+
+### Likely interview questions
+1. **Why `position: fixed` pseudo-elements for the background, not a background image on body?** They can be animated
+   (transform) cheaply on the GPU without repainting the page, and the grid can get its own mask.
+2. **How do you check contrast on a gradient?** Take the worst point: blend the strongest glows over the base colour, then
+   compute the WCAG ratio there; if the worst point passes, everything does.
+3. **Doesn't a moving background distract?** It moves a few percent over 40 seconds, never under the reader's eye, and stops
+   completely under `prefers-reduced-motion`.
