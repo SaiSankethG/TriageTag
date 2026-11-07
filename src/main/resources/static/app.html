@@ -31,7 +31,7 @@
   .bar nav a[aria-current="page"], .bar nav a:hover { color: var(--ink); border-bottom-color: var(--ink); }
 
   /* Layout */
-  .layout { max-width: none; margin: 0; padding: 28px 24px 64px; display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 40px; align-items: start; }
+  .layout { max-width: none; margin: 0; padding: 28px 24px 64px; display: grid; grid-template-columns: clamp(340px, 28vw, 440px) minmax(0, 1fr); gap: 40px; align-items: start; }   /* the list card: wide enough for titles and filters (about 410px on a laptop) */
   @media (min-width: 1100px) { .layout { gap: 96px; } .welcome { margin-left: min(8vw, 140px); } }   /* room between the list and what you read */
   @media (max-width: 820px) { .layout { grid-template-columns: minmax(0, 1fr); gap: 20px; } .list { max-height: 34vh; } }
   @media (min-width: 821px) { .picker { position: sticky; top: 16px; } }   /* sticky only beside the report, never on phones */
@@ -45,7 +45,7 @@
   .switch { display: flex; gap: 16px; margin: 16px 0 8px; border-bottom: 1px solid var(--line); }
   .switch button { border: 0; background: none; color: var(--muted); padding: 6px 0; margin-bottom: -1px; border-bottom: 2px solid transparent; }
   .switch button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 600; }
-  .filters { display: flex; flex-wrap: nowrap; gap: 8px; margin: 14px -18px 8px; padding: 2px 18px 8px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 8px; }   /* all five always visible: they wrap onto a second line instead of scrolling */
   .filters button { flex: none; white-space: nowrap; }
   .filters button { font-size: 13px; border: 0; border-radius: 999px; padding: 3px 10px; background: var(--paper-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
   .filters button[aria-pressed="true"] { background: var(--ink); color: var(--paper); box-shadow: none; }
@@ -366,12 +366,14 @@
     const items = triaged.map(r => ({ r, t: fromListItem(r) })).map(x => ({ ...x, kind: kindOf(x.t) }))
       .filter(x => !openOnly || x.r.state === 'open');
     const count = (k) => items.filter(x => k === 'all' || x.kind === k).length;
+    // Short labels so all five fit on one line; the dot keeps the colour and the full word is in the tooltip.
+    const SHORT = { likely: 'Likely', possible: 'Possible', info: 'Needs info', new: 'Looks new' };
     $('filters').replaceChildren(...['all', 'likely', 'possible', 'info', 'new'].map(k => el('button', {
-      type: 'button', 'aria-pressed': String(filter === k),
+      type: 'button', 'aria-pressed': String(filter === k), title: k === 'all' ? 'All triaged issues' : KINDS[k].word,
       // the row is redrawn, so put keyboard focus back on the chosen filter instead of losing it
       onclick: () => { filter = k; renderTriaged(); $('filters').querySelector('[aria-pressed="true"]').focus(); } },
       k === 'all' ? null : el('i', { style: `background:var(--${KINDS[k].colour})`, 'aria-hidden': 'true' }),
-      `${k === 'all' ? 'All' : KINDS[k].word} ${count(k)}`)));
+      `${k === 'all' ? 'All' : SHORT[k]} ${count(k)}`)));
     const PRIORITY = { likely: 0, possible: 1, info: 2, new: 3 };   // what to look at first
     const shown = items.filter(x => filter === 'all' || x.kind === filter)
       .sort((a, b) => PRIORITY[a.kind] - PRIORITY[b.kind]);           // stable: open first, then newest, within each word

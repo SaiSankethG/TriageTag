@@ -61,3 +61,7 @@ small monospace, identical card styles, header position, console errors) on `/`,
   theme.js: browsers re-check every load. Added a light/dark toggle (sun/moon) to the header on every page; the choice is
   remembered in the browser (theme.js, localStorage) and overrides the system setting both ways. Header measured identical on
   /, /app.html, /guide.html: logo 24px, Home 1175px, toggle 1397px.
+- Round 9 (sai: "increase the width so it's usable"): the list card was 310px, so titles were cut after ~20 characters and
+  filters hid off the edge -> card is 28% of the screen, between 340px and 440px (412px on a 1470px laptop); filter labels
+  shortened (Likely, Possible, Needs info, Looks new; full word on hover). Five filters with counts need ~515px, so they now
+  wrap onto a second line instead of scrolling (reverses the earlier "one scrollable row").
