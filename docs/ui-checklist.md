@@ -65,3 +65,7 @@ small monospace, identical card styles, header position, console errors) on `/`,
   filters hid off the edge -> card is 28% of the screen, between 340px and 440px (412px on a 1470px laptop); filter labels
   shortened (Likely, Possible, Needs info, Looks new; full word on hover). Five filters with counts need ~515px, so they now
   wrap onto a second line instead of scrolling (reverses the earlier "one scrollable row").
+- Round 10 (sai: list column ~460px on laptops, at least 3 filters visible, scrollbar only on hover, full title on hover):
+  column `clamp(340px, 34vw, 460px)`: 460px at 1470 (report 851px), 435px at 1280 (report 686px); filters back to one row,
+  4 of 5 visible, scrollbar hidden until hover or keyboard focus; full title as a tooltip. Measured: Spring Boot titles
+  average 88 characters and the median needs 574px, so only 9% fit one line at 460px; "most fit" would need a ~660px column.

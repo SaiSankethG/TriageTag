@@ -25,7 +25,7 @@ class DemoPageTest {
         assertThat(html).contains("body.reading main { order: -1; }");   // phones: the report first
         // Priority order with a marker on the top issue; filters in one scrolling row; one-line titles, reason on select/hover.
         assertThat(html).contains("const PRIORITY = { likely: 0, possible: 1, info: 2, new: 3 };", "'Look at this first'",
-                "all five always visible", ".list button[aria-current=\"true\"] .y { display: block; }");
+                "flex-wrap: nowrap;", ".filters:hover, .filters:focus-within { scrollbar-width: thin; }", "title: `#${number} ${title}`", ".list button[aria-current=\"true\"] .y { display: block; }");
         // UI loop fixes: phones never scroll sideways; the duplicate comment marks, it doesn't close; only the draft is a card.
         assertThat(html).contains("grid-template-columns: minmax(0, 1fr)", "min-width: 0;", "marks the issue as a duplicate on GitHub", "querySelector('[aria-pressed=\"true\"]').focus()",
                 "class: 'plain' }, el('h2', {}, 'This issue and its best match')").doesNotContain("lets GitHub close");
