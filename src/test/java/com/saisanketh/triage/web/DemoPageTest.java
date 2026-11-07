@@ -23,6 +23,9 @@ class DemoPageTest {
         assertThat(html).contains("'Likely duplicate'", "'Possible duplicate'", "'Needs info'", "'Looks new'", "function whyOf(",
                 "id=\"filters\"", "id=\"open-only\"", "Copy reply", "Duplicate of #", "Open on GitHub", "This issue and its best match");
         assertThat(html).contains("body.reading main { order: -1; }");   // phones: the report first
+        // Priority order with a marker on the top issue; filters in one scrolling row; one-line titles, reason on select/hover.
+        assertThat(html).contains("const PRIORITY = { likely: 0, possible: 1, info: 2, new: 3 };", "'Look at this first'",
+                "flex-wrap: nowrap;", ".list button[aria-current=\"true\"] .y { display: block; }");
         assertThat(html).contains("id=\"repo-count\"", "triaged of ${r.issues.toLocaleString()} issues");   // counts under the picker, not cut off inside it
         // The public page only reads: no admin token box, no POST.
         assertThat(html).doesNotContain("X-Admin-Token").doesNotContain("admin-token").doesNotContain("method: 'POST'")
@@ -73,7 +76,7 @@ class DemoPageTest {
         }
         for (String page : new String[]{"index.html", "app.html", "guide.html"}) {   // same header box: nothing jumps
             assertThat(new ClassPathResource("static/" + page).getContentAsString(StandardCharsets.UTF_8)).as(page)
-                    .contains(".bar-inner { max-width: 1400px; margin: 0 auto; padding: 12px 16px;");
+                    .contains(".bar-inner { max-width: none; margin: 0; padding: 12px 24px;");
         }
         String theme = new ClassPathResource("static/theme.css").getContentAsString(StandardCharsets.UTF_8);
         assertThat(theme).contains("@media (prefers-reduced-motion: reduce)", "animation: none !important",

@@ -2751,3 +2751,21 @@ reduced motion; contrast at least 4.5:1.
    instead of slipping behind the page background.
 3. **Why does only the active scene take space?** An absolutely positioned element doesn't affect its parent's height, so the
    box sizes to the one in-flow scene and the others can still fade over it.
+
+## Reports list: priority order, one line per issue (7 Nov 2026)
+
+sai: wider layout with the card against the left edge; filters in one scrollable row; sort by priority with a "Look at this
+first" marker; one-line titles, reason only on the selected or hovered item.
+- Layout and header are full width with 24px sides (same header box on every page), 96px gutter, welcome text indented.
+- Order: `PRIORITY = { likely: 0, possible: 1, info: 2, new: 3 }`, then a **stable** `Array.sort`, so within each word the
+  server's order (open first, then newest) is kept. The first item gets the marker.
+- Filters: `flex-wrap: nowrap; overflow-x: auto`, so they never push the list down.
+- Titles: one line with an ellipsis. The reason line is `display: none` and shown by CSS on `:hover`, `:focus-visible` and the
+  selected item (`aria-current="true"`), so keyboard users see it too.
+
+### Likely interview questions
+1. **Why rely on a stable sort?** Since ES2019 `Array.prototype.sort` is stable: equal items keep their order, so sorting by
+   priority alone keeps "open first, newest first" inside each group without a second key.
+2. **Why show the reason on focus as well as hover?** Hover doesn't exist for keyboard or touch users; focus and selection do.
+3. **Why sort in the page and not in SQL?** The word (Likely/Possible/...) is computed in the page from score, AI verdict and
+   missing details; sorting where the word is known avoids duplicating that rule in SQL.
