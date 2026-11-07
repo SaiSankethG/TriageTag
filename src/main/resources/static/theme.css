@@ -91,7 +91,11 @@ h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-opti
 /* The header's text size is fixed here, not inherited from each page's body size, so the links sit in the same place everywhere. */
 .bar .name { font-size: 21px; }
 .bar nav a { font-size: 15px; line-height: 1.6; }
-.bar nav { align-items: center; }   /* links and the theme toggle on one line, on every page */
+.bar nav { align-items: center; gap: 28px; }   /* links and the theme toggle on one line, on every page */
+/* The header sits in the same centred box as the landing page content (1160px + 20px sides), so the logo lines up with
+   the headline and the links come in from the edge. Defined here, after each page's own rule, so every page matches. */
+.bar .bar-inner { max-width: 1160px; margin: 0 auto; padding: 14px 20px; }
+.bar nav .theme-toggle { margin-left: 4px; }
 
 /* Moving between pages: a short cross-fade; the header keeps its place (same box on every page). */
 @view-transition { navigation: auto; }
