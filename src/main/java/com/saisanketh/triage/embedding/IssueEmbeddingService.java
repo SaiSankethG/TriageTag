@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /** Creates and stores issue embeddings: in bulk for a repo (batch job), or for one issue (Kafka worker). */
 @Slf4j
@@ -22,12 +23,20 @@ public class IssueEmbeddingService {
 
     /** Embeds every issue of the repo that has no embedding from the current model yet. */
     public EmbeddingSummary embedMissing(String repo) {
+        return embedMissing(repo, (done, total) -> { });
+    }
+
+    /**
+     * Same, and reports progress: {@code progress.accept(done, total)} once at the start (0 of total) and after every batch.
+     */
+    public EmbeddingSummary embedMissing(String repo, BiConsumer<Integer, Integer> progress) {
         long start = System.nanoTime();
         String model = embeddingService.modelName();
         int total = repository.countMissing(repo, model);
         log.info("Embeddings {}: {} issues to embed with {}", repo, total, model);
 
         int embedded = 0;
+        progress.accept(0, total);
         while (true) {
             List<IssueText> batch = repository.findMissing(repo, model, BATCH_SIZE);
             if (batch.isEmpty()) {
@@ -37,6 +46,7 @@ public class IssueEmbeddingService {
             List<float[]> vectors = embeddingService.embedAll(texts);
             repository.saveAll(batch.stream().map(IssueText::issueId).toList(), vectors, model);
             embedded += batch.size();
+            progress.accept(embedded, total);
             log.info("Embeddings {}: {}/{} done", repo, embedded, total);
         }
 

@@ -68,6 +68,20 @@ class IssueEmbeddingServiceTest {
     }
 
     @Test
+    void reportsProgressAtTheStartAndAfterEveryBatch() {
+        when(repository.countMissing("octo-org/hello", "fake")).thenReturn(3);
+        when(repository.findMissing(eq("octo-org/hello"), eq("fake"), anyInt()))
+                .thenReturn(List.of(new IssueText(1, "One", "a"), new IssueText(2, "Two", "b")))
+                .thenReturn(List.of(new IssueText(3, "Three", "c")))
+                .thenReturn(List.of());
+        List<String> progress = new ArrayList<>();
+
+        service.embedMissing("octo-org/hello", (done, total) -> progress.add(done + "/" + total));
+
+        assertThat(progress).containsExactly("0/3", "2/3", "3/3");
+    }
+
+    @Test
     void embedsOneIssueByItsKey() {
         when(repository.findIssueId("GITHUB", "1001")).thenReturn(Optional.of(7L));
         when(repository.findText(7L)).thenReturn(Optional.of(new IssueText(7, "Title", "Body")));

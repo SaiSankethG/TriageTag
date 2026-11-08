@@ -41,6 +41,11 @@ public class DocIngestService {
                 .collect(Collectors.toMap(e -> e.getKey().toLowerCase(Locale.ROOT), Map.Entry::getValue));
     }
 
+    /** True if application.yml says where this repo's reference docs are (triage.docs.sources). */
+    public boolean hasDocs(String repo) {
+        return sources.containsKey(repo.toLowerCase(Locale.ROOT));
+    }
+
     public IngestSummary ingest(String repo) {
         long start = System.nanoTime();
         DocsProperties.Source source = sources.get(repo.toLowerCase(Locale.ROOT));

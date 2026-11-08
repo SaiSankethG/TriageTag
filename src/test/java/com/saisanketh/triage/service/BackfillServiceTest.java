@@ -64,6 +64,13 @@ class BackfillServiceTest {
     }
 
     @Test
+    void reportsTheIssuesStoredSoFarAfterEveryPage() {
+        List<Integer> progress = new ArrayList<>();
+        backfillService.backfill("octo-org/hello", progress::add);
+        assertThat(progress).hasSize(2).last().isEqualTo(3);
+    }
+
+    @Test
     void secondRunOfTheSameDataInsertsNothing() {
         backfillService.backfill("octo-org/hello");
 

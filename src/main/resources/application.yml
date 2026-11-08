@@ -8,6 +8,12 @@ spring:
           # Pages, theme.css and theme.js: the browser must re-check them on every load (it still reuses its copy when
           # nothing changed). Without this, browsers mixed old and new files and the header looked different per page.
           no-cache: true
+  task:
+    scheduling:
+      pool:
+        # 3 threads for the 3 @Scheduled tasks: the "Add repository" runner (a job runs for minutes), the outbox relay (every
+        # 500 ms) and the relay's hourly clean-up. With Spring's default of 1, the relay would wait for a whole job.
+        size: 3
   datasource:
     url: jdbc:postgresql://localhost:5433/triage
     username: copilot
@@ -46,6 +52,8 @@ triage:
   admin-token: ${TRIAGE_ADMIN_TOKEN:}
   outbox:
     poll-ms: 500          # the relay looks for unsent outbox rows this often (after the previous run ended)
+  repo-jobs:
+    poll-ms: 5000         # "Add repository" jobs: look for a queued one this often (one job runs at a time)
   candidates:
     # Per repo: issues with any of these labels are never returned as duplicate candidates (bookkeeping copies).
     # The [brackets] keep the "/" in the map key. Example:

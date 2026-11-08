@@ -2787,3 +2787,52 @@ first" marker; one-line titles, reason only on the selected or hovered item.
    flash of light colours.
 3. **Why is localStorage fine here when the admin token must not use it?** The theme is a harmless preference; a token is a
    secret that would outlive the tab and be readable by any script on the page.
+
+## Backend piece 1: installing the GitHub App adds the repository (8 Nov 2026)
+
+**What it does.** When someone installs the GitHub App on a repository, GitHub sends an `installation` webhook (action
+`created`, with a `repositories` list). Repositories added to an existing installation later arrive as
+`installation_repositories` (action `added`, list `repositories_added`). For each **public** repository the webhook puts one row in a new
+table, `repo_job` (Flyway V12), with status `QUEUED`, and answers GitHub at once. A background runner (`RepoJobRunner`) picks the oldest queued
+job every 5 seconds and does three steps in order:
+1. **BACKFILL**: load every past issue (the same `BackfillService` the admin endpoint uses), writing "issues so far" after each page.
+2. **EMBEDDINGS**: embed the issues that have no vector yet, writing "done of total" after each batch of 256.
+3. **DOCS**: load the reference docs if application.yml lists them for this repo. If it doesn't, the job still finishes (`DONE`) with a
+   note: "no reference docs, so its reports have no draft reply".
+Anyone can read the progress at `GET /repos/{owner}/{repo}/job`. The operator can start a job by hand with
+`POST /repo-jobs/{owner}/{repo}` (admin token).
+
+**Why this way.**
+- **A queue table, not work inside the webhook.** GitHub waits only 10 seconds for an answer, and loading spring-boot took about 18 minutes.
+  The webhook only inserts rows, which takes milliseconds.
+- **One transaction for the delivery id and the jobs.** A redelivered webhook finds its delivery id and queues nothing. A partial unique index
+  (`ON repo_job (lower(repo)) WHERE status IN ('QUEUED','RUNNING')`) also stops two open jobs for the same repository, even if they come
+  from two different deliveries or the operator.
+- **Progress commits as it goes.** The runner has no transaction around the job. Each progress `UPDATE` commits on its own, so the
+  status endpoint shows the job moving. One big transaction would hide everything until the end, and hold locks for 20 minutes.
+- **Claiming with `UPDATE ... WHERE id = (SELECT ... FOR UPDATE SKIP LOCKED) RETURNING *`.** One statement takes the job and marks it
+  `RUNNING`. A second app instance asking at the same moment skips the locked row instead of taking the same job.
+- **Restart recovery.** On startup (`@PostConstruct`, before the scheduler starts), `RUNNING` jobs go back to `QUEUED`. This is safe
+  because every step can run again: the backfill upserts, embeddings only fill gaps, and docs replace the old ones. It assumes one app
+  instance (the k3s Deployment has 1 replica).
+- **Three scheduler threads.** Spring's `@Scheduled` uses a single thread by default. A 20-minute job on that thread would stop the outbox
+  relay (every 500 ms) from sending webhooks to Kafka. There are three scheduled tasks (job runner, relay, hourly outbox clean-up), so
+  `spring.task.scheduling.pool.size: 3` gives each one its own thread. Switching scheduling off (`triage.outbox.relay-enabled=false`)
+  also stops repo jobs.
+- **Public errors are short.** The status endpoint is public, so a failed job shows only a plain reason ("GitHub answered 404",
+  "Database error"). The full exception, which can contain SQL or a response body, goes to the log only.
+- **Private repositories are skipped.** The reports site is public, so loading a private repository would publish its issues. A
+  repository whose `private` flag is missing is treated as private.
+
+**Rejected alternative.** Sending the job through Kafka like issue events. That would give retries and a dead-letter topic for free, but
+a 20-minute message would exceed the consumer's `max.poll.interval.ms` (5 minutes), so Kafka would think the worker died and hand the
+job to another one. Progress would also still need a table. A database table is the simpler fit for few, long jobs.
+
+### Likely interview questions
+1. *Why not do the backfill inside the webhook request?* GitHub times out after 10 seconds and would redeliver. The webhook only
+   records the work (a row in `repo_job`) and a background runner does it, which is the same idea as the outbox.
+2. *What happens if the app crashes in the middle of a job?* The row stays `RUNNING`. At the next startup it goes back to `QUEUED`
+   and runs again from the first step. Every step is idempotent, so running it twice gives the same data.
+3. *How do you stop the same repository being loaded twice at the same time?* A partial unique index allows only one `QUEUED` or
+   `RUNNING` row per repository (case-insensitive). The insert uses `ON CONFLICT ... DO NOTHING`, so a second request is a no-op,
+   and `SKIP LOCKED` means two runners never claim the same job.

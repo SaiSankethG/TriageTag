@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.function.IntConsumer;
+
 /**
  * Loads all of a repo's issues: fetches every page from the {@link IssueSource} and upserts each issue.
  *
@@ -25,6 +27,16 @@ public class BackfillService {
     private final IssueService issueService;
 
     public BackfillSummary backfill(String repo) {
+        return backfill(repo, loaded -> { });
+    }
+
+    /**
+     * Same, and reports progress after every page.
+     *
+     * @param issuesSoFar called after each page with the number of issues stored so far (for the "Add repository" job's
+     *                    status; GitHub doesn't say up front how many issues a repo has, so there is no total)
+     */
+    public BackfillSummary backfill(String repo, IntConsumer issuesSoFar) {
         long start = System.nanoTime();   // nanoTime is for measuring durations; it never jumps like wall-clock time
         int pages = 0;
         int inserted = 0;
@@ -44,6 +56,7 @@ public class BackfillService {
                     case STALE -> stale++;   // we already had newer data, e.g. from a webhook
                 }
             }
+            issuesSoFar.accept(inserted + updated + stale);
             if (pages % LOG_EVERY_PAGES == 0) {
                 log.info("Backfill {}: {} pages, {} inserted, {} updated, {} skipped so far",
                         repo, pages, inserted, updated, skipped);

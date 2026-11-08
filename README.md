@@ -115,7 +115,18 @@ curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/embeddings/s
 curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/docs/spring-projects/spring-boot                  # docs (~15 s)
 curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/reports/spring-projects/spring-boot/52529         # one report
 curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/eval/spring-projects/spring-boot                  # replay (~3 min)
-./mvnw test                                                                   # 251 tests; Testcontainers for Postgres and Kafka
+./mvnw test                                                                   # 285 tests; Testcontainers for Postgres and Kafka
+```
+
+**Adding a repository.** When the GitHub App is installed on a repository (or a repository is added to an installation),
+the webhook queues an "Add repository" job: load past issues, embed them, then load reference docs if the repo has
+any configured. Jobs run one at a time in the background; private repositories are skipped, because the reports site
+is public. (Not yet covered: if the App is installed on a private repository, its new-issue webhooks still produce reports. Report
+access for private repositories is a later piece.) Watch the progress (public), or queue a job by hand (admin):
+
+```bash
+curl localhost:8080/repos/spring-projects/spring-petclinic/job                                                  # status, step, done/total
+curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/repo-jobs/spring-projects/spring-petclinic   # queue a job
 ```
 
 On the demo page, **Create report** appears only after pasting the admin token into the "Admin" box (kept in that browser tab

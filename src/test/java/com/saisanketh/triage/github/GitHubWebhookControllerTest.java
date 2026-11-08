@@ -1,6 +1,8 @@
 package com.saisanketh.triage.github;
 
 import com.saisanketh.triage.kafka.IssueEventMessage;
+import com.saisanketh.triage.repojob.RepoJobService;
+import com.saisanketh.triage.repojob.RepoJobService.InstalledRepo;
 import org.springframework.dao.DataAccessResourceFailureException;
 import com.saisanketh.triage.service.WebhookIntakeService;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +16,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -33,16 +36,18 @@ class GitHubWebhookControllerTest {
     private static final String DELIVERY = "72d3162e-cc78-11e3-81ab-4c9367dc0958";
 
     private WebhookIntakeService intakeService;
+    private RepoJobService repoJobs;
 
     @BeforeEach
     void setUp() {
+        repoJobs = mock(RepoJobService.class);
         intakeService = mock(WebhookIntakeService.class);
         when(intakeService.accept(any(), any())).thenReturn(WebhookIntakeService.Result.ACCEPTED);
     }
 
     private MockMvc mockMvc(String secret) {
         GitHubWebhookController controller = new GitHubWebhookController(
-                new WebhookSignatureVerifier(secret), JsonMapper.builder().build(), intakeService);
+                new WebhookSignatureVerifier(secret), JsonMapper.builder().build(), intakeService, repoJobs);
         return MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -187,5 +192,70 @@ class GitHubWebhookControllerTest {
     void issuesEventWithoutRepositoryIs400() throws Exception {
         send(mockMvc(SECRET), "issues", "{\"action\": \"opened\", \"issue\": {\"number\": 1}}", SECRET)
                 .andExpect(status().isBadRequest());
+    }
+
+    // --- GitHub App installed on repositories: "Add repository" jobs (backend piece 1) ---
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void installingTheAppQueuesEveryListedRepoAndMarksMissingPrivateFlagsPrivate() throws Exception {
+        when(repoJobs.queueInstalled(any(), any(), any(), any())).thenReturn(1);
+        String body = """
+                {"action": "created", "installation": {"id": 1},
+                 "repositories": [{"full_name": "octo-org/hello", "private": false},
+                                  {"full_name": "octo-org/secret", "private": true},
+                                  {"full_name": "octo-org/unknown"}]}
+                """;
+        send(mockMvc(SECRET), "installation", body, SECRET)
+                .andExpect(status().isOk())
+                .andExpect(content().string("queued 1 of 3 repositories"));
+
+        ArgumentCaptor<List<InstalledRepo>> repos = ArgumentCaptor.forClass(List.class);
+        verify(repoJobs).queueInstalled(eq(DELIVERY), eq("installation"), eq("created"), repos.capture());
+        assertThat(repos.getValue()).containsExactly(new InstalledRepo("octo-org/hello", false),
+                new InstalledRepo("octo-org/secret", true), new InstalledRepo("octo-org/unknown", true));
+        verifyNoInteractions(intakeService);
+    }
+
+    @Test
+    void reposAddedToAnInstallationAreQueuedFromRepositoriesAdded() throws Exception {
+        when(repoJobs.queueInstalled(any(), any(), any(), any())).thenReturn(1);
+        String body = """
+                {"action": "added", "repositories_added": [{"full_name": "octo-org/new", "private": false}],
+                 "repositories_removed": []}
+                """;
+        send(mockMvc(SECRET), "installation_repositories", body, SECRET).andExpect(status().isOk());
+        verify(repoJobs).queueInstalled(DELIVERY, "installation_repositories", "added",
+                List.of(new InstalledRepo("octo-org/new", false)));
+    }
+
+    @Test
+    void otherInstallationActionsAreIgnoredWith202() throws Exception {
+        send(mockMvc(SECRET), "installation", "{\"action\": \"deleted\", \"repositories\": []}", SECRET)
+                .andExpect(status().isAccepted());
+        verifyNoInteractions(repoJobs);
+    }
+
+    @Test
+    void aRepeatedInstallationDeliveryIsAnswered200() throws Exception {
+        when(repoJobs.queueInstalled(any(), any(), any(), any())).thenReturn(-1);
+        send(mockMvc(SECRET), "installation", "{\"action\": \"created\", \"repositories\": []}", SECRET)
+                .andExpect(status().isOk())
+                .andExpect(content().string("duplicate delivery"));
+    }
+
+    @Test
+    void anInstallationWithAWrongSignatureQueuesNothing() throws Exception {
+        send(mockMvc(SECRET), "installation", "{\"action\": \"created\", \"repositories\": []}", "wrong-secret")
+                .andExpect(status().isUnauthorized());
+        verifyNoInteractions(repoJobs);
+    }
+
+    @Test
+    void aDatabaseFailureWhileQueueingIs500SoGitHubCanRedeliver() throws Exception {
+        when(repoJobs.queueInstalled(any(), any(), any(), any()))
+                .thenThrow(new DataAccessResourceFailureException("database down"));
+        send(mockMvc(SECRET), "installation", "{\"action\": \"created\", \"repositories\": []}", SECRET)
+                .andExpect(status().isInternalServerError());
     }
 }

@@ -121,7 +121,8 @@ GitHub → **Settings → Developer settings → GitHub Apps → New GitHub App*
 - Name e.g. `triage-assistant-sai`; Homepage URL: the repo URL.
 - **Webhook URL**: `https://<your-host>/webhooks/github`; **Webhook secret**: the same `GITHUB_WEBHOOK_SECRET` as in secret.yaml.
 - **Permissions**: Repository → **Issues: Read and write**; Metadata: Read-only (automatic).
-- **Subscribe to events**: **Issues**.
+- **Subscribe to events**: **Issues**. (Installation events need no box: GitHub always sends them to the App's webhook.
+  Installing the App on a public repository starts an "Add repository" job; see the README.)
 - **Where can this GitHub App be installed?** "Any account" (public), so maintainers can try it.
 - Create → note the **App ID** → **Generate a private key** (downloads a `.pem`; keep it outside the repo).
 - **Install App** → only on `SaiSankethG/triage-sandbox` for now.
