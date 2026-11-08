@@ -121,7 +121,9 @@ curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/eval/spring-
 **Adding a repository.** When the GitHub App is installed on a repository (or a repository is added to an installation),
 the webhook queues an "Add repository" job: load past issues, embed them, then load reference docs if the repo has
 any configured. Jobs run one at a time in the background; private repositories are skipped, because the reports site
-is public. (Not yet covered: if the App is installed on a private repository, its new-issue webhooks still produce reports. Report
+is public. Two report parts are Spring Boot-only and are set per repository: reference docs (`triage.docs.sources`) and the
+"already fixed?" hint (`triage.fixed-hint.repos`, because it reads the reporter's Spring Boot version). Other repositories' reports
+say "Not available for this repository" for those parts. (Not yet covered: if the App is installed on a private repository, its new-issue webhooks still produce reports. Report
 access for private repositories is a later piece.) Watch the progress (public), or queue a job by hand (admin):
 
 ```bash

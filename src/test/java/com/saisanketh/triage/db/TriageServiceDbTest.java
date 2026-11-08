@@ -108,6 +108,20 @@ class TriageServiceDbTest extends PostgresTest {
     }
 
     @Test
+    void aRepoWithoutTheFixedHintGetsNoneEvenForAStrongFixedMatch() {
+        save(1, "2024-01-01T00:00:00Z", 1, "Datasource url not picked up", "...", "closed", "3.4.2", "type: bug");
+        long id = save(3, "2024-06-01T00:00:00Z", 0, "Datasource url not picked up from yaml",
+                "Using Spring Boot 3.4.1. Steps: run it.", "open", null);
+        jdbc.update("UPDATE issue SET repo = 'octo-org/other'");   // a repo that isn't in triage.fixed-hint.repos
+
+        TriageReport report = triageService.create(id);
+
+        assertThat(report.duplicates()).extracting(TriageReport.Duplicate::number).containsExactly(1);
+        assertThat(report.fixedHint()).isNull();
+        org.mockito.Mockito.verifyNoInteractions(fixSource);      // not even asked: no GitHub call for a part that won't show
+    }
+
+    @Test
     void aWeakTopMatchGetsNoLlmCheckNoHintAndNoDraft() {
         save(1, "2024-01-01T00:00:00Z", 70, "Banner colours", "...", "closed", "3.4.2");
         long id = save(2, "2024-06-01T00:00:00Z", 0, "Datasource url", "", "open", null);

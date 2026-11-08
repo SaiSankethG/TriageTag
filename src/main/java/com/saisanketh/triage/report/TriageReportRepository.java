@@ -149,7 +149,7 @@ public class TriageReportRepository {
                 rs.getString("html_url"), card, rs.getTimestamp("created_at").toInstant(),
                 node(rs, "duplicates"), node(rs, "duplicate_check"), node(rs, "labels"), node(rs, "missing"),
                 node(rs, "fixed_hint"), node(rs, "draft_reply"), rs.getString("llm_model"),
-                rs.getString("prompt_version"), rs.getInt("cost_tokens"), rs.getString("notes"));
+                rs.getString("prompt_version"), rs.getInt("cost_tokens"), rs.getString("notes"), List.of());
     }
 
     private JsonNode node(ResultSet rs, String column) throws SQLException {

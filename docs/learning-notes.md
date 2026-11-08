@@ -2921,3 +2921,31 @@ one instance.
    partition and are read by one consumer in order.
 3. *What did you check before turning it on?* Every shared object: the stateless listener, the embedding model (tested from 3 threads),
    the token counter (atomic upsert), the one-report and one-comment rules (unique keys), and the connection pool size.
+
+## Backend piece 4: Spring Boot-only parts are optional per repo (8 Nov 2026)
+
+**What it does.** Most of a report works for any repository: similar issues, suggested labels, missing details, and a draft reply
+from earlier issues. Two parts were built for spring-boot:
+- **"Already fixed?" hint.** `ReporterVersion` finds the reporter's *Spring Boot* version (starter-parent `<version>`, the Gradle
+  plugin, "Spring Boot 3.2.1"...). On another repo it would never find a version and would always say "ask for the version", which is
+  wrong. It now runs only for repos listed in `triage.fixed-hint.repos` (default: spring-projects/spring-boot), so other repos
+  don't even make the GitHub call it needs.
+- **Reference docs.** Already set per repo (`triage.docs.sources`). Without them, drafts are built from earlier issues only.
+
+A new `RepoParts` component answers "does this repo get part X?". `GET /reports/...` adds `notAvailable`: a list of
+`{part, reason}`. The reports page shows those parts as "Not available for this repository" plus the reason, instead of leaving them out.
+
+**Why worked out when read, not stored in the report.** Whether a repo has docs or the hint is a setting that can change (add docs
+for a repo tomorrow). Computing it at read time means old reports don't need rewriting, and no database change is needed.
+
+**Rejected alternative.** Guessing the project's framework from its issues and parsing "any" version number. Version numbers in
+issues are often for other things (Java 21, Gradle 8.10, a library), so a generic parser would give confident wrong hints. Saying
+"not available" is honest; a per-project version pattern can be added later.
+
+### Likely interview questions
+1. *How do you add the fixed hint for a new project?* Write a version finder for how that project's reporters write their version,
+   then add the repo to `triage.fixed-hint.repos`. Until then the page says it isn't available.
+2. *Why not just hide the missing part?* A maintainer comparing two repos would think the tool failed. "Not available, because ..."
+   explains it and avoids support questions.
+3. *Why does the API compute `notAvailable` each time instead of storing it?* It depends on settings, not on the issue. Storing it
+   would make old reports wrong after a settings change.

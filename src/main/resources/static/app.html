@@ -524,6 +524,8 @@
     const kind = kindOf(t);
     const top = (r.duplicates || [])[0];
     const draft = r.draftReply || {};
+    // Parts this repository doesn't get (Spring Boot-only parts), by name -> the reason to show.
+    const notAvailable = Object.fromEntries((r.notAvailable || []).map(n => [n.part, n.reason]));
     const m = r.missing || {};
     const parts = [];
 
@@ -576,14 +578,20 @@
       draftSection.append(el('details', { class: 'fold', style: 'margin-top:10px' }, el('summary', {}, `What the draft is based on (${draft.sources.length})`),
         el('ul', { class: 'small', style: 'margin:0' }, ...draft.sources.map(s => el('li', {}, `${s.kind === 'docs' ? 'Docs' : 'Issue'}: `, link(s.url, s.title))))));
     }
+    if (notAvailable.docs) {
+      draftSection.append(el('p', { class: 'small muted', style: 'margin:8px 0 0' }, 'Reference docs: Not available for this repository. ', notAvailable.docs));
+    }
     parts.push(draftSection);
 
     // 4. This issue next to its best match, so the maintainer can judge in one look
     if (top) {
       const cut = (text, full) => (text || '').trim() ? text + (full > text.length ? '…' : '') : '(No description.)';
       parts.push(el('section', { class: 'plain' }, el('h2', {}, 'This issue and its best match'),
-        r.fixedHint ? el('div', { class: 'fixed' }, el('strong', {}, 'Already fixed? '), r.fixedHint.text, ' ',
-          r.fixedHint.closerUrl ? link(r.fixedHint.closerUrl, 'See the fix') : null) : null,
+        // "Not available" wins over a stored hint: a report made before the hint was limited to Spring Boot may hold a wrong one.
+        notAvailable.fixedHint ? el('p', { class: 'small muted', style: 'margin:0 0 10px' }, el('strong', {}, 'Already fixed? '),
+            'Not available for this repository. ', notAvailable.fixedHint)
+          : r.fixedHint ? el('div', { class: 'fixed' }, el('strong', {}, 'Already fixed? '), r.fixedHint.text, ' ',
+            r.fixedHint.closerUrl ? link(r.fixedHint.closerUrl, 'See the fix') : null) : null,
         el('div', { class: 'side' },
           el('div', {}, el('h3', {}, 'This issue, ', el('span', { class: 'num' }, `#${r.number}`)), el('div', { class: 'sub' }, `${stateText(card.state, card.stateReason)}, opened ${fmtDate(card.createdAt)}`),
             el('pre', {}, cut(card.bodyStart.slice(0, 600), card.bodyLength))),

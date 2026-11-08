@@ -17,6 +17,7 @@ import com.saisanketh.triage.github.GitHubAppAuth;
 import com.saisanketh.triage.docs.DocIngestService;
 import com.saisanketh.triage.docs.DocSource;
 import com.saisanketh.triage.report.TriageReportRepository;
+import com.saisanketh.triage.report.RepoParts;
 import com.saisanketh.triage.report.TriageService;
 import com.saisanketh.triage.embedding.IssueEmbeddingRepository;
 import com.saisanketh.triage.eval.EvalService;
@@ -59,7 +60,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         "triage.eval.results-file=target/test-m3-results.md",
         "triage.candidates.exclude-labels[octo-org/hello]=status: forward-port",
         "triage.eval.duplicate-check-file=target/test-m4-duplicate-check.md",
-        "triage.comments.skip-labels[octo-org/hello]=status: forward-port"})
+        "triage.comments.skip-labels[octo-org/hello]=status: forward-port",
+        "triage.fixed-hint.repos=example/first, Octo-Org/Hello"})
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({PostgresContainerConfig.class, ClockConfig.class, IssueService.class,
         WebhookDeliveryRepository.class, WebhookIntakeService.class, KeywordDuplicateSearch.class,
@@ -68,7 +70,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
         LlmTestConfig.class, LlmConfig.class, PromptTemplates.class, IssueTextRepository.class, DuplicateVerifier.class,
         DuplicateCheckEval.class, IssueFixRepository.class, FixedHintService.class,
         DocChunkRepository.class, DocIngestService.class, DraftReplyService.class, MissingDetailsChecker.class,
-        TriageReportRepository.class, TriageService.class, TokenBudget.class,
+        TriageReportRepository.class, TriageService.class, RepoParts.class, TokenBudget.class,
         OutboxRepository.class, RepoJobRepository.class, RepoJobService.class, CommentRepository.class, CommentService.class, TriageMetrics.class})
 public abstract class PostgresTest {
 

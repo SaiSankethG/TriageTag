@@ -108,6 +108,9 @@ triage:
     min-issue-score: 0.75
   fixed-hint:
     min-score: 0.75   # the "already fixed?" hint looks at the top match only if it is at least this similar
+    # Repos that get the hint: ONE comma-separated line (not a YAML "- item" list, which @Value can't read). It reads the reporter's Spring Boot version, so only spring-boot for now;
+    # other repos' reports say "not available". Reference docs are switched on per repo under triage.docs.sources.
+    repos: spring-projects/spring-boot
   comments:
     # Comment mode (off by default; per repo with SQL: INSERT INTO repo_setting VALUES ('owner/name', 'SUGGEST')).
     # Issues with these labels never get a comment: the team's per-branch clones, which the LLM rightly calls "the same

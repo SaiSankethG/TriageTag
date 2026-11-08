@@ -59,6 +59,7 @@ public class TriageService {
     private final TokenBudget budget;
     private final CommentService commentService;
     private final TriageMetrics metrics;
+    private final RepoParts repoParts;
     private final double possibleThreshold;
     private final Clock clock;
     private final double commentThreshold;
@@ -68,11 +69,13 @@ public class TriageService {
                          LabelSuggester labelSuggester, DuplicateVerifier duplicateVerifier,
                          MissingDetailsChecker missingDetailsChecker, FixedHintService fixedHintService,
                          DraftReplyService draftReplyService, TriageReportRepository reports, TriageLlm llm,
-                         TokenBudget budget, CommentService commentService, TriageMetrics metrics, Clock clock,
+                         TokenBudget budget, CommentService commentService, TriageMetrics metrics, RepoParts repoParts,
+                         Clock clock,
                          @Value("${triage.duplicates.comment-threshold:0.90}") double commentThreshold,
                          @Value("${triage.fixed-hint.min-score:0.75}") double fixedHintMinScore,
                          @Value("${triage.duplicates.possible-threshold:0.75}") double possibleThreshold) {
         this.jdbc = jdbc;
+        this.repoParts = repoParts;
         this.issueTexts = issueTexts;
         this.vectorSearch = vectorSearch;
         this.labelSuggester = labelSuggester;
@@ -134,7 +137,8 @@ public class TriageService {
         }
         List<LabelSuggestion> labels = labelSuggester.suggest(issueId);
         MissingDetails missing = missingDetailsChecker.check(repo, issue.title(), issue.body());
-        FixedHint fixedHint = top.filter(t -> t.score() >= fixedHintMinScore)
+        // Only where it is set up (it reads Spring Boot versions); elsewhere the page says "not available" (RepoParts).
+        FixedHint fixedHint = top.filter(t -> repoParts.hasFixedHint(repo) && t.score() >= fixedHintMinScore)
                 .flatMap(t -> fixedHintService.hint(repo, t.number(), issue.body())).orElse(null);
         DraftReply draft = draftReplyService.draft(repo, issue, similar, topMatch(repo, top, duplicateCheck), missing);
 
