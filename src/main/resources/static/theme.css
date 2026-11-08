@@ -1,6 +1,6 @@
 /* Shared look for every page: colours, fonts, grain, the hero glow, grid and washes, and the motion rules. Each page links this AFTER its own
-   <style>, so these tokens win. Light = warm paper, dark = ink blue. Fonts: Bricolage Grotesque (headings, the tag's word),
-   IBM Plex Sans (text), IBM Plex Mono (issue numbers). If the fonts don't load, the system fonts below take over. */
+   <style>, so these tokens win. Light = warm paper, dark = ink blue. Fonts: Instrument Sans (headings and text; headings use its
+   narrower width), IBM Plex Mono (only the landing terminal). If the fonts don't load, the system fonts below take over. */
 :root {
   --bg: #f3ede1; --paper: #fbf8f1; --paper-2: #f1ebdd; --ink: #1d2433; --muted: #474e5f; --faint: #4a5162;   /* both at least 4.9:1 even where two glows overlap */
   --line: #ddd4c2; --link: #2350a8; --focus: #2350a8; --grid: rgba(35, 80, 168, .06);
@@ -9,11 +9,11 @@
   --red-band: #c0392b; --green-band: #2f7d4f; --blue-band: #2f5f9e;   /* band fills: white text stays readable */
   --red-tint: #f6e1dc; --amber-tint: #f6ead0; --green-tint: #e0eee3; --blue-tint: #e2e9f4;
   --band: #fbf8f2;   /* the lighter section band */
-  --glow-1: rgba(192, 57, 43, .12); --glow-2: rgba(200, 138, 10, .15); --glow-3: rgba(47, 95, 158, .12); --glow-4: rgba(47, 125, 79, .11);
+  --glow-1: rgba(192, 57, 43, .04); --glow-2: rgba(200, 138, 10, .05); --glow-3: rgba(47, 95, 158, .04); --glow-4: rgba(47, 125, 79, .035);   /* light: a third of the earlier glow */
   --wash-red: rgba(192, 57, 43, .06); --wash-blue: rgba(47, 95, 158, .06); --wash-green: rgba(47, 125, 79, .06); --wash-amber: rgba(200, 138, 10, .07);
   --grain: .05;
-  --display: "Bricolage Grotesque", "Avenir Next Condensed", "Arial Narrow", sans-serif;
-  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "Instrument Sans", "Avenir Next", "Helvetica Neue", sans-serif;
+  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --condensed: var(--display);
   --sun: none; --moon: inline-block;   /* which icon the theme toggle shows */
@@ -84,7 +84,7 @@ body::after {
 .wash-green { --wash: var(--wash-green); } .wash-amber { --wash: var(--wash-amber); }
 section.block[class*="wash-"] { background: linear-gradient(to bottom, var(--wash), transparent 80%), var(--base, transparent); }
 h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-optical-sizing: auto; letter-spacing: -.01em; }
-.num { font-family: var(--mono); font-size: 1em; letter-spacing: 0; }
+.num { font-family: var(--body); font-variant-numeric: tabular-nums; font-size: 1em; letter-spacing: 0; }
 /* In small text the numbers use the text font: no small monospace labels. */
 :where(.small, .sub, .y, .m, .state) .num { font-family: inherit; }
 .bar { background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(6px); }

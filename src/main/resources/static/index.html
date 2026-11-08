@@ -41,17 +41,22 @@
   .btn.quiet { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
 
   /* Hero */
-  .hero { padding-block: 128px 104px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 48px; align-items: center; }
-  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; padding-block: 64px 56px; } }
-  .hero .lede { margin: 18px 0 28px; }
-  .ctas { display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero { padding-block: 112px 96px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 56px; justify-items: center; }
+  .hero-text { text-align: center; display: grid; justify-items: center; max-width: 720px; }
+  .hero-text h1 { max-width: 16ch; }
+  .hero-text .lede { max-width: 720px; }
+  @media (max-width: 900px) { .hero { padding-block: 64px 56px; gap: 40px; } }
+  .hero .lede { margin: 18px auto 28px; }
+  .ctas { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
   /* The sample tag */
-  .sample { justify-self: center; width: min(100%, 440px); }
+  .sample { width: 100%; max-width: 1000px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; align-items: start; }
+  @media (max-width: 860px) { .sample { grid-template-columns: minmax(0, 1fr); max-width: 480px; } }
   /* The live triage window: what the assistant does for one real issue, typed out line by line, then the tag swings in. */
-  .console { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 20px; }
+  .console { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
   .console-bar { display: flex; align-items: center; gap: 6px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: var(--paper-2); font-size: 14px; color: var(--muted); }
-  .console-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .console-bar i { width: 12px; height: 12px; border-radius: 50%; }
+  .console-bar i:nth-of-type(1) { background: #ff5f57; } .console-bar i:nth-of-type(2) { background: #febc2e; } .console-bar i:nth-of-type(3) { background: #28c840; }   /* the same in both themes, like a real window */
   .console-bar span { margin-left: 8px; overflow-wrap: anywhere; }
   .console-body { margin: 0; font-family: var(--mono); font-size: 15px; line-height: 1.75; padding: 14px 16px; min-height: 12.4em; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink); }
   .console-body .ok { color: var(--green); } .console-body .bad { color: var(--red); } .console-body .dim { color: var(--muted); }
@@ -107,6 +112,9 @@
   @media (prefers-reduced-motion: no-preference) { .fill { transition: width 1.1s cubic-bezier(.2, .8, .2, 1); } .bar-row.kw .fill { transition-delay: .15s; } }
   /* Sections alternate: the page background (warm paper / ink), then a lighter band, so each reads as its own stop. */
   section.band { --base: var(--band); background: var(--band); }
+  /* The first section after the hero fades in from the page colour instead of starting with a hard edge. */
+  .hero-glow + section.block.band { border-top: 0; padding-top: 96px;
+    background: linear-gradient(to bottom, var(--bg), transparent 160px), linear-gradient(to bottom, var(--wash, transparent), transparent 80%), var(--base, transparent); }
 
   /* How to use: steps + animated stage */
   .how { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 560px); gap: 48px; margin-top: 32px; align-items: start; }
@@ -199,7 +207,7 @@
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wdth,wght@0,75..100,400..700;1,75..100,400..700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
 <link rel="stylesheet" href="/theme.css">
 <script src="/theme.js"></script>
 </head>
@@ -226,7 +234,7 @@
   <!-- 1. A live sample: a real report from the running app -->
   <div class="hero-glow">
   <div class="wrap hero">
-    <div>
+    <div class="hero-text">
       <h1>Every new issue, triaged before you read it</h1>
       <p class="lede">When someone opens an issue, the assistant finds earlier issues about the same problem, checks what the
         reporter left out, and drafts a first reply from your docs. You get a short note, not posted on GitHub by default, and decide what to do.</p>
@@ -240,8 +248,10 @@
         <div class="console-bar"><i></i><i></i><i></i><span id="console-repo">TriageTag</span></div>
         <pre class="console-body" id="console-body"></pre>
       </div>
+      <div class="sample-tag-col">
       <div id="sample-tag"><div class="tag grey"><div class="band"><div class="verdict">Loading a real report…</div></div><div class="body"><p class="muted small">One moment.</p></div></div></div>
       <p class="sample-caption" id="sample-caption"></p>
+      </div>
     </div>
   </div>
 

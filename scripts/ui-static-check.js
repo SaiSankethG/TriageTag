@@ -13,6 +13,8 @@ const check = (ok, what) => { console.log(`${ok ? 'PASS' : 'FAIL'}  ${what}`); i
 const theme = read('theme.css');
 for (const page of pages) {
   const html = read(page);
+  check(html.includes("family=Instrument+Sans"), `${page}: loads Instrument Sans (headings and text)`);
+  check((html.match(/var\(--mono\)/g) || []).length === (page === "index.html" ? 1 : 0), `${page}: monospace only in the landing terminal`);
   check(!html.includes('innerHTML'), `${page}: no innerHTML (text goes in with textContent)`);
   check(!/<script src="http/.test(html), `${page}: no external scripts`);
   check(html.includes('<link rel="stylesheet" href="/theme.css">'), `${page}: links the shared theme.css`);
