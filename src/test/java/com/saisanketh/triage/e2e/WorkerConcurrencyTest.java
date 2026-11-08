@@ -28,8 +28,9 @@ class WorkerConcurrencyTest extends FullStackTest {
         ConcurrentMessageListenerContainer<?, ?> workers = (ConcurrentMessageListenerContainer<?, ?>) container;
         assertThat(workers.getConcurrency()).isEqualTo(3);
 
-        waitUntil("every partition has a worker", () -> partitionsPerWorker(workers).stream().mapToInt(Integer::intValue)
-                .sum() == 3);
+        // Wait for the group to settle: right after start, one consumer can briefly hold all 3 partitions until Kafka's
+        // rebalance hands two of them to the others ([0, 0, 3] -> [1, 1, 1]). Checking the sum only was flaky.
+        waitUntil("each worker has one partition", () -> partitionsPerWorker(workers).equals(List.of(1, 1, 1)));
         assertThat(partitionsPerWorker(workers)).containsExactly(1, 1, 1);
     }
 
