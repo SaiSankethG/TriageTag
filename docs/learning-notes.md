@@ -2836,3 +2836,43 @@ job to another one. Progress would also still need a table. A database table is 
 3. *How do you stop the same repository being loaded twice at the same time?* A partial unique index allows only one `QUEUED` or
    `RUNNING` row per repository (case-insensitive). The insert uses `ON CONFLICT ... DO NOTHING`, so a second request is a no-op,
    and `SKIP LOCKED` means two runners never claim the same job.
+
+## Backend piece 2: nightly database backup (8 Nov 2026)
+
+**What it does.** `deploy/k3s/40-backup.yaml` adds a Kubernetes **CronJob**: every night at 02:30 India time it starts a short-lived pod
+that runs `pg_dump` against the `postgres` Service. It writes `triage-<date>.dump` to its own volume (`postgres-backups`, 10 GB) and
+deletes dumps older than 7 days. Restore uses `pg_restore` (steps in docs/m5-report.md).
+
+**The parts, from the basics.**
+- **CronJob**: Kubernetes' version of cron. On the `schedule` it creates a **Job**, and the Job runs a Pod until it exits 0.
+  `timeZone: Asia/Kolkata` makes "30 2 * * *" mean 02:30 in India (without it, the schedule follows the kube-controller-manager's time zone; on k3s that runs inside the k3s server, so it's the VM's zone, UTC).
+- **concurrencyPolicy: Forbid**: if last night's dump is somehow still running, tonight's run is skipped instead of starting a second one.
+- **backoffLimit: 2, restartPolicy: Never**: a failed dump is tried twice more in fresh pods, then the Job shows as Failed
+  (`kubectl get jobs`).
+- **startingDeadlineSeconds: 3600**: if the VM was off at 02:30 and comes back within the hour, the backup still runs.
+- **pg_dump --format=custom**: Postgres's own compressed archive (113 MB for today's 43,810 issues plus embeddings). Unlike a plain
+  `.sql` file, `pg_restore` can restore one table out of it or list what's inside (`pg_restore --list`).
+- **Same image as Postgres** (`pgvector/pgvector:pg16-trixie`): `pg_dump` must be at least the server's version, and the same image is
+  the simplest way to guarantee it. A test checks that the two images stay equal.
+- **Write to `.part`, then `mv`**: a dump that fails half-way never sits there looking like a good backup. `mv` within one filesystem is
+  an atomic rename.
+- **Password**: from the same `triage-secrets` Secret as Postgres (`PGPASSWORD`, which pg_dump reads by itself). Never in the file.
+
+**Tested locally** by running the same script in the same image against the docker-compose Postgres. It wrote a 113 MB dump,
+`pg_restore --list` read it, and the 7-day cleanup deleted an old `.dump` and an old `.part` while keeping a new one.
+
+**Rejected alternative.** Streaming the WAL (write-ahead log) with a tool like pgBackRest or WAL-G for point-in-time recovery. That is
+the production answer (lose seconds, not a day), but it needs extra software and object storage. For a demo database that can be
+rebuilt from GitHub in about 20 minutes, a nightly dump is enough.
+
+**Limit, said plainly.** The dumps live on the same VM disk. They protect against a bad migration, a wrong DELETE or a broken
+Postgres volume, not against losing the VM. Copy one off the VM now and then (m5-report has the steps).
+
+### Likely interview questions
+1. *How would you restore last night's backup?* Scale the app to 0, run `pg_restore --clean --if-exists` from the dump into
+   postgres-0, then scale the app back to 1. Flyway sees the restored `flyway_schema_history` and runs any newer migrations. One catch: `--clean` only
+   drops what is in the dump, so if a migration ran after the dump, restore into a fresh database (or drop those newer tables first).
+2. *Why a CronJob and not a cron line on the VM?* It is declared next to the database in the same manifests, uses the same Secret,
+   gets retries and a history of runs, and keeps working if the cluster moves to another machine.
+3. *What's your RPO (recovery point objective)?* Up to 24 hours of data with a nightly dump. Lower would need WAL archiving. Issues can
+   also be re-fetched from GitHub, so the real loss is reports and LLM spend.

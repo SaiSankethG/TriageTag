@@ -111,6 +111,45 @@ curl -X POST -H "X-Admin-Token: <your TRIAGE_ADMIN_TOKEN>" localhost:8080/docs/s
 `POST /reports/...` is reachable through the Ingress (a Kubernetes Ingress can't filter by HTTP method), but the app refuses it
 without the token; on the public demo page, paste the token into the "Admin" box to see **Create report**.
 
+### Nightly backup (added 8 Nov 2026)
+`deploy/k3s/40-backup.yaml` dumps the database every night at 02:30 India time and keeps 7 days of dumps, on their own 10 GB volume.
+Apply it once Postgres runs, then run one backup straight away to check it:
+```bash
+sudo k3s kubectl apply -f 40-backup.yaml
+```
+```bash
+sudo k3s kubectl -n triage create job --from=cronjob/postgres-backup backup-now
+```
+```bash
+sudo k3s kubectl -n triage logs -f job/backup-now
+```
+The log ends with the list of kept dumps (about 110 MB each today). The dumps are on the same disk as the database, so they cover a bad
+migration or a wrong DELETE, not losing the VM. **Copy one to your Mac now and then.** First start a helper pod that can see the volume:
+```bash
+sudo k3s kubectl -n triage run backup-shell --image=pgvector/pgvector:pg16-trixie --restart=Never --overrides='{"spec":{"containers":[{"name":"backup-shell","image":"pgvector/pgvector:pg16-trixie","command":["sleep","3600"],"volumeMounts":[{"name":"b","mountPath":"/backups"}]}],"volumes":[{"name":"b","persistentVolumeClaim":{"claimName":"postgres-backups"}}]}}'
+```
+```bash
+sudo k3s kubectl -n triage exec backup-shell -- ls -l /backups
+```
+```bash
+sudo k3s kubectl -n triage cp backup-shell:/backups/<file>.dump ~/<file>.dump
+```
+Then, on your Mac: `scp -i <key> ubuntu@<public-ip>:~/<file>.dump .`
+**Restore** (replaces the current data; stop the app first so nothing writes meanwhile):
+```bash
+sudo k3s kubectl -n triage scale deployment/triage-app --replicas=0
+```
+```bash
+sudo k3s kubectl -n triage exec -i postgres-0 -- pg_restore -U copilot -d triage --clean --if-exists --no-owner < ~/<file>.dump
+```
+```bash
+sudo k3s kubectl -n triage scale deployment/triage-app --replicas=1
+```
+pg_restore carries on after an error and prints "errors ignored on restore: N" at the end. A warning about the owner of an extension
+is harmless; any other error means the restore is incomplete, so stop and check before starting the app. If migrations ran after the
+dump was taken, restore into a fresh database instead (`--clean` only drops what the dump contains).
+Finally remove the helper pod: `sudo k3s kubectl -n triage delete pod backup-shell`.
+
 ### 3. HTTPS and a hostname (your choice)
 GitHub can send webhooks to plain http, but it shouldn't. The simplest options: a **Cloudflare Tunnel** (free, HTTPS, no open
 ports needed) or Traefik's built-in Let's Encrypt on a domain you own. Then replace `triage.example.com` in `30-app.yaml`.

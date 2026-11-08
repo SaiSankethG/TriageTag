@@ -55,7 +55,7 @@ class K3sManifestsTest {
         List<Map<String, Object>> all = allObjects();
 
         assertThat(all).extracting(o -> o.get("kind")).contains("Namespace", "StatefulSet", "Deployment", "Service",
-                "Ingress", "Secret");
+                "Ingress", "Secret", "CronJob", "PersistentVolumeClaim");
         for (Map<String, Object> o : all) {
             Map<String, Object> metadata = map(o.get("metadata"));
             if (!"Namespace".equals(o.get("kind"))) {
@@ -111,5 +111,38 @@ class K3sManifestsTest {
                 "/settings", "/actuator/health");
         assertThat(routed).noneMatch(p -> p.startsWith("/backfill") || p.startsWith("/eval") || p.startsWith("/embeddings")
                 || p.startsWith("/docs"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void theNightlyBackupDumpsWithTheServersOwnVersionOneAtATimeAndKeepsAWeek() throws IOException {
+        List<Map<String, Object>> backup = objects("40-backup.yaml");
+        Map<String, Object> cronJob = backup.stream().filter(o -> "CronJob".equals(o.get("kind"))).findFirst().orElseThrow();
+        Map<String, Object> spec = map(cronJob.get("spec"));
+        assertThat(spec.get("schedule")).isEqualTo("30 2 * * *");
+        assertThat(spec.get("timeZone")).isEqualTo("Asia/Kolkata");
+        assertThat(spec.get("concurrencyPolicy")).isEqualTo("Forbid");
+
+        Map<String, Object> pod = map(map(map(map(spec.get("jobTemplate")).get("spec")).get("template")).get("spec"));
+        Map<String, Object> container = (Map<String, Object>) ((List<Object>) pod.get("containers")).get(0);
+        Map<String, Object> postgres = objects("10-postgres.yaml").stream()
+                .filter(o -> "StatefulSet".equals(o.get("kind"))).findFirst().orElseThrow();
+        Map<String, Object> pgContainer = (Map<String, Object>) ((List<Object>) map(map(map(postgres.get("spec"))
+                .get("template")).get("spec")).get("containers")).get(0);
+        assertThat(container.get("image")).as("pg_dump must match the server's version").isEqualTo(pgContainer.get("image"));
+
+        Set<String> templateKeys = map(objects("secret.example.yaml").get(0).get("stringData")).keySet();
+        for (Object e : (List<Object>) container.get("env")) {
+            Object from = map(e).get("valueFrom");
+            if (from != null) {
+                assertThat(templateKeys).contains((String) map(map(from).get("secretKeyRef")).get("key"));
+            }
+        }
+        String script = String.join("\n", (List<String>) container.get("args"));
+        assertThat(script).contains("pg_dump --format=custom", "mv \"$file.part\" \"$file\"", "-mtime +\"$((KEEP_DAYS - 1))\"");
+
+        String claim = (String) map(map(map(((List<Object>) pod.get("volumes")).get(0)).get("persistentVolumeClaim"))).get("claimName");
+        assertThat(backup).anyMatch(o -> "PersistentVolumeClaim".equals(o.get("kind"))
+                && claim.equals(map(o.get("metadata")).get("name")));
     }
 }

@@ -1,0 +1,79 @@
+# Nightly database backup (backend piece 2, 8 Nov 2026): pg_dump of the "triage" database at 02:30 India time (21:00 UTC),
+# kept for 7 days on its own volume. Apply after 10-postgres.yaml:
+#   sudo k3s kubectl apply -f 40-backup.yaml
+# Run one now (to test):   sudo k3s kubectl -n triage create job --from=cronjob/postgres-backup backup-now
+# See the last run:         sudo k3s kubectl -n triage logs job/backup-now   (it lists the backups it keeps)
+# Copy one off the VM, or restore it: docs/m5-report.md, "Nightly backup".
+#
+# What it protects against: a bad migration, a wrong DELETE, a broken Postgres volume. What it does NOT: losing the whole VM
+# (the backups are on the same disk). For that, copy one off the VM now and then (scp), as the restore steps show.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-backups
+  namespace: triage
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi   # one compressed dump is ~110 MB today; 7 of them fit with lots of room to grow
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: triage
+spec:
+  schedule: "30 2 * * *"
+  timeZone: "Asia/Kolkata"           # 02:30 India time, when nobody is using the demo
+  concurrencyPolicy: Forbid          # never two dumps at once (a slow one is still running: skip tonight's)
+  startingDeadlineSeconds: 3600      # the VM was down at 02:30? still run if it is back within an hour
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2                # a failed dump is tried twice more, then the Job shows as failed
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: pg-dump
+              image: pgvector/pgvector:pg16-trixie   # the same image as Postgres: pg_dump matches the server version (16)
+              env:
+                - name: PGHOST
+                  value: postgres
+                - name: PGUSER
+                  value: copilot
+                - name: PGDATABASE
+                  value: triage
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: triage-secrets
+                      key: POSTGRES_PASSWORD
+                - name: KEEP_DAYS
+                  value: "7"
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -eu
+                  file="/backups/triage-$(date -u +%Y-%m-%dT%H%M).dump"
+                  # -Fc: Postgres's compressed custom format, restored with pg_restore. Written under a temporary name first,
+                  # so a dump that fails half-way never looks like a good backup.
+                  pg_dump --format=custom --file="$file.part"
+                  mv "$file.part" "$file"
+                  echo "Backup written: $file ($(du -h "$file" | cut -f1))"
+                  # Keep KEEP_DAYS days of dumps. find's -mtime +N means "at least N+1 whole days old", hence the -1.
+                  # Old leftovers of failed runs (*.part) go too.
+                  find /backups -name 'triage-*.dump*' -mtime +"$((KEEP_DAYS - 1))" -print -delete
+                  ls -l /backups
+              resources:
+                requests: { cpu: 100m, memory: 128Mi }
+                limits: { memory: 512Mi }
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: postgres-backups
