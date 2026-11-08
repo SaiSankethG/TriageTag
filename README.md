@@ -123,8 +123,9 @@ the webhook queues an "Add repository" job: load past issues, embed them, then l
 any configured. Jobs run one at a time in the background; private repositories are skipped, because the reports site
 is public. Two report parts are Spring Boot-only and are set per repository: reference docs (`triage.docs.sources`) and the
 "already fixed?" hint (`triage.fixed-hint.repos`, because it reads the reporter's Spring Boot version). Other repositories' reports
-say "Not available for this repository" for those parts. (Not yet covered: if the App is installed on a private repository, its new-issue webhooks still produce reports. Report
-access for private repositories is a later piece.) Watch the progress (public), or queue a job by hand (admin):
+say "Not available for this repository" for those parts. Issue webhooks from private repositories are ignored too, so nothing from a private repository reaches the public
+reports through GitHub. The operator's own admin calls (`/backfill`, `/repo-jobs`) don't check this: don't point them at a
+private repository. (Reports for private repositories, behind a login, are a later piece.) Watch the progress (public), or queue a job by hand (admin):
 
 ```bash
 curl localhost:8080/repos/spring-projects/spring-petclinic/job                                                  # status, step, done/total

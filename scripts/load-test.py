@@ -60,7 +60,7 @@ def payload(i):
             "html_url": f"https://github.com/{REPO}/issues/{number}", "created_at": now, "updated_at": now,
             "repository_url": f"https://api.github.com/repos/{REPO}",   # the mapper takes the repo name from here
         },
-        "repository": {"full_name": REPO},
+        "repository": {"full_name": REPO, "private": False},   # private repos are ignored (piece 1b)
         "sender": {"login": "load-test"},
     }).encode()
 

@@ -106,6 +106,13 @@ public class GitHubWebhookController {
             return ResponseEntity.badRequest().body("issues event without issue or repository.full_name");
         }
 
+        // Private repositories are not triaged (piece 1b): the reports site is public, so a report would publish a private
+        // issue. A missing flag counts as private, the same rule as for installations. 202 = received on purpose, don't resend.
+        if (json.path("repository").path("private").asBoolean(true)) {
+            log.info("Ignored webhook delivery {}: issues/{} in a private repository", deliveryId, action);
+            return ResponseEntity.accepted().body("ignored: private repository");
+        }
+
         IssueEventMessage message = new IssueEventMessage(deliveryId, action, repoName.asString(), issue);
         try {
             if (intakeService.accept(event, message) == WebhookIntakeService.Result.DUPLICATE) {

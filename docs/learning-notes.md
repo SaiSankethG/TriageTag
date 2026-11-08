@@ -2949,3 +2949,25 @@ issues are often for other things (Java 21, Gradle 8.10, a library), so a generi
    explains it and avoids support questions.
 3. *Why does the API compute `notAvailable` each time instead of storing it?* It depends on settings, not on the issue. Storing it
    would make old reports wrong after a settings change.
+
+## Backend piece 1b: private repositories are never triaged (8 Nov 2026)
+
+**What it does.** Piece 1 skipped private repositories when the App is installed, but their `issues` webhooks were still accepted, so
+a new issue in a private repository would get a report on the public site. The webhook receiver now checks `repository.private` on
+every `issues` event. A private repository (or a payload without the flag) is answered **202 "ignored: private repository"** and
+nothing is stored or queued.
+
+**Why 202 and not 200 or 4xx.** 2xx tells GitHub the delivery arrived, so it doesn't count as failed or get redelivered. 202
+("accepted, not processed") is what the receiver already answers for events it deliberately ignores. A 4xx would show as a failed
+delivery in the App's settings and look like a bug.
+
+**Why treat a missing flag as private.** GitHub always sends the flag, so a missing one means something unexpected (a hand-made or
+changed payload). Failing closed means the worst case is a missed report, not a leaked private issue.
+
+### Likely interview questions
+1. *Where is the check, and why there?* At the webhook, before anything is stored, so private data never reaches the database,
+   Kafka or the LLM. Checking later (e.g. when showing a report) would still have stored it and paid for the LLM call.
+2. *What if a public repository becomes private later?* New events stop being triaged at once. Issues and reports stored while it
+   was public stay until removed; cleanup on "repository made private" or uninstall is a later piece.
+3. *How would you support private repositories properly?* Reports behind a login ("Sign in with GitHub"), showing a repository's
+   reports only to users who can see that repository, checked with the GitHub API.

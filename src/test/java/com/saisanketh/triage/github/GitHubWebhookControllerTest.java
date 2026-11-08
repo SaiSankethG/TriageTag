@@ -55,7 +55,7 @@ class GitHubWebhookControllerTest {
         return """
                 {"action": "%s",
                  "issue": {"number": 7, "title": "Something broke"},
-                 "repository": {"full_name": "octo-org/hello"}}
+                 "repository": {"full_name": "octo-org/hello", "private": false}}
                 """.formatted(action);
     }
 
@@ -192,6 +192,31 @@ class GitHubWebhookControllerTest {
     void issuesEventWithoutRepositoryIs400() throws Exception {
         send(mockMvc(SECRET), "issues", "{\"action\": \"opened\", \"issue\": {\"number\": 1}}", SECRET)
                 .andExpect(status().isBadRequest());
+    }
+
+    // --- private repositories are never triaged (piece 1b): the reports site is public ---
+
+    @Test
+    void anIssueInAPrivateRepoIsIgnoredWith202AndNothingIsQueued() throws Exception {
+        String body = """
+                {"action": "opened", "issue": {"number": 7, "title": "Secret bug"},
+                 "repository": {"full_name": "octo-org/secret", "private": true}}
+                """;
+        send(mockMvc(SECRET), "issues", body, SECRET)
+                .andExpect(status().isAccepted())
+                .andExpect(content().string("ignored: private repository"));
+        verifyNoInteractions(intakeService);
+    }
+
+    @Test
+    void anIssueWithoutAPrivateFlagIsTreatedAsPrivate() throws Exception {
+        String body = """
+                {"action": "opened", "issue": {"number": 7, "title": "Unknown"}, "repository": {"full_name": "octo-org/x"}}
+                """;
+        send(mockMvc(SECRET), "issues", body, SECRET)
+                .andExpect(status().isAccepted())
+                .andExpect(content().string("ignored: private repository"));
+        verifyNoInteractions(intakeService);
     }
 
     // --- GitHub App installed on repositories: "Add repository" jobs (backend piece 1) ---
