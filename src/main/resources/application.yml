@@ -36,6 +36,11 @@ spring:
         delivery.timeout.ms: 5000   # max total time for a send, retries included (must be >= linger + request timeout)
     consumer:
       auto-offset-reset: earliest   # a new consumer group starts at the oldest message, so nothing sent before it started is missed
+      properties:
+        # A report can take long: up to 3 LLM calls, each with a 60 s timeout and 2 retries (worst case ~9 min). Kafka's default
+        # of 5 min between polls would then count the worker as dead and rebalance the group, which pauses all 3 workers.
+        max.poll.interval.ms: 900000   # 15 min
+        max.poll.records: 10           # fewer messages per poll, so one batch never needs that long in normal use
 
 github:
   api-url: https://api.github.com
@@ -52,6 +57,10 @@ triage:
   admin-token: ${TRIAGE_ADMIN_TOKEN:}
   outbox:
     poll-ms: 500          # the relay looks for unsent outbox rows this often (after the previous run ended)
+  worker:
+    # Kafka consumers in the triage-worker group, each on its own thread. 3 = the partitions of issue-events: more would sit
+    # idle (a partition is read by one consumer of a group at a time), fewer would leave a partition waiting behind another.
+    concurrency: 3
   repo-jobs:
     poll-ms: 5000         # "Add repository" jobs: look for a queued one this often (one job runs at a time)
   candidates:

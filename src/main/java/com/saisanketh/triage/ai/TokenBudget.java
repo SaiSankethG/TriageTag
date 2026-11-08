@@ -13,8 +13,9 @@ import java.time.ZoneOffset;
  * The daily LLM token budget (config {@code triage.llm.daily-token-budget}). Usage is counted in the llm_usage table, so
  * it survives restarts and is shared by every instance of the app.
  *
- * <p>The check happens before a call and the count after it, so the last call of a day can go over the budget by one
- * call's tokens. That's accepted: the budget is a cost brake, not an exact meter.
+ * <p>The check happens before a call and the count after it, so the last calls of a day can go over the budget by one
+ * call's tokens per worker running at that moment (3 Kafka workers, backend piece 3). That's accepted: the budget is a cost brake,
+ * not an exact meter. The count itself is one atomic upsert, so parallel calls never lose each other's tokens.
  */
 @Component
 public class TokenBudget {

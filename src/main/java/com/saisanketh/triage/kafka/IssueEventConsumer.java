@@ -28,6 +28,12 @@ import java.util.Set;
  *
  * <p>Safe to receive a message twice (Kafka delivers "at least once"): the upsert matches on
  * (source, externalId) and ignores older data, and deleting a row that's already gone does nothing.
+ *
+ * <p><b>3 workers in parallel</b> ({@code triage.worker.concurrency}, backend piece 3): Spring starts 3 consumers in the group, one
+ * per partition of issue-events, each on its own thread. An issue's events share a key, so they all land on one partition and are
+ * still handled in order by one worker. What the workers share is safe from several threads: this class keeps no state, the
+ * embedding model is one thread-safe ONNX session, the token budget adds with one atomic SQL upsert, and a report or a comment is
+ * unique per issue in the database.
  */
 @Slf4j
 @Component
@@ -51,7 +57,8 @@ public class IssueEventConsumer {
     private final TriageMetrics metrics;
     private final Clock clock;
 
-    @KafkaListener(topics = KafkaTopicsConfig.ISSUE_EVENTS, groupId = GROUP_ID)
+    @KafkaListener(topics = KafkaTopicsConfig.ISSUE_EVENTS, groupId = GROUP_ID,
+            concurrency = "${triage.worker.concurrency:3}")
     public void onIssueEvent(ConsumerRecord<String, String> record) {
         JsonNode message = parse(record);
         String action = message.get("action") == null ? "" : message.get("action").asString();

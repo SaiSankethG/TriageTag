@@ -2876,3 +2876,48 @@ Postgres volume, not against losing the VM. Copy one off the VM now and then (m5
    gets retries and a history of runs, and keeps working if the cluster moves to another machine.
 3. *What's your RPO (recovery point objective)?* Up to 24 hours of data with a nightly dump. Lower would need WAL archiving. Issues can
    also be re-fetched from GitHub, so the real loss is reports and LLM spend.
+
+## Backend piece 3: three triage workers in parallel (8 Nov 2026)
+
+**What it does.** `@KafkaListener(..., concurrency = "${triage.worker.concurrency:3}")`. Spring Kafka starts 3 consumers in the
+`triage-worker` group, each on its own thread, inside one app. Kafka gives each one of the 3 partitions of `issue-events`. Before, one
+consumer read all 3 partitions in turn, so a slow report (1 to 3 LLM calls, about 2 to 5 s each) held up the issues behind it on every
+partition.
+
+**From the basics.**
+- **Consumer group**: consumers with the same `group.id` split a topic's partitions between them. A partition is read by **one**
+  consumer of the group at a time, which is how Kafka keeps per-partition order. So 3 partitions means at most 3 useful consumers: a
+  4th would get nothing and wait as a spare.
+- **Order is still kept where it matters**: an issue's events share its key (`owner/name#number`), and one key always goes to the same
+  partition, so "opened" is still handled before "edited" of the same issue. Different issues can now run side by side.
+- **`ConcurrentMessageListenerContainer`**: what `concurrency` creates. It holds N single-threaded containers (one `KafkaConsumer`
+  each, because a KafkaConsumer must not be used from two threads).
+
+**What had to be checked (thread safety).** The three threads share some objects, so each was checked:
+- `IssueEventConsumer` keeps no state of its own.
+- The embedding model is one ONNX Runtime session, which is safe to call from several threads. A new test calls it from 3 threads at
+  once (30 calls) and gets the same vectors as one at a time.
+- The token budget adds tokens with one atomic SQL upsert (`ON CONFLICT ... DO UPDATE SET tokens = tokens + ...`), so no update is
+  lost. The check before a call can now let up to 3 calls through at the end of the day instead of 1 (the comment says so).
+- A report (unique `issue_id`) and a posted comment (primary key `issue_id`, row written before posting) are still one per issue, even
+  with several threads.
+- Database connections: 3 workers + the outbox relay + a repo job + web requests stay well under Hikari's default pool of 10.
+
+**Poll interval.** Kafka expects every consumer to poll again within `max.poll.interval.ms` (default 5 min), or it removes it from the
+group and rebalances (with 3 workers that pauses all of them). One report can in the worst case take ~9 min (3 LLM calls x 60 s timeout
+x 3 tries), so it is now 15 min, and `max.poll.records` is 10 so a normal batch stays short.
+
+**Test.** `WorkerConcurrencyTest` starts the whole app with real Kafka and Postgres (Testcontainers) and checks there are 3 consumers,
+each with exactly 1 partition.
+
+**Rejected alternative.** Running 3 replicas of the app (3 pods) instead of 3 threads. That spreads load across machines, but on one
+2-OCPU VM it would load the 90 MB embedding model and the JVM 3 times. It would also break the repo-job restart recovery, which assumes
+one instance.
+
+### Likely interview questions
+1. *Why exactly 3?* Because the topic has 3 partitions. Within a group a partition goes to one consumer, so a 4th consumer would sit
+   idle. To scale further you add partitions first (and accept that adding partitions moves keys to new partitions).
+2. *Doesn't parallelism break ordering?* Only across issues, which don't need ordering. Events of one issue share a key, land on one
+   partition and are read by one consumer in order.
+3. *What did you check before turning it on?* Every shared object: the stateless listener, the embedding model (tested from 3 threads),
+   the token counter (atomic upsert), the one-report and one-comment rules (unique keys), and the connection pool size.

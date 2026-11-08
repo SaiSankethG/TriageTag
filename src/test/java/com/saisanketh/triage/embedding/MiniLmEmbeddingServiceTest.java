@@ -40,6 +40,30 @@ class MiniLmEmbeddingServiceTest {
         assertThat(cosine(batch.get(1), service.embed("second text"))).isGreaterThan(0.999);
     }
 
+    /** Backend piece 3: 3 Kafka workers share this one model, so it must give the same answers when called from 3 threads at once. */
+    @Test
+    void threeThreadsAtOnceGetTheSameVectorsAsOneAtATime() throws Exception {
+        List<String> texts = List.of("Actuator health endpoint returns 404", "Port 8080 already in use",
+                "YAML anchors are not supported", "Caffeine cache ignores AsyncCacheLoader", "Docker Compose support fails",
+                "Flyway migration runs twice");
+        List<float[]> expected = texts.stream().map(service::embed).toList();
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(3);
+        try {
+            List<java.util.concurrent.Future<float[]>> results = new java.util.ArrayList<>();
+            for (int round = 0; round < 5; round++) {
+                for (String text : texts) {
+                    results.add(pool.submit(() -> service.embed(text)));
+                }
+            }
+            for (int i = 0; i < results.size(); i++) {
+                assertThat(cosine(results.get(i).get(), expected.get(i % texts.size()))).isGreaterThan(0.9999);
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
     private static double cosine(float[] a, float[] b) {
         double dot = 0;
         double normA = 0;
