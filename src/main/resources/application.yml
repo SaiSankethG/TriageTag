@@ -18,6 +18,11 @@ spring:
     url: jdbc:postgresql://localhost:5433/triage
     username: copilot
     password: copilot
+    hikari:
+      # Wait at most 3 s for a database connection (Hikari's default is 30 s). Found in the stability rehearsal (10 Nov 2026):
+      # with Postgres down, each webhook hung 30 s before its 500, but GitHub gives up after 10 s, and every hung request
+      # held a web thread. Now it fails in ~3 s, inside GitHub's window, and GitHub's "Redeliver" works once it is back.
+      connection-timeout: 3000
   jpa:
     hibernate:
       ddl-auto: validate   # Flyway owns the schema; Hibernate only checks that the entities match it
