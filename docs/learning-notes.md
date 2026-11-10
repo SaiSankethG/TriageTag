@@ -2992,6 +2992,14 @@ Full results: docs/stability-report.md.
   allocates native memory outside the heap. 20% headroom lowers the max heap from 1.97 GB to 1.45 GB. The measured peak was 631 MB in
   total, so this is a safety margin, not a tuning.
 
+- **A patient retry when the database is down.** The 3 s timeout had a side effect, found in review: a Kafka message already being
+  processed failed its 3 quick retries in ~15 s and went to the dead-letter topic, so restarting Postgres for 20 s would lose those
+  reports. The error handler now picks the back-off by error (`setBackOffFunction`): "database unreachable" (no connection, no
+  transaction) waits 1, 2, 4 ... up to 30 s between tries, for up to 10 minutes; anything else keeps the 3 quick retries, because
+  waiting can't fix a bug or bad data. 10 minutes stays under `max.poll.interval.ms` (15 min).
+- **Start-up with the database down.** Flyway needs the database at start-up, so the app exits and k3s restarts it with growing
+  delays (CrashLoopBackOff: 10 s, 20 s, 40 s ... up to 5 min) until Postgres is up. Acceptable: Postgres starts in seconds.
+
 **Rejected alternative.** Testing only on the VM after the deploy. A failure there mixes app bugs with VM, network and DNS problems,
 and fixing it means editing on a server. The rehearsal separates the two: once the app is known to be stable, any problem on the VM
 is about the VM.
@@ -2999,7 +3007,8 @@ is about the VM.
 ### Likely interview questions
 1. *How did you know the app was ready to deploy?* A production rehearsal: the real image with the VM's memory and CPU limits, a
    restored copy of the data, every path smoke-tested, each dependency broken on purpose, a load test and a soak test. It found 4
-   real problems (30 s hang with the DB down, wrong Java version, no memory headroom, a test script reading the wrong database).
+   real problems (30 s hang with the DB down, wrong Java version, no memory headroom, a test script reading the wrong database)
+   plus a wording fix, and the review of the first fix found a fifth (messages in flight lost during a database restart).
 2. *What happens when Kafka goes down?* Webhooks are still accepted (p95 3 ms) because the transactional outbox stores them in Postgres.
    When Kafka returns, the relay sends them and every report appears. Nothing is lost.
 3. *Why should liveness stay UP when the database is down?* If liveness failed, Kubernetes would restart the app, which can't fix

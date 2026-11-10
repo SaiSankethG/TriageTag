@@ -54,8 +54,8 @@ spec:
             - { name: GITHUB_APP_PRIVATE_KEY_PATH, value: "/etc/github-app/private-key.pem" }
             # The eval endpoints write result files; in the container they go to /tmp, not into a docs/ folder.
             # The buildpack sizes the heap from the memory limit and by default leaves 0% headroom for memory outside the
-            # heap. The embedding model (ONNX Runtime) allocates outside it, so keep 20% free: heap ~1.6 GB of 2.5 GB.
-            # (Rehearsal, 10 Nov 2026: 611 MB used at peak in a 500-webhook load test, so this is a safety margin.)
+            # heap. The embedding model (ONNX Runtime) allocates outside it, so keep 20% free: heap max ~1.45 GB of 2.5 GB.
+            # (Rehearsal, 10 Nov 2026: 631 MB used at peak in a 500-webhook load test, so this is a safety margin.)
             - { name: BPL_JVM_HEAD_ROOM, value: "20" }
             - { name: TRIAGE_EVAL_RESULTS_FILE, value: "/tmp/m3-results.md" }
             - { name: TRIAGE_EVAL_DUPLICATE_CHECK_FILE, value: "/tmp/m4-duplicate-check.md" }

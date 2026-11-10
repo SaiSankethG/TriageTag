@@ -10,6 +10,16 @@ Checks every path once, the way GitHub and a visitor use it:
 Usage:
   BASE_URL=http://localhost:8090 GITHUB_WEBHOOK_SECRET=... TRIAGE_ADMIN_TOKEN=... scripts/smoke-test.py
   INSTALL_REPO=spring-projects/spring-petclinic ... scripts/smoke-test.py     # also run the install check (needs GITHUB_TOKEN on the app)
+  PUBLIC=1 BASE_URL=https://<your-host> ...                                   # through the public Ingress (see below)
+
+PUBLIC=1: the Ingress routes only public paths, so the probe URLs (/actuator/health/liveness, /readiness) and the admin
+paths (/repo-jobs) answer 404 there on purpose. Those checks are skipped. For the full set on the VM, run it through
+`sudo k3s kubectl -n triage port-forward svc/triage-app 8080:80` with BASE_URL=http://localhost:8080.
+
+Leaves test data behind: each run adds one issue (and its report) numbered 800000-899999 in Codertocat/Hello-World (the
+GitHub example repo of the fixture, so the real repos' searches are untouched; it does show up in /repos). To remove it:
+  DELETE FROM issue WHERE repo = 'Codertocat/Hello-World' AND number BETWEEN 800000 AND 899999;
+  DELETE FROM outbox_event WHERE message_key LIKE 'Codertocat/Hello-World#8_____';
 
 Secrets are read from the environment and never printed. Exit code 0 = all checks passed.
 """
@@ -27,6 +37,7 @@ BASE = os.environ.get("BASE_URL", "http://localhost:8080").rstrip("/")
 SECRET = os.environ.get("GITHUB_WEBHOOK_SECRET", "")
 ADMIN = os.environ.get("TRIAGE_ADMIN_TOKEN", "")
 INSTALL_REPO = os.environ.get("INSTALL_REPO", "")
+PUBLIC = os.environ.get("PUBLIC", "") == "1"
 REPORT_WAIT_S = int(os.environ.get("REPORT_WAIT_S", "90"))
 JOB_WAIT_S = int(os.environ.get("JOB_WAIT_S", "1800"))
 FIXTURE = os.path.join(os.path.dirname(__file__), "..", "src", "test", "resources", "github", "webhook-issues-opened.json")
@@ -77,9 +88,10 @@ def main():
     # 1. Health and pages
     status, body = request("GET", "/actuator/health")
     check(status == 200 and '"UP"' in body, "health is UP", body[:120])
-    for probe in ("liveness", "readiness"):
-        status, _ = request("GET", f"/actuator/health/{probe}")
-        check(status == 200, f"{probe} probe answers 200", str(status))
+    if not PUBLIC:   # not routed by the public Ingress, on purpose
+        for probe in ("liveness", "readiness"):
+            status, _ = request("GET", f"/actuator/health/{probe}")
+            check(status == 200, f"{probe} probe answers 200", str(status))
     for page in ("/", "/app.html", "/guide.html", "/theme.css", "/theme.js"):
         status, _ = request("GET", page)
         check(status == 200, f"GET {page} is 200", str(status))
@@ -90,10 +102,14 @@ def main():
 
     # 2. Admin calls need the token
     status, _ = request("POST", "/repo-jobs/octo-org/hello")
-    check(status == 401, "an admin call without the token is 401", str(status))
+    if PUBLIC:
+        check(status == 404, "admin paths are not reachable from outside (404)", str(status))
+    else:
+        check(status == 401, "an admin call without the token is 401", str(status))
 
     # 3. Webhook: wrong signature, new issue -> report, redelivery, private repo
-    fixture = json.load(open(FIXTURE))
+    with open(FIXTURE) as f:
+        fixture = json.load(f)
     status, _ = webhook("issues", fixture, secret="wrong-secret")
     check(status == 401, "a webhook with a wrong signature is 401", str(status))
 
