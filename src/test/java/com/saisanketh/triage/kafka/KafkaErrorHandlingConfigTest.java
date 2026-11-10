@@ -33,6 +33,12 @@ class KafkaErrorHandlingConfigTest {
     }
 
     @Test
+    void theHandlerPicksThePatientBackOffOnlyForAnUnreachableDatabase() {
+        assertThat(KafkaErrorHandlingConfig.backOffFor(new CannotCreateTransactionException("no connection"))).isNotNull();
+        assertThat(KafkaErrorHandlingConfig.backOffFor(new IllegalStateException("a bug"))).isNull();   // null = default retries
+    }
+
+    @Test
     void theDatabaseBackOffWaitsUpTo30sBetweenTriesForAbout10Minutes() {
         BackOffExecution execution = KafkaErrorHandlingConfig.databaseDownBackOff().start();
         long total = 0;

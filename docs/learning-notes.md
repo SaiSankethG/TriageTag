@@ -2996,7 +2996,10 @@ Full results: docs/stability-report.md.
   processed failed its 3 quick retries in ~15 s and went to the dead-letter topic, so restarting Postgres for 20 s would lose those
   reports. The error handler now picks the back-off by error (`setBackOffFunction`): "database unreachable" (no connection, no
   transaction) waits 1, 2, 4 ... up to 30 s between tries, for up to 10 minutes; anything else keeps the 3 quick retries, because
-  waiting can't fix a bug or bad data. 10 minutes stays under `max.poll.interval.ms` (15 min).
+  waiting can't fix a bug or bad data. Each wait is at most 30 s and is followed by a seek and a fresh poll, so Kafka's poll timer
+  (`max.poll.interval.ms`) restarts each time; the 10 minutes are only when we give up and dead-letter it. Two edge cases, both
+  acceptable: if the error type changes mid-outage the 10 minutes start again (a longer wait, nothing lost), and a connection that
+  drops during a commit shows up as a different exception that only gets the 3 quick retries.
 - **Start-up with the database down.** Flyway needs the database at start-up, so the app exits and k3s restarts it with growing
   delays (CrashLoopBackOff: 10 s, 20 s, 40 s ... up to 5 min) until Postgres is up. Acceptable: Postgres starts in seconds.
 

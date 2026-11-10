@@ -38,8 +38,9 @@ public class KafkaErrorHandlingConfig {
     /**
      * How long a message keeps being retried while the database can't be reached (stability rehearsal, 10 Nov 2026). With the
      * 3 s connection timeout, the normal 3 quick retries gave up after ~15 s and sent the message to the DLT: a Postgres restart
-     * would lose the reports of every message in flight. Now: wait 1, 2, 4 ... up to 30 s between tries, for up to 10 minutes,
-     * which is under max.poll.interval.ms (15 min), so Kafka doesn't think the worker died.
+     * would lose the reports of every message in flight. Now: wait 1, 2, 4 ... up to 30 s between tries, for up to 10 minutes.
+     * Each wait is at most 30 s and is followed by a seek and a fresh poll, so Kafka's poll timer (max.poll.interval.ms) restarts
+     * every time; the 10 minutes are only the point where we give up and send the message to the DLT.
      */
     static final long DATABASE_DOWN_MAX_WAIT_MS = 10 * 60 * 1000;
     static final long DATABASE_DOWN_MAX_INTERVAL_MS = 30_000;
@@ -63,8 +64,9 @@ public class KafkaErrorHandlingConfig {
         };
         DefaultErrorHandler errorHandler = new DefaultErrorHandler(countAndSend, backOff);
         errorHandler.addNotRetryableExceptions(BadIssueEventException.class);
-        // The database can't be reached: wait for it (up to DATABASE_DOWN_MAX_WAIT) instead of giving up after ~4 s of retries.
-        errorHandler.setBackOffFunction((record, exception) -> databaseUnreachable(exception) ? databaseDownBackOff() : null);
+        // The database can't be reached: wait for it (up to DATABASE_DOWN_MAX_WAIT_MS) instead of giving up after the 3 quick
+        // retries (~15 s with the 3 s connection timeout). null = use the default back-off above.
+        errorHandler.setBackOffFunction((record, exception) -> backOffFor(exception));
         return errorHandler;
     }
 
@@ -75,6 +77,11 @@ public class KafkaErrorHandlingConfig {
             cause = cause.getCause();
         }
         return cause.getClass().getSimpleName() + ": " + cause.getMessage();
+    }
+
+    /** The back-off for one failed record: the patient one if the database is unreachable, else null (the default). */
+    static BackOff backOffFor(Exception exception) {
+        return databaseUnreachable(exception) ? databaseDownBackOff() : null;
     }
 
     /** The long, patient back-off for "the database can't be reached". */
