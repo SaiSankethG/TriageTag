@@ -35,8 +35,9 @@ import java.time.Clock;
 @RequiredArgsConstructor
 public class RepoJobRunner {
 
-    /** Shown on a finished job whose repo has no reference docs configured: reports for it have no draft reply. */
-    static final String NO_DOCS_NOTE = "No reference docs are set up for this repository, so its reports have no draft reply.";
+    /** Shown on a finished job whose repo has no reference docs configured (the same wording as the reports page). */
+    static final String NO_DOCS_NOTE = "No reference docs are set up for this repository, so draft replies are based on "
+            + "earlier issues only.";
 
     private final RepoJobRepository jobs;
     private final BackfillService backfill;

@@ -2798,7 +2798,7 @@ job every 5 seconds and does three steps in order:
 1. **BACKFILL**: load every past issue (the same `BackfillService` the admin endpoint uses), writing "issues so far" after each page.
 2. **EMBEDDINGS**: embed the issues that have no vector yet, writing "done of total" after each batch of 256.
 3. **DOCS**: load the reference docs if application.yml lists them for this repo. If it doesn't, the job still finishes (`DONE`) with a
-   note: "no reference docs, so its reports have no draft reply".
+   note: "no reference docs, so draft replies are based on earlier issues only" (wording fixed in the 10 Nov rehearsal).
 Anyone can read the progress at `GET /repos/{owner}/{repo}/job`. The operator can start a job by hand with
 `POST /repo-jobs/{owner}/{repo}` (admin token).
 
