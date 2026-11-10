@@ -180,6 +180,11 @@
                     <image>
                         <name>issue-triage-assistant:${project.version}</name>
                         <imagePlatform>linux/arm64</imagePlatform>
+                        <env>
+                            <!-- Run on Java 21, the project's version. Without this the buildpack picks the JDK that built
+                                 the jar (25 on sai's Mac), found in the 10 Nov 2026 rehearsal. -->
+                            <BP_JVM_VERSION>21</BP_JVM_VERSION>
+                        </env>
                     </image>
                     <excludes>
                         <exclude>

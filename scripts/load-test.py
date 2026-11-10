@@ -5,6 +5,7 @@
 Usage:
     LOADTEST_WEBHOOK_SECRET=<the app's github.webhook-secret> python3 -I scripts/load-test.py http://localhost:8081 500 10
     (base URL, number of webhooks, parallel senders)
+    Add LOADTEST_DB_CONTAINER=<container> when the app under test uses another Postgres than docker-compose's.
 
 - Standard library only (no new dependency). The secret is read from the environment and never printed.
 - The issues are synthetic, numbered 900000+ in spring-projects/spring-boot, so each new issue is searched against the
@@ -80,9 +81,15 @@ def send(i):
     return i, started, time.time() - started, status
 
 
+# Which database to read the results from (and clean up): the docker-compose Postgres by default, or a named container
+# (LOADTEST_DB_CONTAINER, e.g. a rehearsal stack). It must be the database of the app under test, or nothing is found.
+DB_CONTAINER = os.environ.get("LOADTEST_DB_CONTAINER", "")
+PSQL_PREFIX = (["docker", "exec", "-i", DB_CONTAINER] if DB_CONTAINER else ["docker-compose", "exec", "-T", "postgres"])
+
+
 def psql(sql):
-    return subprocess.run(["docker-compose", "exec", "-T", "postgres", "psql", "-U", "copilot", "-d", "triage", "-At",
-                           "-F", "|", "-c", sql], check=True, capture_output=True, text=True).stdout
+    return subprocess.run(PSQL_PREFIX + ["psql", "-U", "copilot", "-d", "triage", "-At", "-F", "|", "-c", sql],
+                          check=True, capture_output=True, text=True).stdout
 
 
 def percentile(values, p):

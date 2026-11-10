@@ -2971,3 +2971,36 @@ changed payload). Failing closed means the worst case is a missed report, not a 
    was public stay until removed; cleanup on "repository made private" or uninstall is a later piece.
 3. *How would you support private repositories properly?* Reports behind a login ("Sign in with GitHub"), showing a repository's
    reports only to users who can see that repository, checked with the GitHub API.
+
+## Stability rehearsal: running it like production before the VM (10 Nov 2026)
+
+**What was done.** The real container image ran on the Mac with the VM's limits (2.5 GB, 2 CPUs), its own Postgres and Kafka, and a
+restored copy of the data. Then every path was checked (`scripts/smoke-test.py`), each dependency was broken on purpose (Kafka down,
+Postgres down, the app killed mid-job, a poison message), and load was applied (500 webhooks in a burst, then a 10-minute soak).
+Full results: docs/stability-report.md.
+
+**The fixes, from the basics.**
+- **Hikari `connection-timeout`.** Hikari is the connection pool: it keeps up to 10 open database connections and lends one to each
+  piece of code that needs it. If none can be had, the caller waits up to `connection-timeout` (default 30 s) and then gets an error.
+  With Postgres down, that meant a 30 s hang on every webhook, longer than GitHub waits (10 s). At 3 s, the webhook fails quickly and
+  GitHub records an error it can redeliver.
+- **`BP_JVM_VERSION`.** Cloud Native Buildpacks build the image without a Dockerfile. One buildpack (BellSoft Liberica) installs a Java
+  runtime, and by default it matches the JDK that compiled the jar. On the Mac that was Java 25, so the image ran 25 while the project
+  says 21. Setting `BP_JVM_VERSION=21` pins it.
+- **`BPL_JVM_HEAD_ROOM`.** At start-up the buildpack's memory calculator splits the container limit into heap, metaspace, code cache
+  and thread stacks. Headroom is the share it leaves for everything else. The default is 0%, but ONNX Runtime (the embedding model)
+  allocates native memory outside the heap. 20% headroom lowers the max heap from 1.97 GB to 1.45 GB. The measured peak was 631 MB in
+  total, so this is a safety margin, not a tuning.
+
+**Rejected alternative.** Testing only on the VM after the deploy. A failure there mixes app bugs with VM, network and DNS problems,
+and fixing it means editing on a server. The rehearsal separates the two: once the app is known to be stable, any problem on the VM
+is about the VM.
+
+### Likely interview questions
+1. *How did you know the app was ready to deploy?* A production rehearsal: the real image with the VM's memory and CPU limits, a
+   restored copy of the data, every path smoke-tested, each dependency broken on purpose, a load test and a soak test. It found 4
+   real problems (30 s hang with the DB down, wrong Java version, no memory headroom, a test script reading the wrong database).
+2. *What happens when Kafka goes down?* Webhooks are still accepted (p95 3 ms) because the transactional outbox stores them in Postgres.
+   When Kafka returns, the relay sends them and every report appears. Nothing is lost.
+3. *Why should liveness stay UP when the database is down?* If liveness failed, Kubernetes would restart the app, which can't fix
+   the database and only adds a restart loop. The app reconnects by itself (tested), so only readiness or alerts should react.
