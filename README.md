@@ -1,6 +1,6 @@
 # TriageTag
 
-**TriageTag** (repository: `issue-triage-assistant`) is a maintainer-side GitHub issue triage assistant. When an issue is opened, it tells the maintainer within seconds, **without posting on GitHub**:
+**TriageTag** ([github.com/SaiSankethG/TriageTag](https://github.com/SaiSankethG/TriageTag)) is a maintainer-side GitHub issue triage assistant. When an issue is opened, it tells the maintainer within seconds, **without posting on GitHub**:
 likely duplicates (with a score and a second check by an LLM), suggested labels, which details the reporter left out, whether a
 similar issue was already fixed in a later version, and a draft reply grounded in the project's docs. Java 21, Spring Boot 4,
 Kafka, PostgreSQL + pgvector, Claude Haiku 5.5, k3s.
@@ -24,7 +24,7 @@ flowchart LR
     W -- "2 narrow questions" --> LLM[Claude Haiku 5.5]
     W -- "fixed in which version?" --> GQL[GitHub GraphQL]
     W -- "triage_report" --> PG
-    PG --> UI[Demo page / REST API]
+    PG --> UI[Reports page / REST API]
     W -. "comment mode, off by default" .-> GH
 ```
 
@@ -86,8 +86,24 @@ Each test issue is searched against the real ~44k spring-boot issues; everything
 | One report with no queue in front of it | 0.23 s |
 
 Real traffic is far lower (spring-boot: ~16 new issues a day over the last 30 days, ~2 from outside the team), so a new issue's report is ready in well under a second plus the
-real LLM calls (~2-5 s on Haiku 5.5). For bursts, the topic has 3 partitions, so 3 listener threads (`concurrency: 3`) would
-roughly triple throughput.
+real LLM calls (~2-5 s on Haiku 5.5). Since then the worker runs 3 threads, one per partition (`triage.worker.concurrency: 3`),
+which more than halved the burst times (next section).
+
+### Stability (production rehearsal, 10 Nov 2026)
+The real container image, limited like the k3s Deployment (2.5 GB, 2 CPUs), with its own Postgres and Kafka and a restored copy
+of the data; every path smoke-tested, each dependency broken on purpose, then load ([docs/stability-report.md](docs/stability-report.md)).
+
+| Test | Result |
+|---|---|
+| 500-webhook burst, 3 workers | 500/500 reports in 24 s; end to end p50 11.1 s / p95 20.3 s (one worker: 23 s / 43 s); peak memory 631 MB of 2.5 GB |
+| 10-minute soak, 2 issues/s | 1,200/1,200 reports; memory flat at ~650 MB after warm-up; no errors |
+| Kafka down | webhooks still accepted (p95 3 ms) via the outbox; all reports made once Kafka was back |
+| Postgres down | webhooks fail in 3 s (inside GitHub's 10 s) and recover without a restart; 45 s outage with 10 messages in flight: 10/10 reports, 0 dead letters |
+| App killed during a repo job | the job is queued again at start-up and finishes |
+| Broken message | to the dead-letter topic, counted; the workers keep going |
+
+The rehearsal found and fixed 6 problems, among them a 30 s hang when the database was down and lost reports during a database
+restart.
 
 ## Run locally
 
@@ -103,7 +119,7 @@ used and the page says so), and `TRIAGE_ADMIN_TOKEN`.
 
 **Admin calls** (everything that changes data or spends tokens: backfill, embeddings, docs, eval, `POST /reports`) need the
 header `X-Admin-Token` with the value of `TRIAGE_ADMIN_TOKEN`; without the env var they answer 503, with a wrong token 401.
-Reading (the demo page, `GET /reports`, search) and the GitHub webhook (own HMAC check) don't need it. Set it before starting the app:
+Reading (the Reports page, `GET /reports`, search) and the GitHub webhook (own HMAC check) don't need it. Set it before starting the app:
 
 ```bash
 export TRIAGE_ADMIN_TOKEN=$(openssl rand -hex 32)
@@ -115,7 +131,7 @@ curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/embeddings/s
 curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/docs/spring-projects/spring-boot                  # docs (~15 s)
 curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/reports/spring-projects/spring-boot/52529         # one report
 curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/eval/spring-projects/spring-boot                  # replay (~3 min)
-./mvnw test                                                                   # 285 tests; Testcontainers for Postgres and Kafka
+./mvnw test                                                                   # 301 tests; Testcontainers for Postgres and Kafka
 ```
 
 **Adding a repository.** When the GitHub App is installed on a repository (or a repository is added to an installation),
@@ -132,12 +148,14 @@ curl localhost:8080/repos/spring-projects/spring-petclinic/job                  
 curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/repo-jobs/spring-projects/spring-petclinic   # queue a job
 ```
 
-On the demo page, **Create report** appears only after pasting the admin token into the "Admin" box (kept in that browser tab
+On the Reports page, **Create report** appears only after pasting the admin token into the "Admin" box (kept in that browser tab
 only); without it, only existing reports can be viewed.
 
-Container image and deployment: `./mvnw spring-boot:build-image` (linux/arm64, buildpacks) and `deploy/k3s/`
-(Postgres and Kafka StatefulSets, the app with startup/liveness/readiness probes, an Ingress that routes only the public paths,
-and a secret *template*).
+Container image and deployment: `./mvnw spring-boot:build-image` (linux/arm64, buildpacks, Java 21) and `deploy/k3s/`
+(Postgres and Kafka StatefulSets, the app with startup/liveness/readiness probes, an HTTPS Ingress that routes only the public
+paths, a nightly `pg_dump` CronJob). Two scripts do the deploy: `deploy/bundle.sh` (Mac: image + data + manifests, no secrets)
+and `deploy/vm-setup.sh` (VM: firewall, k3s, Secrets from environment variables, restore, HTTPS with Let's Encrypt or a
+Cloudflare Tunnel, then `scripts/smoke-test.py`). Steps: [docs/m5-report.md](docs/m5-report.md), STOP B.
 
 ## Design decisions
 
@@ -163,6 +181,7 @@ and a secret *template*).
 
 - The duplicate check and the false-alarm numbers rely on what maintainers *marked*; some "false alarms" are real but unmarked
   duplicates.
-- The "already fixed?" version parsing is Spring Boot-specific; the reference docs are one version (4.1.2).
+- The "already fixed?" hint reads Spring Boot versions only, so other repos' reports show it as "not available"; spring-boot's
+  reference docs are one version (4.1.2), and other repos have none until configured.
 - One replica of each component on one small VM: no high availability.
 - MiniLM reads only ~256 word pieces per text; long issues are judged by their start.
