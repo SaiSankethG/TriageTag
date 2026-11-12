@@ -44,59 +44,34 @@ showed 4 / 24 when I checked. **Check the limit in your console before creating 
    **VM.Standard.A1.Flex**, **2 OCPUs, 12 GB**.
 3. Networking: keep the default VCN/public subnet, **Assign a public IPv4 address**: yes.
 4. **Add SSH keys**: Generate a key pair → **Save private key** (keep it outside the repo) → Create.
-5. Open ports 80/443: the instance's subnet → Security list → **Add Ingress Rules**: source `0.0.0.0/0`, TCP, ports `80` and
-   `443`. Ubuntu images on Oracle also block them in iptables; on the VM run:
-   ```bash
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
-   ```
-   ```bash
-   sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT
-   ```
-   ```bash
-   sudo netfilter-persistent save
-   ```
+5. Open ports 80/443 (only for HTTPS option A, Let's Encrypt): the instance's subnet → Security list → **Add Ingress Rules**:
+   source `0.0.0.0/0`, TCP, ports `80` and `443`. The VM's own firewall (Oracle's Ubuntu images block these ports and also
+   reject forwarded traffic, which would break k3s's internal network) is fixed by `vm-setup.sh` in step 2: nothing to do by hand.
 
-### 2. Install k3s and load the app (~20 min)
-On the VM (`ssh -i <key> ubuntu@<public-ip>`):
+### 2. Install everything with two scripts (~20 min, updated 12 Nov 2026)
+On the Mac, pack the image, the database and the manifests (no secrets) into `~/triage-bundle` (~470 MB):
 ```bash
-curl -sfL https://get.k3s.io | sh -
+deploy/bundle.sh
 ```
+Copy it to the VM:
 ```bash
-sudo k3s kubectl get nodes
+scp -i <key> -r ~/triage-bundle ubuntu@<public-ip>:~
 ```
-On the Mac, build the image and copy it plus the database (so the VM doesn't need a 40-minute backfill):
+On the VM (`ssh -i <key> ubuntu@<public-ip>`), put the secrets in the shell's environment. They become Kubernetes Secrets
+and are never written to a file. Paste them from your password manager; generate new tokens with `openssl rand -hex 32`.
+Keep `POSTGRES_PASSWORD` the same on every run: Postgres only reads it when its volume is new.
 ```bash
-./mvnw -q -DskipTests spring-boot:build-image
+read -rs -p "POSTGRES_PASSWORD: " POSTGRES_PASSWORD; echo; export POSTGRES_PASSWORD
 ```
+Repeat that line for `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`, `TRIAGE_ADMIN_TOKEN` and (optional) `ANTHROPIC_API_KEY`
+(`read -s` keeps them off the screen and out of the shell history). Then run the setup with the public name from step 3:
 ```bash
-docker save issue-triage-assistant:0.0.1-SNAPSHOT | gzip > ~/triage-image.tar.gz
+cd ~/triage-bundle && HOST=<ip-with-dashes>.sslip.io ./vm-setup.sh
 ```
-```bash
-docker-compose exec -T postgres pg_dump -U copilot -Fc triage > ~/triage.dump
-```
-```bash
-scp -i <key> ~/triage-image.tar.gz ~/triage.dump deploy/k3s/*.yaml ubuntu@<public-ip>:~
-```
-On the VM:
-```bash
-gunzip -c triage-image.tar.gz | sudo k3s ctr images import -
-```
-```bash
-cp secret.example.yaml secret.yaml && nano secret.yaml
-```
-(fill in the real values, including `TRIAGE_ADMIN_TOKEN`: generate it with `openssl rand -hex 32` and keep a copy in your
-password manager; never copy `secret.yaml` back into the repo)
-```bash
-sudo k3s kubectl apply -f 00-namespace.yaml -f secret.yaml -f 10-postgres.yaml -f 20-kafka.yaml
-```
-Wait until `sudo k3s kubectl -n triage get pods` shows postgres-0 Running, then restore the data **before** the app starts:
-```bash
-sudo k3s kubectl -n triage exec -i postgres-0 -- pg_restore -U copilot -d triage --no-owner < triage.dump
-```
-```bash
-sudo k3s kubectl apply -f 30-app.yaml
-```
-Check: `sudo k3s kubectl -n triage get pods` (triage-app Ready after ~1 min), then `curl -H 'Host: triage.example.com' localhost/actuator/health`.
+It fixes the firewall (including Oracle's FORWARD reject rule, which otherwise breaks k3s's internal network), installs k3s,
+loads the image, creates the Secrets, starts Postgres and Kafka, restores the dump (only into an empty database, all or
+nothing), turns on HTTPS, starts the app and the nightly backup, waits for `https://<HOST>/actuator/health`, and runs the smoke
+test through the public address. Safe to run again.
 
 **Admin calls on the VM** (backfill, embeddings, docs, eval, creating reports) are not routed by the Ingress at all (only
 `/webhooks/github`, `/`, `/index.html`, `/reports`, `/repos`, `/settings` and `/actuator/health` are public). Reach the app
@@ -150,28 +125,32 @@ is harmless; any other error means the restore is incomplete, so stop and check 
 dump was taken, restore into a fresh database instead (`--clean` only drops what the dump contains).
 Finally remove the helper pod: `sudo k3s kubectl -n triage delete pod backup-shell`.
 
-### 3. HTTPS and a hostname (your choice)
-GitHub can send webhooks to plain http, but it shouldn't. The simplest options: a **Cloudflare Tunnel** (free, HTTPS, no open
-ports needed) or Traefik's built-in Let's Encrypt on a domain you own. Then replace `triage.example.com` in `30-app.yaml`.
-Tell me which, and I'll write the exact config.
+### 3. HTTPS: two options (both ready, 12 Nov 2026)
+| | A. Let's Encrypt (default) | B. Cloudflare Tunnel |
+|---|---|---|
+| Needs | Nothing to buy: `HOST=<ip-with-dashes>.sslip.io` (a free DNS service that answers with the IP in the name), or your own domain with an A record pointing at the VM | A domain whose DNS is on Cloudflare (free plan) |
+| Open ports on the VM | 80 and 443 (Oracle security list + the script's iptables rules) | None: cloudflared connects outwards |
+| Certificate | Traefik gets and renews it (`deploy/https/letsencrypt.yaml`) | Cloudflare's |
+| Run | `HOST=... ./vm-setup.sh` | Set up the tunnel once (the steps are at the top of `deploy/https/cloudflare-tunnel.yaml`), then `HTTPS_MODE=cloudflare CLOUDFLARE_TUNNEL_TOKEN=... HOST=<your hostname> ./vm-setup.sh` |
+
+Either way the Ingress decides which paths are public: admin paths and `/actuator/prometheus` are never reachable from outside.
 
 ### 4. Create the GitHub App (~10 min)
 GitHub → **Settings → Developer settings → GitHub Apps → New GitHub App**:
 - Name e.g. `triage-assistant-sai`; Homepage URL: the repo URL.
-- **Webhook URL**: `https://<your-host>/webhooks/github`; **Webhook secret**: the same `GITHUB_WEBHOOK_SECRET` as in secret.yaml.
+- **Webhook URL**: `https://<your-host>/webhooks/github`; **Webhook secret**: the same value as your `GITHUB_WEBHOOK_SECRET`.
 - **Permissions**: Repository → **Issues: Read and write**; Metadata: Read-only (automatic).
 - **Subscribe to events**: **Issues**. (Installation events need no box: GitHub always sends them to the App's webhook.
   Installing the App on a public repository starts an "Add repository" job; see the README.)
 - **Where can this GitHub App be installed?** "Any account" (public), so maintainers can try it.
 - Create → note the **App ID** → **Generate a private key** (downloads a `.pem`; keep it outside the repo).
 - **Install App** → only on `SaiSankethG/triage-sandbox` for now.
-On the VM:
+Copy the `.pem` to the VM (`scp`), then run the setup again with the App's details added (only what changed is updated):
 ```bash
-sudo k3s kubectl -n triage create secret generic github-app-key --from-file=private-key.pem=<path-to.pem>
+export GITHUB_APP_ID=<the App ID> GITHUB_APP_PRIVATE_KEY_FILE=~/<the-app>.private-key.pem
 ```
-Put the App ID in `secret.yaml` (`GITHUB_APP_ID`), apply it again, and restart the app:
 ```bash
-sudo k3s kubectl -n triage rollout restart deployment/triage-app
+cd ~/triage-bundle && HOST=<same host> ./vm-setup.sh && sudo k3s kubectl -n triage rollout restart deployment/triage-app
 ```
 Comment mode stays off until you turn it on for the sandbox only:
 ```bash
@@ -188,7 +167,7 @@ Script and three duplicate pairs: `docs/demo-script.md`.
 - `docs/m4-results.md` section 4: the 48 confirmed "false alarms": real duplicate, yes or no?
 
 ## Open questions
-1. **HTTPS option** (Cloudflare Tunnel vs Let's Encrypt on a domain), see STOP B step 3.
+1. **HTTPS option**: decided 12 Nov 2026, Let's Encrypt on `<ip>.sslip.io` (or a domain later), see STOP B step 3.
 2. **Prompt v3 is now the default** for drafts; if sai's blind scores prefer v2, switching back is a one-line change.
 3. **Comment mode on a real repo** needs a maintainer to install the App; until then only the sandbox.
 4. ~~The fake LLM's estimated tokens counted in `llm_usage`.~~ Fixed in M6: only real-model tokens use up the daily budget (the

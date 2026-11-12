@@ -3016,3 +3016,33 @@ is about the VM.
    When Kafka returns, the relay sends them and every report appears. Nothing is lost.
 3. *Why should liveness stay UP when the database is down?* If liveness failed, Kubernetes would restart the app, which can't fix
    the database and only adds a restart loop. The app reconnects by itself (tested), so only readiness or alerts should react.
+
+## Deploy in two scripts, HTTPS with Let's Encrypt (12 Nov 2026)
+
+**What it does.** `deploy/bundle.sh` (Mac) packs the container image, a database dump and the manifests into `~/triage-bundle`.
+`deploy/vm-setup.sh` (VM) runs the 7 setup steps in order and can be run again safely: each step checks first (firewall rule
+already there? k3s installed? database already has tables, so no restore?).
+
+**HTTPS from the basics.**
+- **Traefik** is the reverse proxy that comes with k3s. It receives every request on ports 80/443 and passes it to the right Service,
+  following the Ingress rules.
+- **Let's Encrypt** gives free 90-day certificates. To prove you control a name, its server asks for a token over plain HTTP on port
+  80 (the **HTTP-01 challenge**); Traefik answers it by itself. Traefik also renews the certificate before it expires.
+- **sslip.io**: a public DNS service where `129-146-1-2.sslip.io` resolves to `129.146.1.2`. That gives a real DNS name, and so a real
+  certificate, without buying a domain.
+- **HelmChartConfig**: k3s installs Traefik with Helm; this object changes the chart's settings (adds the certificate resolver "le"
+  and a small volume for `acme.json`, so a restart doesn't ask for a new certificate; the limit is 5 per week per name).
+- **Two Ingresses**: the main one listens only on HTTPS (`websecure`) and asks for the "le" certificate. The second one, on plain
+  HTTP, only redirects to HTTPS (a Traefik Middleware) and lists the same public paths, so even a broken redirect can't expose an
+  admin path.
+
+**Rejected alternative.** cert-manager, the usual Kubernetes certificate tool: more powerful (DNS challenges, many issuers), but
+another component to install and run on a 12 GB VM, for one certificate Traefik can already get.
+
+### Likely interview questions
+1. *How does your app get HTTPS?* Traefik (the k3s ingress) has a Let's Encrypt resolver; the Ingress asks for it; Let's Encrypt
+   checks the name over port 80, and Traefik stores and renews the certificate.
+2. *Why is the setup script safe to run twice?* Each step checks the current state first (a firewall rule exists, k3s is installed,
+   the database already has tables) and `kubectl apply` only changes what differs. Running it again fixes a half-finished setup.
+3. *Why ship a database dump instead of loading from GitHub on the VM?* The full backfill plus embeddings took about 18 minutes and
+   thousands of GitHub API calls; a restore takes about a minute and gives exactly the data the evaluation numbers came from.

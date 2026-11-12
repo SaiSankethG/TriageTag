@@ -1,0 +1,28 @@
+# HTTPS option A (the default): Let's Encrypt, using the Traefik that k3s already runs (no cert-manager, no extra software).
+# Option B is cloudflare-tunnel.yaml. This file lives in kube-system, so it is outside deploy/k3s/ (everything there is in the
+# "triage" namespace). vm-setup.sh applies it when HTTPS_MODE=letsencrypt.
+#
+# How it works: Traefik gets a "certificate resolver" named "le". The app's Ingress (deploy/k3s/30-app.yaml) asks for it, so
+# the first HTTPS request for the host makes Traefik prove to Let's Encrypt that it controls that name (the HTTP-01 challenge
+# on port 80) and fetch a free 90-day certificate, renewed automatically. The certificate is kept on a small volume
+# (/data/acme.json), so a restart doesn't ask Let's Encrypt again (it allows 5 certificates per week for the same name).
+#
+# The host needs a DNS name that points at the VM. Without a domain, use <ip-with-dashes>.sslip.io (e.g. 129-146-1-2.sslip.io):
+# a free public DNS service that answers with the IP written in the name.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    additionalArguments:
+      - "--certificatesresolvers.le.acme.storage=/data/acme.json"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+    persistence:
+      enabled: true
+      size: 128Mi
+    # Stop the old Traefik before starting the new one when the settings change, so two pods never share acme.json.
+    updateStrategy:
+      type: Recreate
+      rollingUpdate: null

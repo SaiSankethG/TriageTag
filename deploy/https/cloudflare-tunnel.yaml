@@ -1,0 +1,46 @@
+# HTTPS option B: a Cloudflare Tunnel. Needs a domain whose DNS is managed by Cloudflare (free plan is enough).
+# vm-setup.sh applies it when HTTPS_MODE=cloudflare (option A, the default, is letsencrypt.yaml).
+#
+# How it works: cloudflared runs inside the cluster and opens an OUTBOUND connection to Cloudflare. Visitors and GitHub reach
+# https://<your-hostname> at Cloudflare, which sends the request down that connection. So the VM needs no open ports at all,
+# and Cloudflare handles the certificate.
+#
+# cloudflared forwards to Traefik's HTTPS entry point (not to the app directly), so the Ingress still decides which paths are
+# public and admin paths stay unreachable. Set this up once in the Cloudflare dashboard (Zero Trust -> Networks -> Tunnels ->
+# Create a tunnel -> Cloudflared), then under "Public hostname":
+#   Subdomain/Domain: e.g. triage.your-domain.dev
+#   Service:          HTTPS  traefik.kube-system.svc.cluster.local:443
+#   Additional application settings -> TLS: No TLS Verify = on, Origin Server Name = triage.your-domain.dev
+# Copy the tunnel token into the env var CLOUDFLARE_TUNNEL_TOKEN before running vm-setup.sh (it becomes the Secret below).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: triage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:2025.11.1   # pinned; arm64 and amd64
+          args: ["tunnel", "--no-autoupdate", "--metrics", "0.0.0.0:2000", "run"]
+          env:
+            - name: TUNNEL_TOKEN          # cloudflared reads the token from this variable
+              valueFrom:
+                secretKeyRef:
+                  name: cloudflare-tunnel
+                  key: token
+          livenessProbe:
+            httpGet: { path: /ready, port: 2000 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits: { memory: 256Mi }

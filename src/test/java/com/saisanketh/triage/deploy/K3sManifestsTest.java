@@ -100,17 +100,28 @@ class K3sManifestsTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void theIngressRoutesOnlyPublicPaths() throws IOException {
-        Map<String, Object> ingress = objects("30-app.yaml").stream()
-                .filter(o -> "Ingress".equals(o.get("kind"))).findFirst().orElseThrow();
-        List<Object> rules = (List<Object>) map(ingress.get("spec")).get("rules");
-        List<Object> paths = (List<Object>) map(map(rules.get(0)).get("http")).get("paths");
-        List<String> routed = paths.stream().map(p -> (String) map(p).get("path")).toList();
+    void everyIngressRoutesOnlyPublicPathsAndTheMainOneIsHttpsOnly() throws IOException {
+        List<Map<String, Object>> ingresses = objects("30-app.yaml").stream()
+                .filter(o -> "Ingress".equals(o.get("kind"))).toList();
+        assertThat(ingresses).hasSize(2);   // HTTPS + the http -> https redirect
+        for (Map<String, Object> ingress : ingresses) {
+            List<Object> rules = (List<Object>) map(ingress.get("spec")).get("rules");
+            assertThat(map(rules.get(0)).get("host")).isEqualTo("triage.example.com");   // vm-setup.sh replaces it
+            List<Object> paths = (List<Object>) map(map(rules.get(0)).get("http")).get("paths");
+            List<String> routed = paths.stream().map(p -> (String) map(p).get("path")).toList();
 
-        assertThat(routed).containsExactlyInAnyOrder("/webhooks/github", "/", "/index.html", "/app.html", "/guide.html", "/theme.css", "/theme.js", "/reports", "/repos",
-                "/settings", "/actuator/health");
-        assertThat(routed).noneMatch(p -> p.startsWith("/backfill") || p.startsWith("/eval") || p.startsWith("/embeddings")
-                || p.startsWith("/docs"));
+            assertThat(routed).containsExactlyInAnyOrder("/webhooks/github", "/", "/index.html", "/app.html", "/guide.html",
+                    "/theme.css", "/theme.js", "/reports", "/repos", "/settings", "/actuator/health");
+            assertThat(routed).noneMatch(p -> p.startsWith("/backfill") || p.startsWith("/eval") || p.startsWith("/embeddings")
+                    || p.startsWith("/docs") || p.startsWith("/repo-jobs") || p.startsWith("/actuator/prometheus"));
+        }
+        Map<String, String> https = (Map<String, String>) map(ingresses.get(0).get("metadata")).get("annotations");
+        assertThat(https).containsEntry("traefik.ingress.kubernetes.io/router.entrypoints", "websecure")
+                .containsEntry("traefik.ingress.kubernetes.io/router.tls.certresolver", "le");
+        assertThat(map(ingresses.get(0).get("spec")).get("tls")).isNotNull();
+        Map<String, String> redirect = (Map<String, String>) map(ingresses.get(1).get("metadata")).get("annotations");
+        assertThat(redirect).containsEntry("traefik.ingress.kubernetes.io/router.entrypoints", "web")
+                .containsEntry("traefik.ingress.kubernetes.io/router.middlewares", "triage-redirect-https@kubernetescrd");
     }
 
     @Test
@@ -144,5 +155,30 @@ class K3sManifestsTest {
         String claim = (String) map(map(map(((List<Object>) pod.get("volumes")).get(0)).get("persistentVolumeClaim"))).get("claimName");
         assertThat(backup).anyMatch(o -> "PersistentVolumeClaim".equals(o.get("kind"))
                 && claim.equals(map(o.get("metadata")).get("name")));
+    }
+
+    @Test
+    void vmSetupCreatesEverySecretKeyFromTheEnvironmentAndBundlesNoSecretFile() throws IOException {
+        String setup = Files.readString(Path.of("deploy/vm-setup.sh"));
+        for (String key : map(objects("secret.example.yaml").get(0).get("stringData")).keySet()) {
+            assertThat(setup).as("vm-setup.sh sets " + key).contains("\"" + key + "=$");
+        }
+        assertThat(setup).contains("--from-env-file=/dev/stdin");          // values go through stdin, not the command line
+        String bundle = Files.readString(Path.of("deploy/bundle.sh"));
+        assertThat(bundle).contains("rm -f \"$out/k3s/secret.yaml\"");
+    }
+
+    @Test
+    void bothHttpsOptionsExist() throws IOException {
+        String letsEncrypt = Files.readString(Path.of("deploy/https/letsencrypt.yaml"));
+        assertThat(letsEncrypt).contains("kind: HelmChartConfig", "certificatesresolvers.le.acme.httpchallenge.entrypoint=web");
+        List<Map<String, Object>> tunnel = new ArrayList<>();
+        for (Object doc : new Yaml().loadAll(Files.readString(Path.of("deploy/https/cloudflare-tunnel.yaml")))) {
+            tunnel.add(map(doc));
+        }
+        assertThat(tunnel).extracting(o -> o.get("kind")).containsExactly("Deployment");
+        assertThat(map(tunnel.get(0).get("metadata")).get("namespace")).isEqualTo("triage");
+        assertThat(Files.readString(Path.of("deploy/https/cloudflare-tunnel.yaml")))
+                .contains("cloudflare/cloudflared:2025.11.1", "traefik.kube-system.svc.cluster.local:443");
     }
 }
