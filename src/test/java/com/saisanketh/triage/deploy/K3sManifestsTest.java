@@ -166,6 +166,9 @@ class K3sManifestsTest {
         assertThat(setup).contains("--from-env-file=/dev/stdin");          // values go through stdin, not the command line
         String bundle = Files.readString(Path.of("deploy/bundle.sh"));
         assertThat(bundle).contains("rm -f \"$out/k3s/secret.yaml\"");
+        // Test repositories are left out of the public copy (deleted after the restore, never from the local database).
+        assertThat(bundle).contains("SaiSankethG/triage-sandbox", "hidden-repos.txt");
+        assertThat(setup).contains("done < hidden-repos.txt", "DELETE FROM issue WHERE lower(repo) = lower(:'repo');");
     }
 
     @Test

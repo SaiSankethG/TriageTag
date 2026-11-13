@@ -72,6 +72,9 @@ It fixes the firewall (including Oracle's FORWARD reject rule, which otherwise b
 loads the image, creates the Secrets, starts Postgres and Kafka, restores the dump (only into an empty database, all or
 nothing), turns on HTTPS, starts the app and the nightly backup, waits for `https://<HOST>/actuator/health`, and runs the smoke
 test through the public address. Safe to run again.
+Test repositories are left out of the public copy: `bundle.sh` writes `hidden-repos.txt` (default `SaiSankethG/triage-sandbox`;
+override with `HIDE_REPOS="owner/a owner/b"`), and `vm-setup.sh` deletes their data right after the restore. Your local database
+is never changed.
 
 **Admin calls on the VM** (backfill, embeddings, docs, eval, creating reports) are not routed by the Ingress at all (only
 `/webhooks/github`, `/`, `/index.html`, `/reports`, `/repos`, `/settings` and `/actuator/health` are public). Reach the app

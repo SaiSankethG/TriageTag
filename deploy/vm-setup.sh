@@ -107,6 +107,24 @@ else
   # One transaction, stop at the first error: either everything is restored or nothing is (so a re-run can try again).
   kubectl -n triage exec -i postgres-0 -- pg_restore -U copilot -d triage --no-owner --single-transaction --exit-on-error \
     < triage.dump || fail "the restore failed and was rolled back; the database is still empty"
+  # Test repositories named in hidden-repos.txt (made by bundle.sh) don't go public: delete their data from this copy.
+  # Issues cascade to their embeddings, labels, reports and comments; the rest is matched by repository name.
+  if [ -s hidden-repos.txt ]; then
+    while read -r hidden; do
+      [ -n "$hidden" ] || continue
+      kubectl -n triage exec -i postgres-0 -- psql -U copilot -d triage -q -v ON_ERROR_STOP=1 -v repo="$hidden" <<'SQL'
+BEGIN;
+DELETE FROM issue WHERE lower(repo) = lower(:'repo');
+DELETE FROM doc_chunk WHERE lower(repo) = lower(:'repo');
+DELETE FROM repo_job WHERE lower(repo) = lower(:'repo');
+DELETE FROM repo_setting WHERE lower(repo) = lower(:'repo');
+DELETE FROM webhook_delivery WHERE lower(repo) = lower(:'repo');
+DELETE FROM outbox_event WHERE lower(message_key) LIKE lower(:'repo') || '#%';
+COMMIT;
+SQL
+      echo "Left out of the public copy: $hidden"
+    done < hidden-repos.txt
+  fi
   issues=$(kubectl -n triage exec postgres-0 -- psql -U copilot -d triage -tAc "SELECT count(*) FROM issue")
   echo "Restored: $issues issues."
 fi
