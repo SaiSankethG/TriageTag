@@ -37,7 +37,7 @@ cp scripts/smoke-test.py "$out/scripts/"
 cp src/test/resources/github/webhook-issues-opened.json "$out/fixtures/"
 # Repositories kept out of the public copy (your test repos): vm-setup.sh deletes their data right after the restore.
 # Your local database is not changed. Space-separated; override with HIDE_REPOS="owner/a owner/b" deploy/bundle.sh
-printf '%s\n' ${HIDE_REPOS:-SaiSankethG/triage-sandbox} > "$out/hidden-repos.txt"
+printf '%s\n' ${HIDE_REPOS:-SaiSankethG/triage-sandbox spring-projects/spring-petclinic} > "$out/hidden-repos.txt"
 
 echo
 du -sh "$out"/* | sed 's|'"$out"'/||'

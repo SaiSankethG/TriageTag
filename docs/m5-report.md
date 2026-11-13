@@ -72,7 +72,7 @@ It fixes the firewall (including Oracle's FORWARD reject rule, which otherwise b
 loads the image, creates the Secrets, starts Postgres and Kafka, restores the dump (only into an empty database, all or
 nothing), turns on HTTPS, starts the app and the nightly backup, waits for `https://<HOST>/actuator/health`, and runs the smoke
 test through the public address. Safe to run again.
-Test repositories are left out of the public copy: `bundle.sh` writes `hidden-repos.txt` (default `SaiSankethG/triage-sandbox`;
+Test repositories are left out of the public copy: `bundle.sh` writes `hidden-repos.txt` (default `SaiSankethG/triage-sandbox` and `spring-projects/spring-petclinic`;
 override with `HIDE_REPOS="owner/a owner/b"`), and `vm-setup.sh` deletes their data right after the restore. Your local database
 is never changed.
 
