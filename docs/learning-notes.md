@@ -2673,8 +2673,8 @@ sizes. A test checks the same `.bar-inner` rule is on every page.
 
 ### The look
 One stylesheet, `theme.css`, holds the colours, fonts, grid and motion for all pages (each page links it after its own styles,
-so its tokens win). Warm paper with a faint 24px grid in light mode, ink blue in dark. Instrument Sans for headings and
-text (since Round 19), IBM Plex Mono only in the landing terminal (loaded from Google Fonts; system fonts if they don't load).
+so its tokens win). Warm paper with a faint 24px grid in light mode, ink blue in dark. Geist for headings and
+text (since Round 20; Instrument Sans in Round 19), Geist Mono only in the landing terminal (loaded from Google Fonts; system fonts if they don't load).
 The coloured bands got their own darker shades so white text is at least 4.5:1 contrast in both modes.
 Motion: the tag swings in around its punched hole, list items come in one after another, similarity bars fill, pages
 cross-fade (CSS view transitions, no library). All of it is off under `prefers-reduced-motion: reduce`.

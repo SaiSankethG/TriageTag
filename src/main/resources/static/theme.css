@@ -1,6 +1,6 @@
 /* Shared look for every page: colours, fonts, grain, the hero glow, grid and washes, and the motion rules. Each page links this AFTER its own
-   <style>, so these tokens win. Light = warm paper, dark = ink blue. Fonts: Instrument Sans (headings and text; headings use its
-   narrower width), IBM Plex Mono (only the landing terminal). If the fonts don't load, the system fonts below take over. */
+   <style>, so these tokens win. Light = warm paper, dark = ink blue. Fonts (Round 20): Geist for every
+   heading and text, Geist Mono only in the landing terminal: one family, made for software products. If the fonts don't load, the system fonts below take over. */
 :root {
   --bg: #f3ede1; --paper: #fbf8f1; --paper-2: #f1ebdd; --ink: #1d2433; --muted: #474e5f; --faint: #4a5162;   /* both at least 4.9:1 even where two glows overlap */
   --line: #ddd4c2; --link: #2350a8; --focus: #2350a8; --grid: rgba(35, 80, 168, .06);
@@ -12,9 +12,9 @@
   --glow-1: rgba(192, 57, 43, .04); --glow-2: rgba(200, 138, 10, .05); --glow-3: rgba(47, 95, 158, .04); --glow-4: rgba(47, 125, 79, .035);   /* light: a third of the earlier glow */
   --wash-red: rgba(192, 57, 43, .06); --wash-blue: rgba(47, 95, 158, .06); --wash-green: rgba(47, 125, 79, .06); --wash-amber: rgba(200, 138, 10, .07);
   --grain: .05;
-  --display: "Instrument Sans", "Avenir Next", "Helvetica Neue", sans-serif;
-  --body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --display: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --body: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --condensed: var(--display);
   --sun: none; --moon: inline-block;   /* which icon the theme toggle shows */
 }
