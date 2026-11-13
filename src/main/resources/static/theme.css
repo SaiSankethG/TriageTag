@@ -92,12 +92,14 @@ h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-opti
 .bar .name { font-size: 21px; }
 .bar nav a { font-size: 15px; line-height: 1.6; }
 .bar nav { align-items: center; gap: 32px; }   /* links and the theme toggle on one line, on every page */
+.bar nav a { white-space: nowrap; }   /* Round 21: four links now (GitHub added); never break one over lines */
 /* The header's content sits in a centred 1200px column on every page. Its 40px sides leave 1120px, the same width as the
    landing page content, so the logo's left edge lines up with the headline and the links end where the content ends.
    Defined here, after each page's own rule, so every page matches. Narrower screens (phones) keep 20px sides. */
 .bar .bar-inner { max-width: 1200px; margin: 0 auto; padding: 14px 20px; }
 @media (min-width: 1200px) { .bar .bar-inner { padding-left: 40px; padding-right: 40px; } }
 .bar nav .theme-toggle { margin-left: 4px; }
+@media (max-width: 480px) { .bar nav { gap: 14px; } .bar nav .theme-toggle { margin-left: 0; } }   /* after the rule above, so it wins on phones */
 
 /* Moving between pages: a short cross-fade; the header keeps its place (same box on every page). */
 @view-transition { navigation: auto; }
@@ -128,9 +130,6 @@ h1, h2, h3, .condensed, .name, .verdict { font-family: var(--display); font-opti
   /* The hero glows drift: a slow 40-second loop, barely noticeable, so the page feels alive without moving under the text. */
   .hero-glow::before { animation: drift 40s ease-in-out infinite alternate; }
   @keyframes drift { from { transform: translate3d(-2vmax, -1vmax, 0) rotate(0deg); } to { transform: translate3d(2vmax, 1.5vmax, 0) rotate(6deg); } }
-  /* List items come in one after another; each sets --i (its position) inline. */
-  .stagger > * { animation: rise .42s ease-out both; animation-delay: calc(min(var(--i, 0), 14) * 35ms); }
-  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
   /* Similarity bars fill from zero to their value (--w). */
   .meter > div { animation: fill 0.9s cubic-bezier(.2, .8, .2, 1) both; animation-delay: .25s; }
   @keyframes fill { from { width: 0; } }

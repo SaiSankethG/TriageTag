@@ -23,13 +23,15 @@ class DemoPageTest {
         assertThat(html).contains("'Likely duplicate'", "'Possible duplicate'", "'Needs info'", "'Looks new'", "function whyOf(",
                 "id=\"filters\"", "id=\"open-only\"", "Copy reply", "Duplicate of #", "Open on GitHub", "This issue and its best match");
         assertThat(html).contains("body.reading main { order: -1; }");   // phones: the report first
-        // Priority order with a marker on the top issue; filters in one scrolling row; one-line titles, reason on select/hover.
+        // Priority order with a marker on the top issue; filters wrap so all five show (Round 21); titles, reason on select/hover.
         assertThat(html).contains("const PRIORITY = { likely: 0, possible: 1, info: 2, new: 3 };", "'Look at this first'",
-                "flex-wrap: nowrap;", ".filters:hover, .filters:focus-within { scrollbar-width: thin; }", "title: `#${number} ${title}`", ".list button[aria-current=\"true\"] .y { display: block; }");
+                ".filters { display: flex; flex-wrap: wrap;", "title: `#${number} ${title}`", ".list button[aria-current=\"true\"] .y { display: block; }");
         // UI loop fixes: phones never scroll sideways; the duplicate comment marks, it doesn't close; only the draft is a card.
         assertThat(html).contains("grid-template-columns: minmax(0, 1fr)", "min-width: 0;", "marks the issue as a duplicate on GitHub", "querySelector('[aria-pressed=\"true\"]').focus()",
                 "class: 'plain' }, el('h2', {}, 'This issue and its best match')").doesNotContain("lets GitHub close");
-        assertThat(html).contains("id=\"repo-count\"", "triaged of ${r.issues.toLocaleString()} issues");   // counts under the picker, not cut off inside it
+        // Round 21: code blocks in an issue's text are rendered with textContent only, never as HTML.
+        assertThat(html).contains("function issueText(text)", "el('pre', { class: 'code' }, body)").doesNotContain("innerHTML");
+        assertThat(html).contains("id=\"repo-count\"", "example report${r.triaged === 1 ? '' : 's'} · ${r.issues.toLocaleString()} issues searched");   // counts under the picker, not cut off inside it
         // The public page only reads: no admin token box, no POST.
         assertThat(html).doesNotContain("X-Admin-Token").doesNotContain("admin-token").doesNotContain("method: 'POST'")
                 .doesNotContain("localStorage");
@@ -90,6 +92,6 @@ class DemoPageTest {
         assertThat(themeJs).contains("data-theme", "localStorage").doesNotContainIgnoringCase("token");   // only the light/dark choice is stored
         String theme = new ClassPathResource("static/theme.css").getContentAsString(StandardCharsets.UTF_8);
         assertThat(theme).contains("@media (prefers-reduced-motion: reduce)", "animation: none !important",
-                ":root[data-theme=\"dark\"]", ":root:not([data-theme=\"light\"])", ".bar .bar-inner { max-width: 1200px; margin: 0 auto;", "@keyframes swing", ".stagger", "@keyframes fill", "prefers-color-scheme: dark", ".hero-glow::before", "body::after", "feTurbulence", "@keyframes drift", "--body: \"Geist\"", ".num { font-family: var(--body)", "--mono: \"Geist Mono\"");
+                ":root[data-theme=\"dark\"]", ":root:not([data-theme=\"light\"])", ".bar .bar-inner { max-width: 1200px; margin: 0 auto;", "@keyframes swing", "@keyframes fill", "prefers-color-scheme: dark", ".hero-glow::before", "body::after", "feTurbulence", "@keyframes drift", "--body: \"Geist\"", ".num { font-family: var(--body)", "--mono: \"Geist Mono\"");
     }
 }

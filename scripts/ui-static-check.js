@@ -14,7 +14,8 @@ const theme = read('theme.css');
 for (const page of pages) {
   const html = read(page);
   check(html.includes("family=Geist:") && html.includes("family=Geist+Mono"), `${page}: loads Geist (headings and text) and Geist Mono (terminal)`);
-  check((html.match(/var\(--mono\)/g) || []).length === (page === "index.html" ? 1 : 0), `${page}: monospace only in the landing terminal`);
+  // monospace only where it means code: the landing terminal, and code blocks in a report's issue text (Round 21)
+  check((html.match(/var\(--mono\)/g) || []).length === (page === "index.html" || page === "app.html" ? 1 : 0), `${page}: monospace only in the landing terminal and report code blocks`);
   check(!html.includes('innerHTML'), `${page}: no innerHTML (text goes in with textContent)`);
   check(!/<script src="http/.test(html), `${page}: no external scripts`);
   check(html.includes('<link rel="stylesheet" href="/theme.css">'), `${page}: links the shared theme.css`);
