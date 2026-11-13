@@ -1,6 +1,7 @@
 # Demo video script (2 minutes)
 
-For sai to record at STOP B. Screen: the demo page (`http://<host>/` or `http://localhost:8080/`), one browser window, 1280×800.
+For sai to record. Updated 13 Nov 2026 for a recording on the Mac (no VM yet): the app on `http://localhost:8080`, real GitHub
+events through the GitHub App + smee, one browser window, 1280×800.
 
 ## The three duplicate pairs to show
 
@@ -26,13 +27,13 @@ or `curl -X POST localhost:8080/reports/spring-projects/spring-boot/51234`), and
 
 **0:00–0:15 · The problem.**
 "Open-source maintainers spend hours on new issues: is this a duplicate, what's missing, where's the doc? Spring Boot alone has
-over 43,000 issues. I built an assistant that tells a maintainer, privately and within seconds, what it found."
+over 43,000 issues. I built an assistant that tells a maintainer within seconds what it found, without posting on GitHub."
 
 **0:15–0:35 · How it works (one sentence per box; show the README diagram).**
 "A GitHub webhook comes in, it's saved with an outbox in Postgres and sent through Kafka to a worker. The worker embeds the
 issue, searches earlier issues with pgvector, asks Claude two narrow questions, and stores a report."
 
-**0:35–1:05 · Pair 1.** Open `/?repo=spring-projects/spring-boot&number=52515`.
+**0:35–1:05 · Pair 1.** Open `/app.html?repo=spring-projects/spring-boot&number=52515` (the Reports page).
 "This issue from October 2026 asks for Optional nested properties. The assistant's best match is #15999, from 2019: the same
 problem in different words, already fixed. The report also says what details are missing and drafts a reply the maintainer can
 edit and copy."
@@ -41,11 +42,15 @@ edit and copy."
 "Another real duplicate: the new issue describes the symptom, the old one the cause. The similarity is 85%; the assistant shows it
 as a possible duplicate and lets the maintainer decide."
 
-**1:25–1:50 · The numbers, honestly.**
+**1:25–1:45 · Live, from GitHub.** Open a new issue on `SaiSankethG/triage-sandbox` (prepared title and text, pasted), click
+**Submit new issue**, switch to `/app.html?repo=SaiSankethG/triage-sandbox`, refresh: its report is there a few seconds later.
+"That was a real GitHub webhook from the GitHub App: the report was ready a few seconds after I opened the issue."
+
+**1:45–2:05 · The numbers, honestly.**
 "I measured it on 833 duplicates that maintainers had confirmed, replaying history: the original is in the top 3 for 46%, versus
 26% for keyword search. Public comments are harder: duplicates are only 4% of new issues, so even with Claude checking, most
-comments would be wrong. So it runs in shadow mode by default, and comment mode is opt-in, at 90% plus Claude's agreement."
+comments would be wrong. So by default it only suggests and posts nothing, and comment mode is opt-in, at 90% plus Claude's agreement."
 
-**1:50–2:00 · Close.**
-"Java 21, Spring Boot, Kafka, Postgres with pgvector, Claude Haiku, running on a free ARM VM with k3s. The code, the evaluation
-and the design notes are on GitHub."
+**2:05–2:15 · Close.**
+"Java 21, Spring Boot, Kafka, Postgres with pgvector, Claude Haiku, packaged for k3s and tested under outages and load. The code,
+the evaluation and the design notes are on GitHub."
