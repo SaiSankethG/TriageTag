@@ -157,6 +157,19 @@ paths, a nightly `pg_dump` CronJob). Two scripts do the deploy: `deploy/bundle.s
 and `deploy/vm-setup.sh` (VM: firewall, k3s, Secrets from environment variables, restore, HTTPS with Let's Encrypt or a
 Cloudflare Tunnel, then `scripts/smoke-test.py`). Steps: [docs/m5-report.md](docs/m5-report.md), STOP B.
 
+## How it compares
+
+AI issue triage isn't new: [Dosu](https://github.com/apps/dosubot) offers auto-labelling, issue deduplication and answers from a
+knowledge base for open-source repos, and the [GitHub Copilot app's Automations](https://awesome-copilot.github.com/learning-hub/using-automations-in-copilot-app/)
+include an issue-triage template that runs a Copilot agent when an issue is opened or on a schedule. TriageTag is a portfolio
+project, not a competitor. What it adds is the part those tools don't publish:
+
+- **Measured quality.** Recall against maintainer-confirmed duplicates (833 pairs, with a keyword baseline) and false-alarm rates
+  on non-duplicates, so the default behaviour (suggest only, never auto-comment) follows from the data.
+- **The engineering in the open.** Webhook intake, transactional outbox, Kafka workers, pgvector search, a cost guard, and
+  failure tests (database and Kafka outages, load, soak), all in this repository.
+- **Low cost per report.** About $0.001 on Claude Haiku 5.5 (1 to 3 short calls), with similar-issue search and labels needing no AI at all.
+
 ## Design decisions
 
 - **PostgreSQL + pgvector, not Cassandra or MongoDB.** The data is relational (issues, labels, reports, deliveries) and small
