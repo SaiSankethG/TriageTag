@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# One-command setup of TriageTag on the VM (Oracle Ubuntu 24.04, run as "ubuntu" from inside ~/triage-bundle).
+# One-command setup of TriageTag on the VM (Ubuntu 24.04 on Google Cloud or Oracle, run from inside ~/triage-bundle).
 # Safe to run again: every step checks first, and `kubectl apply` only changes what differs.
 #
-#   1. firewall: Oracle's images block ports 80/443 and reject forwarded traffic (which breaks k3s's pod network)
+#   1. firewall: Oracle's images block ports 80/443 and reject forwarded traffic (which breaks k3s's pod network);
+#      Google Cloud's images don't (its firewall is the VPC rule "allow HTTP/HTTPS"), so there this step changes nothing
 #   2. installs k3s (one-node Kubernetes) if it isn't there
 #   3. loads the app's container image into k3s
 #   4. creates the Kubernetes Secrets from YOUR environment variables (nothing secret is stored in a file), starts Postgres and Kafka
@@ -49,7 +50,10 @@ if sudo iptables -C FORWARD -j REJECT --reject-with icmp-host-prohibited 2>/dev/
   sudo iptables -D FORWARD -j REJECT --reject-with icmp-host-prohibited
   changed=1
 fi
-if [ "$HTTPS_MODE" = letsencrypt ]; then   # a Cloudflare Tunnel connects outwards: no inbound ports needed
+# Only Oracle's images end INPUT with a REJECT rule; elsewhere (Google Cloud) INPUT is empty and accepts everything.
+oracle_input=0
+sudo iptables -C INPUT -j REJECT --reject-with icmp-host-prohibited 2>/dev/null && oracle_input=1
+if [ "$HTTPS_MODE" = letsencrypt ] && [ "$oracle_input" = 1 ]; then   # a Cloudflare Tunnel connects outwards: no inbound ports needed
   for port in 80 443; do
     if ! sudo iptables -C INPUT -m state --state NEW -p tcp --dport "$port" -j ACCEPT 2>/dev/null; then
       sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport "$port" -j ACCEPT
@@ -59,7 +63,9 @@ if [ "$HTTPS_MODE" = letsencrypt ]; then   # a Cloudflare Tunnel connects outwar
   echo "Also needed once, in the Oracle console: the subnet's security list allows TCP 80 and 443 from 0.0.0.0/0."
 fi
 # Save only when this script changed something (normally the first run, before k3s adds its own rules, which must not be saved).
-[ "$changed" = 0 ] || sudo netfilter-persistent save >/dev/null
+if [ "$changed" = 1 ] && command -v netfilter-persistent >/dev/null; then sudo netfilter-persistent save >/dev/null; fi
+[ "$HTTPS_MODE" != letsencrypt ] || [ "$oracle_input" = 1 ] \
+  || echo "Google Cloud: the VM needs the firewall rule for TCP 80 and 443 (tick \"Allow HTTP/HTTPS traffic\" on the VM)."
 echo "Firewall ready."
 
 step "2/7 k3s"
@@ -161,7 +167,7 @@ done
 if [ "$code" != "200" ]; then
   echo "https://$HOST/actuator/health did not answer 200 (last: ${code:-none}). Check:" >&2
   if [ "$HTTPS_MODE" = letsencrypt ]; then
-    echo "  the Oracle security list (80/443), that $HOST points at this VM, and" >&2
+    echo "  the cloud firewall (Oracle security list or GCP \"Allow HTTP/HTTPS\"), that $HOST points at this VM, and" >&2
     echo "  sudo k3s kubectl -n kube-system logs deploy/traefik | tail -30" >&2
     echo "  (Also try https://$HOST from your Mac: some networks don't route a VM's own public IP back to itself.)" >&2
   else
