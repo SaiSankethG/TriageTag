@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Run on the Mac. Packs everything the VM needs into one folder, so the VM never has to build anything or backfill for an hour:
-#   1. the container image (built with ./mvnw spring-boot:build-image, arm64 like the VM), saved as a .tar.gz
+#   1. the container image (built with ./mvnw spring-boot:build-image for the VM's CPU), saved as a .tar.gz
 #   2. a dump of the local database (the 44k spring-boot issues, embeddings, docs, reports), in pg_dump's custom format
 #   3. the k3s manifests, the HTTPS config, vm-setup.sh and the smoke test
 # No secrets go into the bundle: vm-setup.sh creates the Kubernetes Secrets from environment variables on the VM.
 #
-# Usage:   deploy/bundle.sh            (writes ~/triage-bundle/)
+# Usage:   deploy/bundle.sh            (writes ~/triage-bundle/; image for an ARM VM)
+#          PLATFORM=linux/amd64 deploy/bundle.sh   (for an Intel/AMD VM, e.g. AWS m7i-flex; slower: emulated build)
 # Then:    scp -i <key> -r ~/triage-bundle ubuntu@<vm-ip>:~
 set -euo pipefail
 
@@ -16,8 +17,9 @@ image=$(grep -o 'docker.io/library/issue-triage-assistant:[^" ]*' deploy/k3s/30-
 rm -rf "$out/k3s" "$out/https" "$out/scripts" "$out/fixtures"   # no leftovers from an earlier bundle
 mkdir -p "$out/k3s" "$out/https" "$out/scripts" "$out/fixtures"
 
-echo "1/3 Building the image $image (a few minutes)..."
-./mvnw -q -DskipTests spring-boot:build-image
+platform="${PLATFORM:-linux/arm64}"
+echo "1/3 Building the image $image for $platform (a few minutes)..."
+./mvnw -q -DskipTests -Dimage.platform="$platform" spring-boot:build-image
 docker save "$image" | gzip > "$out/triage-image.tar.gz"
 
 echo "2/3 Dumping the local database..."

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-command setup of TriageTag on the VM (Ubuntu 24.04 on Google Cloud or Oracle, run from inside ~/triage-bundle).
+# One-command setup of TriageTag on the VM (Ubuntu 24.04 on AWS, Google Cloud or Oracle, run from inside ~/triage-bundle).
 # Safe to run again: every step checks first, and `kubectl apply` only changes what differs.
 #
 #   1. firewall: Oracle's images block ports 80/443 and reject forwarded traffic (which breaks k3s's pod network);
@@ -50,7 +50,7 @@ if sudo iptables -C FORWARD -j REJECT --reject-with icmp-host-prohibited 2>/dev/
   sudo iptables -D FORWARD -j REJECT --reject-with icmp-host-prohibited
   changed=1
 fi
-# Only Oracle's images end INPUT with a REJECT rule; elsewhere (Google Cloud) INPUT is empty and accepts everything.
+# Only Oracle's images end INPUT with a REJECT rule; elsewhere (AWS, Google Cloud) INPUT is empty and accepts everything.
 oracle_input=0
 sudo iptables -C INPUT -j REJECT --reject-with icmp-host-prohibited 2>/dev/null && oracle_input=1
 if [ "$HTTPS_MODE" = letsencrypt ] && [ "$oracle_input" = 1 ]; then   # a Cloudflare Tunnel connects outwards: no inbound ports needed
@@ -65,7 +65,7 @@ fi
 # Save only when this script changed something (normally the first run, before k3s adds its own rules, which must not be saved).
 if [ "$changed" = 1 ] && command -v netfilter-persistent >/dev/null; then sudo netfilter-persistent save >/dev/null; fi
 [ "$HTTPS_MODE" != letsencrypt ] || [ "$oracle_input" = 1 ] \
-  || echo "Google Cloud: the VM needs the firewall rule for TCP 80 and 443 (tick \"Allow HTTP/HTTPS traffic\" on the VM)."
+  || echo "Not Oracle: the cloud firewall must allow TCP 80 and 443 (AWS: the security group; Google Cloud: \"Allow HTTP/HTTPS traffic\")."
 echo "Firewall ready."
 
 step "2/7 k3s"
@@ -167,7 +167,7 @@ done
 if [ "$code" != "200" ]; then
   echo "https://$HOST/actuator/health did not answer 200 (last: ${code:-none}). Check:" >&2
   if [ "$HTTPS_MODE" = letsencrypt ]; then
-    echo "  the cloud firewall (Oracle security list or GCP \"Allow HTTP/HTTPS\"), that $HOST points at this VM, and" >&2
+    echo "  the cloud firewall (Oracle security list, AWS security group or GCP \"Allow HTTP/HTTPS\"), that $HOST points at this VM, and" >&2
     echo "  sudo k3s kubectl -n kube-system logs deploy/traefik | tail -30" >&2
     echo "  (Also try https://$HOST from your Mac: some networks don't route a VM's own public IP back to itself.)" >&2
   else

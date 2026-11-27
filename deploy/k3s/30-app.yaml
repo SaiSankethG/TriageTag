@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
         - name: app
-          # Built on the Mac with ./mvnw spring-boot:build-image (linux/arm64) and imported into k3s
+          # Built on the Mac with ./mvnw spring-boot:build-image (linux/arm64 by default; -Dimage.platform=linux/amd64 for Intel VMs) and imported into k3s
           # (docker save | gzip, copy to the VM, sudo k3s ctr images import): no registry needed.
           image: docker.io/library/issue-triage-assistant:0.0.1-SNAPSHOT
           imagePullPolicy: IfNotPresent

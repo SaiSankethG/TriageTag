@@ -151,7 +151,7 @@ curl -X POST -H "X-Admin-Token: $TRIAGE_ADMIN_TOKEN" localhost:8080/repo-jobs/sp
 On the Reports page, **Create report** appears only after pasting the admin token into the "Admin" box (kept in that browser tab
 only); without it, only existing reports can be viewed.
 
-Container image and deployment: `./mvnw spring-boot:build-image` (linux/arm64, buildpacks, Java 21) and `deploy/k3s/`
+Container image and deployment: `./mvnw spring-boot:build-image` (linux/arm64 by default, `-Dimage.platform=linux/amd64` for Intel VMs; buildpacks, Java 21) and `deploy/k3s/`
 (Postgres and Kafka StatefulSets, the app with startup/liveness/readiness probes, an HTTPS Ingress that routes only the public
 paths, a nightly `pg_dump` CronJob). Two scripts do the deploy: `deploy/bundle.sh` (Mac: image + data + manifests, no secrets)
 and `deploy/vm-setup.sh` (VM: firewall, k3s, Secrets from environment variables, restore, HTTPS with Let's Encrypt or a
